@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:tunnel": "tsx scripts/dev-tunnel.ts",
+    "postinstall": "prisma generate",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -89,5 +90,14 @@
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
-  }
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "esbuild",
+      "prisma",
+      "sharp"
+    ]
+  },
+  "packageManager": "pnpm@10.10.0+sha512.d615db246fe70f25dcfea6d8d73dee782ce23e2245e3c4f6f888249fb568149318637dca73c2c5c8ef2a4ca0d5657fb9567188bfab47f566d1ee6ce987815c39"
 }
