@@ -3,6 +3,7 @@
 import type { CartItem, Product } from '@/lib/types'
 import { useCart } from '@/lib/store'
 import { EmptyState } from '@/components/shared/empty-state'
+import { CartItemSkeleton, LoadingSkeleton, ProductCardSkeleton } from '@/components/shared/loading'
 import { MenuSectionHeader } from '@/components/customer/menu-section-header'
 import { MenuGridProductCard } from '@/components/customer/menu-grid-product-card'
 import { MenuListProductCard } from '@/components/customer/menu-list-product-card'
@@ -17,6 +18,7 @@ interface MenuSection {
 }
 
 interface MenuContentProps {
+  isLoading: boolean
   isSearchMode: boolean
   searchResults: Product[]
   selectedCategory: MenuCategoryId
@@ -33,6 +35,7 @@ interface MenuContentProps {
 }
 
 export function MenuContent({
+  isLoading,
   isSearchMode,
   searchResults,
   selectedCategory,
@@ -54,7 +57,11 @@ export function MenuContent({
         isSearchMode ? '-mt-1 py-4' : '-mt-2 pt-14 pb-4',
       )}
     >
-      {isSearchMode ? (
+      {isLoading ? (
+        <MenuLoadingSkeleton
+          variant={isSearchMode || selectedCategory !== 'all' ? 'list' : 'grid'}
+        />
+      ) : isSearchMode ? (
         <SearchResults
           results={searchResults}
           items={items}
@@ -86,6 +93,39 @@ export function MenuContent({
         />
       )}
     </main>
+  )
+}
+
+function MenuLoadingSkeleton({ variant }: { variant: 'grid' | 'list' }) {
+  if (variant === 'list') {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <CartItemSkeleton key={index} />
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-8">
+      {Array.from({ length: 2 }).map((_, sectionIndex) => (
+        <div key={sectionIndex} className="space-y-4">
+          <div className="flex items-center gap-3">
+            <LoadingSkeleton className="h-12 w-12 shrink-0 rounded-2xl" />
+            <div className="space-y-2">
+              <LoadingSkeleton className="h-4 w-28" />
+              <LoadingSkeleton className="h-3 w-20" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <ProductCardSkeleton key={index} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }
 

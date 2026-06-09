@@ -15,7 +15,7 @@ export function LoadingScreen() {
 
 export function LoadingSkeleton({ className }: { className?: string }) {
   return (
-    <div className={`animate-pulse rounded-lg bg-muted ${className}`} />
+    <div className={`animate-pulse rounded-lg bg-[#E8EBEA] ${className}`} />
   )
 }
 
@@ -62,5 +62,115 @@ export function TableCardSkeleton() {
         <LoadingSkeleton className="h-4 w-24" />
       </div>
     </div>
+  )
+}
+
+export function CartItemSkeleton() {
+  return (
+    <div className="flex gap-3 rounded-2xl border border-black/8 bg-white p-3 shadow-sm">
+      <LoadingSkeleton className="h-[88px] w-[88px] shrink-0 rounded-xl md:h-[96px] md:w-[96px]" />
+      <div className="flex flex-1 flex-col gap-2 pt-1">
+        <LoadingSkeleton className="h-4 w-2/3" />
+        <LoadingSkeleton className="h-3 w-full" />
+        <LoadingSkeleton className="h-3 w-4/5" />
+        <LoadingSkeleton className="mt-auto h-8 w-28 rounded-full" />
+      </div>
+    </div>
+  )
+}
+
+export function LandingProductCardSkeleton({
+  variant = 'default',
+}: {
+  variant?: 'default' | 'on-teal'
+}) {
+  return (
+    <div
+      className={`flex h-full w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-black/8 shadow-sm md:rounded-3xl ${
+        variant === 'on-teal' ? 'bg-white/95' : 'bg-white'
+      }`}
+    >
+      <LoadingSkeleton className="aspect-4/3 w-full shrink-0 rounded-none" />
+      <div className="flex flex-1 flex-col p-3 md:p-4">
+        <LoadingSkeleton className="h-4 w-3/4" />
+        <LoadingSkeleton className="mt-2 h-3 w-full" />
+        <LoadingSkeleton className="mt-1 h-3 w-4/5" />
+        <LoadingSkeleton className="mt-2 h-4 w-1/4" />
+        <div className="mt-auto flex items-center justify-center gap-2 pt-2">
+          <LoadingSkeleton className="h-8 w-8 rounded-full" />
+          <LoadingSkeleton className="h-4 w-10" />
+          <LoadingSkeleton className="h-8 w-8 rounded-full" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function LandingCarouselSkeleton({
+  variant = 'default',
+}: {
+  variant?: 'default' | 'on-teal'
+}) {
+  return (
+    <div className="relative w-full px-7 md:px-9">
+      <div className="-ml-3 flex items-stretch md:-ml-4">
+        {Array.from({ length: 2 }).map((_, index) => (
+          <div
+            key={index}
+            className="flex min-w-0 basis-[calc(50%-0.375rem)] pl-3 md:basis-[calc(33.333%-0.75rem)] md:pl-4 lg:basis-[calc(25%-0.75rem)]"
+          >
+            <LandingProductCardSkeleton variant={variant} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export function LandingFooterSkeleton() {
+  return (
+    <div className="grid grid-cols-3 gap-2 md:gap-8 lg:gap-12">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div key={index} className="flex flex-col items-center text-center">
+          <LoadingSkeleton className="mb-2 h-5 w-5 rounded-full md:mb-3 md:h-6 md:w-6" />
+          <LoadingSkeleton className="h-3 w-16 md:h-4 md:w-20" />
+          <LoadingSkeleton className="mt-2 h-3 w-full max-w-[120px] md:mt-3" />
+          <LoadingSkeleton className="mt-2 h-5 w-20 rounded-full md:mt-3 md:w-24" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function CheckoutFormSkeleton() {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div key={index}>
+          {index > 0 && <div className="border-t border-black/8" />}
+          <div className="flex gap-3 p-4">
+            <LoadingSkeleton className="h-10 w-10 shrink-0 rounded-full" />
+            <div className="flex flex-1 flex-col gap-2">
+              <LoadingSkeleton className="h-4 w-40" />
+              <LoadingSkeleton className="h-3 w-full" />
+              <LoadingSkeleton className="h-3 w-3/4" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function CheckoutLoadingSkeleton({ itemCount = 2 }: { itemCount?: number }) {
+  return (
+    <>
+      <div className="space-y-3">
+        {Array.from({ length: itemCount }).map((_, index) => (
+          <CartItemSkeleton key={index} />
+        ))}
+      </div>
+      <CheckoutFormSkeleton />
+    </>
   )
 }

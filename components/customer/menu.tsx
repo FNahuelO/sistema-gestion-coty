@@ -7,7 +7,7 @@ import { MenuContent } from '@/components/customer/menu-content'
 import { ProductDetailModal } from '@/components/customer/product-detail-modal'
 
 export function MenuPage() {
-  const { products } = useCatalog()
+  const { products, isLoading } = useCatalog()
   const { items, itemCount, total, addItem, removeItem, updateQuantity } = useCart()
 
   const {
@@ -36,6 +36,7 @@ export function MenuPage() {
       />
 
       <MenuContent
+        isLoading={isLoading}
         isSearchMode={isSearchMode}
         searchResults={searchResults}
         selectedCategory={selectedCategory}

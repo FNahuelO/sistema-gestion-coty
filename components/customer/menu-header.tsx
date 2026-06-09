@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Search, X, ShoppingBag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MenuCategoryNav } from '@/components/customer/menu-category-nav'
-import { COTY_HEADER, COTY_TEAL, LOGO_SRC, formatPrice } from '@/lib/coty-theme'
+import { COTY_HEADER, COTY_TEAL, LOGO_SRC_SVG, formatPrice } from '@/lib/coty-theme'
 import type { MenuCategoryId } from '@/lib/menu-categories'
 
 interface MenuHeaderProps {
@@ -32,9 +32,9 @@ export function MenuHeader({
       >
         <Link href="/" className="mb-4 flex justify-center">
           <img
-            src={LOGO_SRC}
+            src={LOGO_SRC_SVG}
             alt="Coty Café"
-            className="h-20 w-auto object-contain mix-blend-screen md:h-24"
+            className="w-auto h-full object-contain mix-blend-screen"
           />
         </Link>
 

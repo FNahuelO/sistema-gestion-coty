@@ -128,6 +128,7 @@ async function sendJson<T>(url: string, method: string, body?: unknown): Promise
 
 interface CartContextType {
   items: CartItem[]
+  hydrated: boolean
   addItem: (product: Product, quantity: number, selectedOptions: SelectedOption[], notes?: string) => void
   removeItem: (itemId: string) => void
   updateQuantity: (itemId: string, quantity: number) => void
@@ -236,7 +237,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const itemCount = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items])
 
   return (
-    <CartContext.Provider value={{ items, addItem, removeItem, updateQuantity, clearCart, total, itemCount }}>
+    <CartContext.Provider value={{ items, hydrated, addItem, removeItem, updateQuantity, clearCart, total, itemCount }}>
       {children}
     </CartContext.Provider>
   )

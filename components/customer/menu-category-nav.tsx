@@ -29,7 +29,7 @@ interface MenuCategoryNavProps {
 export function MenuCategoryNav({ selected, onSelect }: MenuCategoryNavProps) {
   return (
     <div className="-mx-1 overflow-x-auto scrollbar-hide">
-      <div className="flex min-w-max gap-4 px-1">
+      <div className="flex min-w-max px-1">
         {MENU_CATEGORIES.map((category) => {
           const Icon = CATEGORY_ICONS[category.id]
           const isActive = selected === category.id

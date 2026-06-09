@@ -25,6 +25,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { SimpleModal } from '@/components/ui/simple-modal'
 import { useCart, useBusiness, useOrders } from '@/lib/store'
 import { CartProductCard } from '@/components/customer/cart-product-card'
+import { CheckoutFormSkeleton, CheckoutLoadingSkeleton, LoadingSkeleton } from '@/components/shared/loading'
 import { COTY_HEADER, COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
 import { cn } from '@/lib/utils'
 import type { OrderType, PaymentMethod, Order } from '@/lib/types'
@@ -88,8 +89,8 @@ function CheckoutSection({
 
 export function CheckoutPage() {
   const pathname = usePathname()
-  const { items, total, updateQuantity, removeItem, clearCart } = useCart()
-  const { settings } = useBusiness()
+  const { items, total, hydrated, updateQuantity, removeItem, clearCart } = useCart()
+  const { settings, isLoading: isSettingsLoading } = useBusiness()
   const { addOrder } = useOrders()
 
   const [orderType, setOrderType] = useState<OrderType>('pickup')
@@ -222,7 +223,19 @@ ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`
 
   return (
     <>
-      {isEmpty ? (
+      {!hydrated ? (
+        <div className="coly-landing min-h-screen bg-white pb-36">
+          <CheckoutHeader />
+          <CheckoutMain className="space-y-3 pb-4 pt-2">
+            <CheckoutLoadingSkeleton />
+          </CheckoutMain>
+          <div className="fixed bottom-[72px] left-0 right-0 z-40 px-4">
+            <div className="mx-auto max-w-lg">
+              <LoadingSkeleton className="h-14 w-full rounded-full" />
+            </div>
+          </div>
+        </div>
+      ) : isEmpty ? (
         <div className="coly-landing min-h-screen bg-white pb-24">
           <CheckoutHeader />
 
@@ -297,6 +310,9 @@ ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`
               />
             ))}
 
+            {isSettingsLoading ? (
+              <CheckoutFormSkeleton />
+            ) : (
             <div className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm">
               <CheckoutSection
                 icon={<MessageSquare className="h-5 w-5 text-white" />}
@@ -382,10 +398,14 @@ ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`
                 </div>
               </CheckoutSection>
             </div>
+            )}
           </CheckoutMain>
 
           <div className="fixed bottom-[72px] left-0 right-0 z-40 px-4">
             <div className="mx-auto max-w-lg">
+              {isSettingsLoading ? (
+                <LoadingSkeleton className="h-14 w-full rounded-full" />
+              ) : (
               <button
                 type="button"
                 onClick={() => setConfirmOpen(true)}
@@ -397,6 +417,7 @@ ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`
                   <ArrowRight className="h-5 w-5" style={{ color: COTY_TEAL }} />
                 </span>
               </button>
+              )}
             </div>
           </div>
         </div>
