@@ -28,8 +28,8 @@ interface MenuCategoryNavProps {
 
 export function MenuCategoryNav({ selected, onSelect }: MenuCategoryNavProps) {
   return (
-    <div className="-mx-1 overflow-x-auto scrollbar-hide">
-      <div className="flex min-w-max px-1">
+    <div className="-mx-1 overflow-x-auto scrollbar-hide md:mx-0 md:overflow-visible">
+      <div className="flex min-w-max px-1 md:min-w-0 md:justify-center md:gap-2 lg:gap-3">
         {MENU_CATEGORIES.map((category) => {
           const Icon = CATEGORY_ICONS[category.id]
           const isActive = selected === category.id
@@ -39,11 +39,11 @@ export function MenuCategoryNav({ selected, onSelect }: MenuCategoryNavProps) {
               key={category.id}
               type="button"
               onClick={() => onSelect(category.id)}
-              className="flex w-[72px] shrink-0 flex-col items-center gap-2"
+              className="flex w-[72px] shrink-0 flex-col items-center gap-2 md:w-20 lg:w-[88px]"
             >
               <div
                 className={cn(
-                  'flex h-14 w-14 items-center justify-center rounded-2xl shadow-md transition-colors'
+                  'flex h-14 w-14 items-center justify-center rounded-2xl shadow-md transition-colors md:h-16 md:w-16'
                 )}
                 style={{
                   backgroundColor: isActive ? '#6BACA5' : '#2E514E',
@@ -57,7 +57,7 @@ export function MenuCategoryNav({ selected, onSelect }: MenuCategoryNavProps) {
                   strokeWidth={1.75}
                 />
               </div>
-              <span className="text-center text-[10px] font-medium leading-tight text-gray-900">
+              <span className="text-center text-[10px] font-medium leading-tight text-gray-900 md:text-xs">
                 {category.name}
               </span>
             </button>

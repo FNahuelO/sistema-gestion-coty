@@ -25,7 +25,7 @@ export function MenuPage() {
   } = useMenuFilters(products)
 
   return (
-    <div className="coly-landing min-h-screen bg-white pb-24">
+    <div className="coly-landing min-h-screen bg-white pb-24 md:pb-10">
       <MenuHeader
         searchQuery={searchQuery}
         isSearchMode={isSearchMode}

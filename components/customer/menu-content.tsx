@@ -53,8 +53,8 @@ export function MenuContent({
   return (
     <main
       className={cn(
-        'relative z-10 mx-auto max-w-lg rounded-t-[1.75rem] bg-white px-4 md:rounded-t-4xl',
-        isSearchMode ? '-mt-1 py-4' : '-mt-2 pt-14 pb-4',
+        'relative z-10 mx-auto w-full max-w-lg rounded-t-[1.75rem] bg-white px-4 md:max-w-4xl md:rounded-t-4xl md:px-6 lg:max-w-6xl lg:px-8',
+        isSearchMode ? '-mt-1 py-4 md:py-6' : '-mt-2 pt-14 pb-4 md:pt-16 md:pb-8',
       )}
     >
       {isLoading ? (
@@ -158,7 +158,7 @@ function SearchResults({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3">
       {results.map((product) => (
         <MenuListProductCard
           key={product.id}
@@ -208,7 +208,7 @@ function AllCategoriesView({
               name={section.name}
               count={section.products.length}
             />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
               {section.products.map((product) => (
                 <MenuGridProductCard
                   key={product.id}
@@ -271,7 +271,7 @@ function SingleCategoryView({
           className="mb-4"
         />
       )}
-      <div className="space-y-3">
+      <div className="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3">
         {products.map((product) => (
           <MenuListProductCard
             key={product.id}

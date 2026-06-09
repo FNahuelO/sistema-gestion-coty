@@ -112,7 +112,7 @@ export function LandingCarouselSkeleton({
   variant?: 'default' | 'on-teal'
 }) {
   return (
-    <div className="relative w-full px-7 md:px-9">
+    <div className="relative w-full px-7 md:px-0 lg:px-2">
       <div className="-ml-3 flex items-stretch md:-ml-4">
         {Array.from({ length: 2 }).map((_, index) => (
           <div

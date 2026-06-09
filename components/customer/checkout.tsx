@@ -30,16 +30,21 @@ import { COTY_HEADER, COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-the
 import { cn } from '@/lib/utils'
 import type { OrderType, PaymentMethod, Order } from '@/lib/types'
 import { toast } from 'sonner'
+import Image from 'next/image'
 
 function CheckoutHeader() {
   return (
-    <header
-      className="mx-auto max-w-lg rounded-b-4xl px-4 pb-14 pt-10 text-center md:rounded-b-[2.5rem]"
+    <div
+      className="w-full rounded-b-4xl md:rounded-b-[2.5rem]"
       style={{ backgroundColor: COTY_HEADER }}
     >
-      <h1 className="text-xl font-bold text-white md:text-2xl">Mi pedido</h1>
-      <p className="mt-1 text-sm text-white/80">Revisá tu orden antes de confirmar</p>
-    </header>
+      <header className="mx-auto max-w-lg px-4 pb-14 pt-10 text-center md:max-w-4xl md:pb-12 md:pt-12 lg:max-w-6xl">
+        <h1 className="text-xl font-bold text-white md:text-2xl">Mi pedido</h1>
+        <p className="mt-1 text-sm text-white/80 md:text-base">
+          Revisá tu orden antes de confirmar
+        </p>
+      </header>
+    </div>
   )
 }
 
@@ -53,7 +58,7 @@ function CheckoutMain({
   return (
     <main
       className={cn(
-        'relative z-10 mx-auto -mt-10 max-w-lg rounded-t-[1.75rem] bg-white px-4 md:rounded-t-4xl',
+        'relative z-10 mx-auto w-full max-w-lg px-4 md:max-w-4xl md:px-6 lg:max-w-6xl lg:px-8',
         className
       )}
     >
@@ -236,10 +241,10 @@ ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`
           </div>
         </div>
       ) : isEmpty ? (
-        <div className="coly-landing min-h-screen bg-white pb-24">
+        <div className="coly-landing min-h-screen bg-white pb-24 md:pb-10">
           <CheckoutHeader />
 
-          <CheckoutMain className="py-12">
+          <CheckoutMain className="py-12 md:py-16">
             <div className="flex flex-col items-center text-center">
               <div
                 className="mb-6 flex h-20 w-20 items-center justify-center rounded-full"
@@ -263,10 +268,10 @@ ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`
           </CheckoutMain>
         </div>
       ) : orderComplete ? (
-        <div className="coly-landing min-h-screen bg-white pb-24">
+        <div className="coly-landing min-h-screen bg-white pb-24 md:pb-10">
           <CheckoutHeader />
 
-          <CheckoutMain className="py-12">
+          <CheckoutMain className="py-12 md:py-16">
             <div className="flex flex-col items-center text-center">
               <div
                 className="mb-6 flex h-20 w-20 items-center justify-center rounded-full"
@@ -294,115 +299,121 @@ ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`
           </CheckoutMain>
         </div>
       ) : (
-        <div className="coly-landing min-h-screen bg-white pb-36">
+        <div className="coly-landing min-h-screen bg-white pb-36 md:pb-24">
           <CheckoutHeader />
 
-          <CheckoutMain className="space-y-3 pb-4 pt-2">
-            {items.map((item, index) => (
-              <CartProductCard
-                key={item.id}
-                item={item}
-                index={index}
-                variant="cart"
-                onIncrease={() => updateQuantity(item.id, item.quantity + 1)}
-                onDecrease={() => updateQuantity(item.id, item.quantity - 1)}
-                onRemove={() => removeItem(item.id)}
-              />
-            ))}
-
-            {isSettingsLoading ? (
-              <CheckoutFormSkeleton />
-            ) : (
-              <div className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm">
-                <CheckoutSection
-                  icon={<MessageSquare className="h-5 w-5 text-white" />}
-                  title={
-                    <>
-                      Nota para el local{' '}
-                      <span className="text-sm font-normal text-muted-foreground">(Opcional)</span>
-                    </>
-                  }
-                >
-                  <Textarea
-                    placeholder="Ej: Sin cebolla, sin tomate, retirar a las 21 hs"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={2}
-                    className="mt-2 resize-none rounded-none border-0 bg-transparent p-0 text-sm shadow-none placeholder:text-gray-40 placeholder:px-1 focus-visible:ring-0"
+          <CheckoutMain className="pb-4 pt-6 md:pt-8">
+            <div className="lg:grid lg:grid-cols-5 lg:items-start lg:gap-8">
+              <div className="space-y-3 lg:col-span-3">
+                {items.map((item, index) => (
+                  <CartProductCard
+                    key={item.id}
+                    item={item}
+                    index={index}
+                    variant="cart"
+                    onIncrease={() => updateQuantity(item.id, item.quantity + 1)}
+                    onDecrease={() => updateQuantity(item.id, item.quantity - 1)}
+                    onRemove={() => removeItem(item.id)}
                   />
-                </CheckoutSection>
-
-                <div className="border-t border-black/8" />
-
-                <CheckoutSection
-                  icon={<Bike className="h-5 w-5 text-white" />}
-                  title="Método de entrega"
-                >
-                  <RadioGroup
-                    value={orderType}
-                    onValueChange={(v) => setOrderType(v as OrderType)}
-                    className="mt-2 space-y-3"
-                  >
-                    <label htmlFor="pickup" className="flex cursor-pointer items-center gap-3">
-                      <RadioGroupItem
-                        value="pickup"
-                        id="pickup"
-                        className="border-[#2D5A57] text-[#2D5A57] data-[state=checked]:border-[#2D5A57]"
-                      />
-                      <span className="text-sm font-medium">Retiro en el local</span>
-                      <span
-                        className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold text-[#2D5A57]"
-                        style={{ backgroundColor: COTY_QTY_BG }}
-                      >
-                        Gratis
-                      </span>
-                    </label>
-                    <label htmlFor="delivery" className="flex cursor-pointer items-center gap-3">
-                      <RadioGroupItem
-                        value="delivery"
-                        id="delivery"
-                        className="border-[#2D5A57] text-[#2D5A57]"
-                      />
-                      <span className="text-sm font-medium">Delivery</span>
-                      {settings.deliveryFee > 0 && (
-                        <span className="ml-auto text-xs text-muted-foreground">
-                          +{formatPrice(settings.deliveryFee)}
-                        </span>
-                      )}
-                    </label>
-                  </RadioGroup>
-                </CheckoutSection>
-
-                <div className="border-t border-black/8" />
-
-                <CheckoutSection
-                  icon={<ShoppingCart className="h-5 w-5 text-white" />}
-                  title="Resumen del pedido"
-                >
-                  <div className="mt-2 space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Productos</span>
-                      <span className="font-medium">{formatPrice(total)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Envío</span>
-                      <span className="font-medium">{formatPrice(deliveryFee)}</span>
-                    </div>
-                    <div className="my-2 border-t border-black/8" />
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold">Total</span>
-                      <span className="text-xl font-bold" style={{ color: COTY_TEAL }}>
-                        {formatPrice(finalTotal)}
-                      </span>
-                    </div>
-                  </div>
-                </CheckoutSection>
+                ))}
               </div>
-            )}
+
+              <div className="mt-3 lg:col-span-2 lg:mt-0 lg:sticky lg:top-24">
+                {isSettingsLoading ? (
+                  <CheckoutFormSkeleton />
+                ) : (
+                  <div className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm">
+                    <CheckoutSection
+                      icon={<Image src="/icons/nota.svg" alt="Nota" width={17} height={17} />}
+                      title={
+                        <>
+                          Nota para el local{' '}
+                          <span className="text-sm font-normal text-muted-foreground">(Opcional)</span>
+                        </>
+                      }
+                    >
+                      <Textarea
+                        placeholder="Ej: Sin cebolla, sin tomate, retirar a las 21 hs"
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        rows={2}
+                        className="mt-2 resize-none rounded-none border-0 bg-transparent p-0 text-sm shadow-none placeholder:text-gray-40 placeholder:px-1 focus-visible:ring-0"
+                      />
+                    </CheckoutSection>
+
+                    <div className="border-t border-black/8" />
+
+                    <CheckoutSection
+                      icon={<Image src="/icons/delivery.svg" alt="Delivery" width={22} height={22} />}
+                      title="Método de entrega"
+                    >
+                      <RadioGroup
+                        value={orderType}
+                        onValueChange={(v) => setOrderType(v as OrderType)}
+                        className="mt-2 space-y-3"
+                      >
+                        <label htmlFor="pickup" className="flex cursor-pointer items-center gap-3">
+                          <RadioGroupItem
+                            value="pickup"
+                            id="pickup"
+                            className="border-[#2D5A57] text-[#2D5A57] data-[state=checked]:border-[#2D5A57]"
+                          />
+                          <span className="text-sm font-medium">Retiro en el local</span>
+                          <span
+                            className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold text-[#2D5A57]"
+                            style={{ backgroundColor: COTY_QTY_BG }}
+                          >
+                            Gratis
+                          </span>
+                        </label>
+                        <label htmlFor="delivery" className="flex cursor-pointer items-center gap-3">
+                          <RadioGroupItem
+                            value="delivery"
+                            id="delivery"
+                            className="border-[#2D5A57] text-[#2D5A57]"
+                          />
+                          <span className="text-sm font-medium">Delivery</span>
+                          {settings.deliveryFee > 0 && (
+                            <span className="ml-auto text-xs text-muted-foreground">
+                              +{formatPrice(settings.deliveryFee)}
+                            </span>
+                          )}
+                        </label>
+                      </RadioGroup>
+                    </CheckoutSection>
+
+                    <div className="border-t border-black/8" />
+
+                    <CheckoutSection
+                      icon={<Image src="/icons/pedidos.svg" alt="Resumen" width={18} height={18} />}
+                      title="Resumen del pedido"
+                    >
+                      <div className="mt-2 space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Productos</span>
+                          <span className="font-medium">{formatPrice(total)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Envío</span>
+                          <span className="font-medium">{formatPrice(deliveryFee)}</span>
+                        </div>
+                        <div className="my-2 border-t border-black/8" />
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold">Total</span>
+                          <span className="text-xl font-bold" style={{ color: COTY_TEAL }}>
+                            {formatPrice(finalTotal)}
+                          </span>
+                        </div>
+                      </div>
+                    </CheckoutSection>
+                  </div>
+                )}
+              </div>
+            </div>
           </CheckoutMain>
 
-          <div className="fixed bottom-[72px] left-0 right-0 z-40 px-4">
-            <div className="mx-auto max-w-lg">
+          <div className="fixed bottom-[72px] left-0 right-0 z-40 px-4 md:bottom-8">
+            <div className="mx-auto max-w-lg md:max-w-md md:ml-auto md:mr-8 lg:mr-12">
               {isSettingsLoading ? (
                 <LoadingSkeleton className="h-14 w-full rounded-full" />
               ) : (

@@ -21,7 +21,6 @@ import {
   ArrowRight,
   ShoppingBag,
 } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import {
   Carousel,
   CarouselContent,
@@ -207,7 +206,7 @@ function ProductCarousel({
       : 'border-[#2D5A57]/20 bg-white text-[#2D5A57] shadow-md hover:bg-white disabled:opacity-30'
 
   return (
-    <Carousel opts={{ align: 'start', loop: false }} className="relative w-full px-7 md:px-9">
+    <Carousel opts={{ align: 'start', loop: false }} className="relative w-full px-7 md:px-0 lg:px-2">
       <CarouselContent className="-ml-3 items-stretch md:-ml-4">
         {products.map((product) => (
           <CarouselItem
@@ -270,78 +269,72 @@ export function CustomerLanding() {
     : '#'
   const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(settings.address)}`
 
+  const heroImage = (
+    <div className="relative overflow-hidden rounded-2xl shadow-md md:rounded-3xl">
+      <img
+        src={HERO_IMAGE}
+        alt="Especialidad del local"
+        className="h-44 w-full object-cover md:h-72 lg:h-[22rem]"
+      />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <img
+          src={LOGO_SRC_SVG_2}
+          alt="Coty Café"
+          className="h-32 w-auto object-contain md:h-44 lg:h-48"
+        />
+      </div>
+    </div>
+  )
+
   return (
-    <div className="coly-landing min-h-screen bg-[#FDFBF9] pb-24">
-      {/* Header + Hero — el verde termina a la mitad de la foto */}
-      <div className="relative mx-auto max-w-6xl">
-        <header
-          className="rounded-b-4xl px-4 pt-6 pb-28 md:rounded-b-[2.5rem] md:px-8 md:pb-36 md:pt-8 lg:pb-40"
-          style={{ backgroundColor: COTY_HEADER }}
-        >
-          <div className="flex flex-col items-center gap-4 md:flex-row md:items-center md:gap-8">
-            <Link href="/" className="flex shrink-0 justify-center md:justify-start">
-              <img
-                src={LOGO_SRC_SVG}
-                alt="Coty Café"
-                className="h-14 w-auto object-contain mix-blend-screen md:h-24"
-              />
-            </Link>
-
-            <form onSubmit={handleSearch} className="w-full flex-1 md:max-w-xl md:mx-auto">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 md:h-5 md:w-5" />
-                <input
-                  type="search"
-                  placeholder="Buscar"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  className="w-full rounded-full bg-white py-3 pl-11 pr-4 text-sm text-foreground placeholder:text-gray-400 focus:outline-none md:py-3.5 md:pl-12 md:text-base"
+    <div className="coly-landing min-h-screen bg-[#FDFBF9] pb-24 md:pb-10">
+      {/* Mobile: header verde + hero solapado */}
+      <div
+        className="w-full rounded-b-4xl md:hidden"
+        style={{ backgroundColor: COTY_HEADER }}
+      >
+        <div className="relative mx-auto w-full max-w-6xl">
+          <header className="px-4 pb-28 pt-6">
+            <div className="flex flex-col items-center gap-4">
+              <Link href="/" className="flex shrink-0 justify-center">
+                <img
+                  src={LOGO_SRC_SVG}
+                  alt="Coty Café"
+                  className="h-20 w-auto object-contain mix-blend-screen"
                 />
-              </div>
-            </form>
-
-            <div className="hidden shrink-0 items-center gap-3 md:flex">
-              <Link
-                href="/menu"
-                className="text-sm font-medium text-white/85 transition-colors hover:text-white"
-              >
-                Menú
               </Link>
-              <Link
-                href="/menu"
-                className="relative flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/25"
-              >
-                <ShoppingBag className="h-4 w-4" />
-                Carrito
-                {itemCount > 0 && (
-                  <Badge className="h-5 min-w-5 rounded-full bg-[#00C9B7] px-1 text-[10px] text-white">
-                    {itemCount}
-                  </Badge>
-                )}
-              </Link>
-            </div>
-          </div>
-        </header>
 
-        <div className="relative z-10 -mt-[5.5rem] px-4 md:-mt-36 md:px-8 lg:-mt-40">
-          <div className="relative overflow-hidden rounded-2xl shadow-md md:rounded-3xl">
-            <img
-              src={HERO_IMAGE}
-              alt="Especialidad del local"
-              className="h-44 w-full object-cover md:h-72 lg:h-80"
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <img
-                src={LOGO_SRC_SVG_2}
-                alt="Coty Café"
-                className="h-32 w-auto object-contain md:h-40"
-              />
+              <form onSubmit={handleSearch} className="w-full">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="search"
+                    placeholder="Buscar"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    className="w-full rounded-full bg-white py-3 pl-11 pr-4 text-sm text-foreground placeholder:text-gray-400 focus:outline-none"
+                  />
+                </div>
+              </form>
             </div>
-          </div>
+          </header>
+
+          <div className="relative z-10 -mt-[5.5rem] px-4">{heroImage}</div>
         </div>
       </div>
 
-      <main className="mx-auto max-w-6xl px-4 pt-2 md:px-8 md:pt-4">
+      {/* Desktop: verde full-bleed detrás de la mitad superior del hero */}
+      <section className="relative hidden md:block">
+        <div
+          className="pointer-events-none absolute left-1/2 top-0 h-[calc(2rem+9rem)] w-screen -translate-x-1/2 rounded-b-[2.5rem] lg:h-[calc(2rem+11rem)]"
+          style={{ backgroundColor: COTY_HEADER }}
+        />
+        <div className="relative mx-auto max-w-6xl px-8 pt-8 lg:px-10">
+          {heroImage}
+        </div>
+      </section>
+
+      <main className="mx-auto w-full max-w-6xl px-4 pt-4 md:px-8 md:pt-8 lg:px-10">
         {/* Categories */}
         <section className="py-6 md:py-10">
           <h2 className="mb-4 text-lg font-bold md:mb-6 md:text-2xl">Categories</h2>
@@ -361,7 +354,7 @@ export function CustomerLanding() {
                 >
                   <div
                     className="flex h-14 w-14 items-center justify-center rounded-xl transition-shadow group-hover:shadow-md md:h-16 md:w-16 md:rounded-2xl lg:h-[4.5rem] lg:w-[4.5rem]"
-                    style={{ backgroundColor: COTY_TEAL }}
+                    style={{ backgroundColor: COTY_HEADER }}
                   >
                     <Icon className="h-6 w-6 text-[#7EC8C4] md:h-7 md:w-7" strokeWidth={1.75} />
                   </div>
@@ -437,15 +430,15 @@ export function CustomerLanding() {
               alt="Hacé tu pedido"
               className="h-28 w-full object-cover md:h-40 lg:h-48"
             />
-            <div className="absolute inset-0 flex items-center justify-between bg-black/45 px-4 md:px-8 lg:px-12">
+            <div className="absolute inset-0 flex items-center justify-between gap-4 bg-black/45 px-4 md:px-8 lg:px-12">
               <img
                 src={LOGO_SRC_SVG}
-                alt="Especialidad del local"
-                className="w-24 mx-auto h-full object-contain md:h-72 lg:h-80"
+                alt="Coty Café"
+                className="h-14 w-auto object-contain mix-blend-screen md:h-20"
               />
               <Link
                 href="/menu"
-                className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-transform hover:scale-105 md:px-8 md:py-3.5 md:text-base"
+                className="shrink-0 flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-transform hover:scale-105 md:px-8 md:py-3.5 md:text-base"
                 style={{ background: COTY_CTA_GRADIENT }}
               >
                 Hace tu pedido
@@ -457,7 +450,7 @@ export function CustomerLanding() {
       </main>
 
       {/* Info footer — full bleed cream */}
-      <section className="bg-[#F5F0EA] py-8 w-[90%] mx-auto rounded-2xl md:rounded-3xl md:py-12">
+      <section className="mx-auto w-[92%] max-w-6xl rounded-2xl bg-[#F5F0EA] py-8 md:w-full md:rounded-3xl md:py-12">
         <div className="mx-auto max-w-6xl px-4 md:px-8">
           {isSettingsLoading ? (
             <LandingFooterSkeleton />
@@ -522,7 +515,7 @@ export function CustomerLanding() {
         <img
           src={LOGO_SRC_SVG_NEGRO}
           alt="Coty Café"
-          className="w-auto h-full object-contain md:h-72 lg:h-80 text-white"
+          className="h-24 w-auto object-contain md:h-32"
         />
         <p className="mt-4 text-center text-[10px] text-muted-foreground md:text-xs">
           Coty Café - Resto Bar. Todos los derechos reservados.
@@ -531,7 +524,7 @@ export function CustomerLanding() {
 
       {/* Floating cart — mobile centered, desktop bottom-right */}
       {itemCount > 0 && (
-        <div className="fixed bottom-[72px] left-1/2 z-50 w-full max-w-[390px] -translate-x-1/2 px-4 md:left-auto md:right-8 md:max-w-sm md:translate-x-0 lg:right-12">
+        <div className="fixed bottom-[72px] left-1/2 z-50 w-full max-w-[390px] -translate-x-1/2 px-4 md:hidden">
           <Link
             href="/checkout"
             className="flex items-center justify-center gap-2 rounded-full py-3.5 text-sm font-semibold text-white shadow-xl transition-transform hover:scale-[1.02] md:py-4 md:text-base"
