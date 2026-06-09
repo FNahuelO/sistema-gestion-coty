@@ -313,91 +313,91 @@ ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`
             {isSettingsLoading ? (
               <CheckoutFormSkeleton />
             ) : (
-            <div className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm">
-              <CheckoutSection
-                icon={<MessageSquare className="h-5 w-5 text-white" />}
-                title={
-                  <>
-                    Nota para el local{' '}
-                    <span className="text-sm font-normal text-muted-foreground">(Opcional)</span>
-                  </>
-                }
-              >
-                <Textarea
-                  placeholder="Ej: Sin cebolla, sin tomate, retirar a las 21 hs"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                  className="mt-2 resize-none rounded-none border-0 bg-transparent p-0 text-sm shadow-none placeholder:text-gray-40 placeholder:px-1 focus-visible:ring-0"
-                />
-              </CheckoutSection>
-
-              <div className="border-t border-black/8" />
-
-              <CheckoutSection
-                icon={<Bike className="h-5 w-5 text-white" />}
-                title="Método de entrega"
-              >
-                <RadioGroup
-                  value={orderType}
-                  onValueChange={(v) => setOrderType(v as OrderType)}
-                  className="mt-2 space-y-3"
+              <div className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm">
+                <CheckoutSection
+                  icon={<MessageSquare className="h-5 w-5 text-white" />}
+                  title={
+                    <>
+                      Nota para el local{' '}
+                      <span className="text-sm font-normal text-muted-foreground">(Opcional)</span>
+                    </>
+                  }
                 >
-                  <label htmlFor="pickup" className="flex cursor-pointer items-center gap-3">
-                    <RadioGroupItem
-                      value="pickup"
-                      id="pickup"
-                      className="border-[#2D5A57] text-[#2D5A57] data-[state=checked]:border-[#2D5A57]"
-                    />
-                    <span className="text-sm font-medium">Retiro en el local</span>
-                    <span
-                      className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold text-[#2D5A57]"
-                      style={{ backgroundColor: COTY_QTY_BG }}
-                    >
-                      Gratis
-                    </span>
-                  </label>
-                  <label htmlFor="delivery" className="flex cursor-pointer items-center gap-3">
-                    <RadioGroupItem
-                      value="delivery"
-                      id="delivery"
-                      className="border-[#2D5A57] text-[#2D5A57]"
-                    />
-                    <span className="text-sm font-medium">Delivery</span>
-                    {settings.deliveryFee > 0 && (
-                      <span className="ml-auto text-xs text-muted-foreground">
-                        +{formatPrice(settings.deliveryFee)}
+                  <Textarea
+                    placeholder="Ej: Sin cebolla, sin tomate, retirar a las 21 hs"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={2}
+                    className="mt-2 resize-none rounded-none border-0 bg-transparent p-0 text-sm shadow-none placeholder:text-gray-40 placeholder:px-1 focus-visible:ring-0"
+                  />
+                </CheckoutSection>
+
+                <div className="border-t border-black/8" />
+
+                <CheckoutSection
+                  icon={<Bike className="h-5 w-5 text-white" />}
+                  title="Método de entrega"
+                >
+                  <RadioGroup
+                    value={orderType}
+                    onValueChange={(v) => setOrderType(v as OrderType)}
+                    className="mt-2 space-y-3"
+                  >
+                    <label htmlFor="pickup" className="flex cursor-pointer items-center gap-3">
+                      <RadioGroupItem
+                        value="pickup"
+                        id="pickup"
+                        className="border-[#2D5A57] text-[#2D5A57] data-[state=checked]:border-[#2D5A57]"
+                      />
+                      <span className="text-sm font-medium">Retiro en el local</span>
+                      <span
+                        className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold text-[#2D5A57]"
+                        style={{ backgroundColor: COTY_QTY_BG }}
+                      >
+                        Gratis
                       </span>
-                    )}
-                  </label>
-                </RadioGroup>
-              </CheckoutSection>
+                    </label>
+                    <label htmlFor="delivery" className="flex cursor-pointer items-center gap-3">
+                      <RadioGroupItem
+                        value="delivery"
+                        id="delivery"
+                        className="border-[#2D5A57] text-[#2D5A57]"
+                      />
+                      <span className="text-sm font-medium">Delivery</span>
+                      {settings.deliveryFee > 0 && (
+                        <span className="ml-auto text-xs text-muted-foreground">
+                          +{formatPrice(settings.deliveryFee)}
+                        </span>
+                      )}
+                    </label>
+                  </RadioGroup>
+                </CheckoutSection>
 
-              <div className="border-t border-black/8" />
+                <div className="border-t border-black/8" />
 
-              <CheckoutSection
-                icon={<ShoppingCart className="h-5 w-5 text-white" />}
-                title="Resumen del pedido"
-              >
-                <div className="mt-2 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Productos</span>
-                    <span className="font-medium">{formatPrice(total)}</span>
+                <CheckoutSection
+                  icon={<ShoppingCart className="h-5 w-5 text-white" />}
+                  title="Resumen del pedido"
+                >
+                  <div className="mt-2 space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Productos</span>
+                      <span className="font-medium">{formatPrice(total)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Envío</span>
+                      <span className="font-medium">{formatPrice(deliveryFee)}</span>
+                    </div>
+                    <div className="my-2 border-t border-black/8" />
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold">Total</span>
+                      <span className="text-xl font-bold" style={{ color: COTY_TEAL }}>
+                        {formatPrice(finalTotal)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Envío</span>
-                    <span className="font-medium">{formatPrice(deliveryFee)}</span>
-                  </div>
-                  <div className="my-2 border-t border-black/8" />
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold">Total</span>
-                    <span className="text-xl font-bold" style={{ color: COTY_TEAL }}>
-                      {formatPrice(finalTotal)}
-                    </span>
-                  </div>
-                </div>
-              </CheckoutSection>
-            </div>
+                </CheckoutSection>
+              </div>
             )}
           </CheckoutMain>
 
@@ -406,17 +406,17 @@ ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`
               {isSettingsLoading ? (
                 <LoadingSkeleton className="h-14 w-full rounded-full" />
               ) : (
-              <button
-                type="button"
-                onClick={() => setConfirmOpen(true)}
-                className="flex w-full items-center justify-between rounded-full px-6 py-4 text-base font-bold text-white shadow-lg transition-opacity hover:opacity-95"
-                style={{ backgroundColor: COTY_TEAL }}
-              >
-                <span className="flex-1 text-center">Confirmar pedido</span>
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white">
-                  <ArrowRight className="h-5 w-5" style={{ color: COTY_TEAL }} />
-                </span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmOpen(true)}
+                  className="flex w-full items-center justify-between rounded-full px-6 py-4 text-base font-bold text-white shadow-lg transition-opacity hover:opacity-95"
+                  style={{ backgroundColor: '#053E38' }}
+                >
+                  <span className="flex-1 text-center">Confirmar pedido</span>
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white">
+                    <ArrowRight className="h-5 w-5" style={{ color: COTY_TEAL }} />
+                  </span>
+                </button>
               )}
             </div>
           </div>

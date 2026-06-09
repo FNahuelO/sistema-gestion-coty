@@ -34,7 +34,7 @@ export function MenuHeader({
           <img
             src={LOGO_SRC_SVG}
             alt="Coty Café"
-            className="w-auto h-full object-contain mix-blend-screen"
+            className="h-14 w-auto object-contain mix-blend-screen md:h-24"
           />
         </Link>
 

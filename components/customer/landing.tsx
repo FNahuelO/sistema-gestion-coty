@@ -32,7 +32,16 @@ import {
 import { cn } from '@/lib/utils'
 import { useBusiness, useCart, useCatalog } from '@/lib/store'
 import type { CartItem, Product } from '@/lib/types'
-import { COTY_TEAL, formatPrice, LOGO_SRC_SVG, LOGO_SRC_SVG_2, LOGO_SRC_SVG_NEGRO } from '@/lib/coty-theme'
+import {
+  COTY_COMBOS_GRADIENT,
+  COTY_CTA_GRADIENT,
+  COTY_HEADER,
+  COTY_TEAL,
+  formatPrice,
+  LOGO_SRC_SVG,
+  LOGO_SRC_SVG_2,
+  LOGO_SRC_SVG_NEGRO,
+} from '@/lib/coty-theme'
 import {
   LandingCarouselSkeleton,
   LandingFooterSkeleton,
@@ -56,23 +65,6 @@ const LANDING_CATEGORIES = [
 function getDefaultCartItem(items: CartItem[], productId: string) {
   return items.find(
     (item) => item.product.id === productId && item.selectedOptions.length === 0 && !item.notes
-  )
-}
-
-function CotyLogo({ size = 'md', className = '' }: { size?: 'sm' | 'md' | 'lg'; className?: string }) {
-  const sizeClass =
-    size === 'sm'
-      ? 'h-14 w-auto md:h-16'
-      : size === 'lg'
-        ? 'h-36 w-auto md:h-44'
-        : 'h-20 w-auto md:h-24'
-
-  return (
-    <img
-      src={LOGO_SRC_SVG}
-      alt="Coty Café"
-      className={`w-auto h-full object-contain ${sizeClass} ${className}`}
-    />
   )
 }
 
@@ -280,18 +272,22 @@ export function CustomerLanding() {
 
   return (
     <div className="coly-landing min-h-screen bg-[#FDFBF9] pb-24">
-      {/* Header + Hero */}
-      <header
-        className="rounded-b-4xl md:rounded-b-[2.5rem]"
-        style={{ backgroundColor: COTY_TEAL }}
-      >
-        <div className="mx-auto max-w-6xl px-4 pb-5 pt-6 md:px-8 md:pb-8 md:pt-8">
-          <div className="mb-4 flex flex-col gap-4 md:mb-6 md:flex-row md:items-center md:gap-8">
+      {/* Header + Hero — el verde termina a la mitad de la foto */}
+      <div className="relative mx-auto max-w-6xl">
+        <header
+          className="rounded-b-4xl px-4 pt-6 pb-28 md:rounded-b-[2.5rem] md:px-8 md:pb-36 md:pt-8 lg:pb-40"
+          style={{ backgroundColor: COTY_HEADER }}
+        >
+          <div className="flex flex-col items-center gap-4 md:flex-row md:items-center md:gap-8">
             <Link href="/" className="flex shrink-0 justify-center md:justify-start">
-              <CotyLogo size="md" className="mix-blend-screen" />
+              <img
+                src={LOGO_SRC_SVG}
+                alt="Coty Café"
+                className="h-14 w-auto object-contain mix-blend-screen md:h-24"
+              />
             </Link>
 
-            <form onSubmit={handleSearch} className="flex-1 md:max-w-xl md:mx-auto">
+            <form onSubmit={handleSearch} className="w-full flex-1 md:max-w-xl md:mx-auto">
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 md:h-5 md:w-5" />
                 <input
@@ -325,27 +321,27 @@ export function CustomerLanding() {
               </Link>
             </div>
           </div>
+        </header>
 
-          <div className="relative overflow-hidden rounded-2xl md:rounded-3xl">
+        <div className="relative z-10 -mt-[5.5rem] px-4 md:-mt-36 md:px-8 lg:-mt-40">
+          <div className="relative overflow-hidden rounded-2xl shadow-md md:rounded-3xl">
             <img
               src={HERO_IMAGE}
               alt="Especialidad del local"
-              className="h-40 w-full object-cover md:h-72 lg:h-80"
+              className="h-44 w-full object-cover md:h-72 lg:h-80"
             />
-            <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-              <div className="flex h-48 w-48 items-center justify-center rounded-full p-2 shadow-lg md:h-36 md:w-36 md:p-3">
-                <img
-                  src={LOGO_SRC_SVG_2}
-                  alt="Especialidad del local"
-                  className="w-auto h-full object-contain md:h-72 lg:h-80"
-                />
-              </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <img
+                src={LOGO_SRC_SVG_2}
+                alt="Coty Café"
+                className="h-32 w-auto object-contain md:h-40"
+              />
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="mx-auto max-w-6xl px-4 md:px-8">
+      <main className="mx-auto max-w-6xl px-4 pt-2 md:px-8 md:pt-4">
         {/* Categories */}
         <section className="py-6 md:py-10">
           <h2 className="mb-4 text-lg font-bold md:mb-6 md:text-2xl">Categories</h2>
@@ -395,18 +391,18 @@ export function CustomerLanding() {
           {isCatalogLoading ? (
             <LoadingSkeleton className="h-28 w-full rounded-2xl md:h-40 lg:h-48" />
           ) : (
-          <div className="relative overflow-hidden rounded-2xl bg-black md:rounded-3xl">
-            <img
-              src={activePromo?.image ?? PROMO_IMAGE}
-              alt={activePromo?.title ?? 'Promoción'}
-              className="h-28 w-full object-cover opacity-60 md:h-40 lg:h-48"
-            />
-            <div className="absolute inset-0 flex items-center justify-center bg-black/40 px-4">
-              <p className="coly-promo-outline text-center text-3xl font-black uppercase leading-none md:text-5xl lg:text-6xl">
-                {activePromo?.title?.toUpperCase() ?? '2X1 EN PINTAS'}
-              </p>
+            <div className="relative overflow-hidden rounded-2xl bg-black md:rounded-3xl">
+              <img
+                src={activePromo?.image ?? PROMO_IMAGE}
+                alt={activePromo?.title ?? 'Promoción'}
+                className="h-28 w-full object-cover opacity-60 md:h-40 lg:h-48"
+              />
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40 px-4">
+                <p className="coly-promo-outline text-center text-3xl font-black uppercase leading-none md:text-5xl lg:text-6xl">
+                  {activePromo?.title?.toUpperCase() ?? '2X1 EN PINTAS'}
+                </p>
+              </div>
             </div>
-          </div>
           )}
         </section>
       </main>
@@ -415,7 +411,7 @@ export function CustomerLanding() {
       <section className="pb-6 md:pb-10">
         <div
           className="rounded-tr-[3rem] md:rounded-tr-[4rem]"
-          style={{ backgroundColor: COTY_TEAL }}
+          style={{ background: COTY_COMBOS_GRADIENT }}
         >
           <div className="mx-auto max-w-6xl px-4 pb-6 pt-5 md:px-8 md:pb-10 md:pt-8">
             <h2 className="mb-4 text-lg font-bold text-white md:mb-6 md:text-2xl">Combos del día</h2>
@@ -449,7 +445,8 @@ export function CustomerLanding() {
               />
               <Link
                 href="/menu"
-                className="flex items-center gap-2 rounded-full bg-linear-to-r from-[#00C9B7] to-[#00E5D0] px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-transform hover:scale-105 md:px-8 md:py-3.5 md:text-base"
+                className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-transform hover:scale-105 md:px-8 md:py-3.5 md:text-base"
+                style={{ background: COTY_CTA_GRADIENT }}
               >
                 Hace tu pedido
                 <ArrowRight className="h-4 w-4 md:h-5 md:w-5" />
@@ -465,57 +462,57 @@ export function CustomerLanding() {
           {isSettingsLoading ? (
             <LandingFooterSkeleton />
           ) : (
-          <div className="grid grid-cols-3 gap-2 md:gap-8 lg:gap-12">
-            <div className="flex flex-col items-center text-center border-r-1 border-[#EAE4E0]">
-              <Clock className="mb-2 h-5 w-5 md:mb-3 md:h-6 md:w-6" style={{ color: COTY_TEAL }} />
-              <p className="text-[11px] font-semibold md:text-sm">Horarios</p>
-              <p className="mt-1 text-[10px] leading-snug text-muted-foreground md:mt-2 md:text-sm">
-                Lun a Sáb {settings.openTime} - {settings.closeTime} hs
-              </p>
-              <span
-                className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-medium md:mt-3 md:px-3 md:py-1 md:text-xs ${settings.isOpen
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-red-100 text-red-700'
-                  }`}
-              >
-                <span className={`h-1.5 w-1.5 rounded-full md:h-2 md:w-2 ${settings.isOpen ? 'bg-green-500' : 'bg-red-500'}`} />
-                {settings.isOpen ? 'Abierto ahora' : 'Cerrado'}
-              </span>
-            </div>
+            <div className="grid grid-cols-3 gap-2 md:gap-8 lg:gap-12">
+              <div className="flex flex-col items-center text-center border-r-1 border-[#EAE4E0]">
+                <Clock className="mb-2 h-5 w-5 md:mb-3 md:h-6 md:w-6" style={{ color: COTY_TEAL }} />
+                <p className="text-[11px] font-semibold md:text-sm">Horarios</p>
+                <p className="mt-1 text-[10px] leading-snug text-muted-foreground md:mt-2 md:text-sm">
+                  Lun a Sáb {settings.openTime} - {settings.closeTime} hs
+                </p>
+                <span
+                  className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-medium md:mt-3 md:px-3 md:py-1 md:text-xs ${settings.isOpen
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-red-100 text-red-700'
+                    }`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full md:h-2 md:w-2 ${settings.isOpen ? 'bg-green-500' : 'bg-red-500'}`} />
+                  {settings.isOpen ? 'Abierto ahora' : 'Cerrado'}
+                </span>
+              </div>
 
-            <div className="flex flex-col items-center text-center ">
-              <MapPin className="mb-2 h-5 w-5 md:mb-3 md:h-6 md:w-6" style={{ color: COTY_TEAL }} />
-              <p className="text-[11px] font-semibold md:text-sm">Ubicación</p>
-              <p className="mt-1 text-[10px] leading-snug text-muted-foreground md:mt-2 md:max-w-xs md:text-sm">
-                {settings.address}
-              </p>
-              <a
-                href={mapsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 rounded-full border border-[#2D5A57]/20 bg-white px-2 py-0.5 text-[9px] font-medium text-[#2D5A57] transition-colors hover:bg-[#2D5A57]/5 md:mt-3 md:px-4 md:py-1.5 md:text-xs"
-              >
-                Ver en el mapa
-              </a>
-            </div>
+              <div className="flex flex-col items-center text-center ">
+                <MapPin className="mb-2 h-5 w-5 md:mb-3 md:h-6 md:w-6" style={{ color: COTY_TEAL }} />
+                <p className="text-[11px] font-semibold md:text-sm">Ubicación</p>
+                <p className="mt-1 text-[10px] leading-snug text-muted-foreground md:mt-2 md:max-w-xs md:text-sm">
+                  {settings.address}
+                </p>
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 rounded-full border border-[#2D5A57]/20 bg-white px-2 py-0.5 text-[9px] font-medium text-[#2D5A57] transition-colors hover:bg-[#2D5A57]/5 md:mt-3 md:px-4 md:py-1.5 md:text-xs"
+                >
+                  Ver en el mapa
+                </a>
+              </div>
 
-            <div className="flex flex-col items-center text-center border-l-1 border-[#EAE4E0]">
-              <Phone className="mb-2 h-5 w-5 md:mb-3 md:h-6 md:w-6" style={{ color: COTY_TEAL }} />
-              <p className="text-[11px] font-semibold md:text-sm">Contacto</p>
-              <p className="mt-1 text-[10px] leading-snug text-muted-foreground md:mt-2 md:text-sm">
-                {settings.phone}
-                {settings.instagram ? ` ${settings.instagram}` : ''}
-              </p>
-              <a
-                href={whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 rounded-full border border-[#2D5A57]/20 bg-white px-2 py-0.5 text-[9px] font-medium text-[#2D5A57] transition-colors hover:bg-[#2D5A57]/5 md:mt-3 md:px-4 md:py-1.5 md:text-xs"
-              >
-                WhatsApp
-              </a>
+              <div className="flex flex-col items-center text-center border-l-1 border-[#EAE4E0]">
+                <Phone className="mb-2 h-5 w-5 md:mb-3 md:h-6 md:w-6" style={{ color: COTY_TEAL }} />
+                <p className="text-[11px] font-semibold md:text-sm">Contacto</p>
+                <p className="mt-1 text-[10px] leading-snug text-muted-foreground md:mt-2 md:text-sm">
+                  {settings.phone}
+                  {settings.instagram ? ` ${settings.instagram}` : ''}
+                </p>
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 rounded-full border border-[#2D5A57]/20 bg-white px-2 py-0.5 text-[9px] font-medium text-[#2D5A57] transition-colors hover:bg-[#2D5A57]/5 md:mt-3 md:px-4 md:py-1.5 md:text-xs"
+                >
+                  WhatsApp
+                </a>
+              </div>
             </div>
-          </div>
           )}
         </div>
       </section>
