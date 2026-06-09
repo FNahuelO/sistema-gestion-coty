@@ -1,0 +1,11 @@
+<svg width="140" height="140" viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <ellipse cx="70" cy="70" rx="62" ry="58" stroke="#3D3D3D" stroke-width="1.5" fill="none" opacity="0.35"/>
+  <path d="M18 70C18 45 38 22 70 18C102 22 122 45 122 70" stroke="#3D3D3D" stroke-width="1.2" fill="none" opacity="0.4"/>
+  <path d="M122 70C122 95 102 118 70 122C38 118 18 95 18 70" stroke="#3D3D3D" stroke-width="1.2" fill="none" opacity="0.4"/>
+  <path d="M28 52C32 44 42 36 52 32" stroke="#3D3D3D" stroke-width="1" fill="none" opacity="0.35"/>
+  <path d="M112 52C108 44 98 36 88 32" stroke="#3D3D3D" stroke-width="1" fill="none" opacity="0.35"/>
+  <path d="M70 28C74 24 78 22 82 22" stroke="#3D3D3D" stroke-width="1" fill="none" opacity="0.35"/>
+  <path d="M70 112C74 116 78 118 82 118" stroke="#3D3D3D" stroke-width="1" fill="none" opacity="0.35"/>
+  <circle cx="70" cy="52" r="8" fill="#3D3D3D" opacity="0.15"/>
+  <text x="70" y="78" text-anchor="middle" fill="#2A2A2A" font-family="Georgia, serif" font-size="22" font-style="italic" font-weight="600">Coly Caf�</text>
+</svg>

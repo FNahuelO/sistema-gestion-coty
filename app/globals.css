@@ -145,7 +145,6 @@
       radial-gradient(circle at top left, color-mix(in oklab, var(--color-accent) 18%, transparent) 0, transparent 36%),
       radial-gradient(circle at top right, color-mix(in oklab, var(--color-primary) 10%, transparent) 0, transparent 28%),
       linear-gradient(180deg, color-mix(in oklab, var(--color-secondary) 40%, transparent) 0%, transparent 36%);
-    background-attachment: fixed;
   }
 }
 
@@ -183,4 +182,27 @@
 
 .safe-area-inset-bottom {
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Coly Café landing */
+.coly-landing {
+  --coly-teal: #2d5a57;
+  --coly-teal-light: #3a6b68;
+  --coly-cyan: #00c9b7;
+  --coly-cream: #fdfbf9;
+  --coly-cream-dark: #f5f0ea;
+}
+
+.coly-promo-outline {
+  color: transparent;
+  -webkit-text-stroke: 2px white;
+  paint-order: stroke fill;
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+
+@media (min-width: 768px) {
+  .coly-promo-outline {
+    -webkit-text-stroke: 3px white;
+  }
 }

@@ -1,6 +1,5 @@
 'use client'
 
-import { motion } from 'framer-motion'
 import { Coffee, ShoppingBag, Search, FileX, Users, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -27,11 +26,7 @@ export function EmptyState({ icon = 'coffee', title, description, action }: Empt
   const Icon = icons[icon]
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center justify-center py-12 text-center"
-    >
+    <div className="flex flex-col items-center justify-center py-12 text-center">
       <div className="mb-4 rounded-full bg-muted p-4">
         <Icon className="h-8 w-8 text-muted-foreground" />
       </div>
@@ -42,6 +37,6 @@ export function EmptyState({ icon = 'coffee', title, description, action }: Empt
           {action.label}
         </Button>
       )}
-    </motion.div>
+    </div>
   )
 }

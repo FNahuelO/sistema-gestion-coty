@@ -2,477 +2,516 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import {
+  Search,
   Coffee,
-  MapPin,
+  Wine,
+  Sandwich,
+  Soup,
+  Beef,
+  UtensilsCrossed,
+  Utensils,
+  Star,
   Clock,
-  Instagram,
+  MapPin,
   Phone,
+  Plus,
+  Minus,
+  ArrowRight,
   ShoppingBag,
-  Menu,
-  X,
-  ChevronRight,
-  Truck,
-  Store
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from '@/components/ui/carousel'
+import { cn } from '@/lib/utils'
 import { useBusiness, useCart, useCatalog } from '@/lib/store'
+import type { CartItem, Product } from '@/lib/types'
+import { COTY_TEAL, formatPrice, LOGO_SRC } from '@/lib/coty-theme'
+const HERO_IMAGE = 'https://images.unsplash.com/photo-1568901346635-1c2c60602214?w=1600&h=900&fit=crop'
+const CTA_IMAGE = 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=1600&h=500&fit=crop'
+const PROMO_IMAGE = 'https://images.unsplash.com/photo-1436076865539-06670f77990b?w=1600&h=400&fit=crop'
 
-export function CustomerLanding() {
-  const { settings } = useBusiness()
-  const { itemCount } = useCart()
-  const { products, promotions, categories } = useCatalog()
-  const [menuOpen, setMenuOpen] = useState(false)
+const LANDING_CATEGORIES = [
+  { name: 'Cafetería', slug: 'coffee', icon: Coffee },
+  { name: 'Tragos y Milkshakes', slug: 'cold', icon: Wine },
+  { name: 'Sándwiches', slug: 'sandwiches', icon: Sandwich },
+  { name: 'Entradas', slug: 'starters', icon: Soup },
+  { name: 'Hamburguesas', slug: 'burgers', icon: Beef },
+  { name: 'Milanesas', slug: 'milanesas', icon: UtensilsCrossed },
+  { name: 'Pastas', slug: 'burgers', icon: Utensils },
+  { name: 'Promociones', slug: 'promo', icon: Star },
+] as const
 
-  const featuredProducts = products.filter(p => p.featured).slice(0, 4)
-  const activePromotions = promotions.filter(p => p.active)
+function getDefaultCartItem(items: CartItem[], productId: string) {
+  return items.find(
+    (item) => item.product.id === productId && item.selectedOptions.length === 0 && !item.notes
+  )
+}
+
+function CotyLogo({ size = 'md', className = '' }: { size?: 'sm' | 'md' | 'lg'; className?: string }) {
+  const sizeClass =
+    size === 'sm'
+      ? 'h-14 w-auto md:h-16'
+      : size === 'lg'
+        ? 'h-36 w-auto md:h-44'
+        : 'h-20 w-auto md:h-24'
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur supports-backdrop-filter:bg-background/75">
-        <div className="flex h-18 items-center justify-between px-4 py-3">
-          <Link href="/" className="flex items-center gap-3">
-            <img src="/icon.svg" alt="Coty Café" className="h-11 w-11 rounded-2xl shadow-sm" />
-            <div>
-              <span className="block font-serif text-xl font-bold tracking-tight">Coty Café</span>
-              <span className="block text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Coffee and moments</span>
-            </div>
-          </Link>
+    <img
+      src={LOGO_SRC}
+      alt="Coty Café"
+      className={`object-contain ${sizeClass} ${className}`}
+    />
+  )
+}
 
-          <div className="flex items-center gap-2">
-            <Link href="/menu">
-              <Button variant="outline" size="sm" className="relative rounded-full border-border/70 bg-card/80 px-3 shadow-sm">
-                <ShoppingBag className="h-5 w-5" />
+function QuantityControl({
+  quantity,
+  onIncrease,
+  onDecrease,
+  quantityBg = 'white',
+}: {
+  quantity: number
+  onIncrease: () => void
+  onDecrease: () => void
+  quantityBg?: 'white' | 'white/95'
+}) {
+  return (
+    <div className="flex items-center justify-center gap-0 pt-1 md:pt-2">
+      <button
+        type="button"
+        onClick={onDecrease}
+        disabled={quantity === 0}
+        className="flex h-8 w-8 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40 md:h-9 md:w-9"
+        style={{ backgroundColor: COTY_TEAL }}
+        aria-label="Quitar"
+      >
+        <Minus className="h-4 w-4" />
+      </button>
+      <div className="relative mx-1 flex min-w-[72px] items-center justify-center md:min-w-[80px]">
+        <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-[#2D5A57]/30" />
+        <span
+          className={`relative px-2 text-sm font-medium text-foreground md:text-base ${
+            quantityBg === 'white/95' ? 'bg-white/95' : 'bg-white'
+          }`}
+        >
+          {quantity || ''}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={onIncrease}
+        className="flex h-8 w-8 items-center justify-center rounded-full text-white md:h-9 md:w-9"
+        style={{ backgroundColor: COTY_TEAL }}
+        aria-label="Agregar"
+      >
+        <Plus className="h-4 w-4" />
+      </button>
+    </div>
+  )
+}
+
+function ProductCard({
+  product,
+  items,
+  addItem,
+  updateQuantity,
+  cardBg = 'white',
+}: {
+  product: Product
+  items: CartItem[]
+  addItem: ReturnType<typeof useCart>['addItem']
+  updateQuantity: ReturnType<typeof useCart>['updateQuantity']
+  cardBg?: 'white' | 'transparent'
+}) {
+  const cartItem = getDefaultCartItem(items, product.id)
+  const quantity = cartItem?.quantity ?? 0
+  const hasRequiredOptions = product.options?.some((option) => option.required)
+
+  const handleIncrease = () => {
+    if (hasRequiredOptions) {
+      window.location.href = `/menu?product=${product.id}`
+      return
+    }
+    if (cartItem) {
+      updateQuantity(cartItem.id, cartItem.quantity + 1)
+      return
+    }
+    addItem(product, 1, [])
+  }
+
+  const handleDecrease = () => {
+    if (cartItem) {
+      updateQuantity(cartItem.id, cartItem.quantity - 1)
+    }
+  }
+
+  return (
+    <div
+      className={`flex flex-col overflow-hidden rounded-2xl border border-black/8 shadow-sm md:rounded-3xl ${
+        cardBg === 'white' ? 'bg-white' : 'bg-white/95'
+      }`}
+    >
+      <div className="aspect-4/3 overflow-hidden">
+        <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+      </div>
+      <div className="flex flex-1 flex-col p-3 md:p-4">
+        <h3 className="text-sm font-bold leading-tight md:text-base">{product.name}</h3>
+        <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground md:text-xs">
+          {product.description}
+        </p>
+        <p className="mt-2 text-sm font-bold md:text-base">{formatPrice(product.price)}</p>
+        <div className="mt-auto pt-2">
+          <QuantityControl
+            quantity={quantity}
+            onIncrease={handleIncrease}
+            onDecrease={handleDecrease}
+            quantityBg={cardBg === 'transparent' ? 'white/95' : 'white'}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ProductCarousel({
+  products,
+  items,
+  addItem,
+  updateQuantity,
+  cardBg = 'white',
+  navVariant = 'default',
+}: {
+  products: Product[]
+  items: CartItem[]
+  addItem: ReturnType<typeof useCart>['addItem']
+  updateQuantity: ReturnType<typeof useCart>['updateQuantity']
+  cardBg?: 'white' | 'transparent'
+  navVariant?: 'default' | 'on-teal'
+}) {
+  if (products.length === 0) return null
+
+  const navClass =
+    navVariant === 'on-teal'
+      ? 'border-white/40 bg-white/95 text-[#2D5A57] shadow-md hover:bg-white disabled:opacity-30'
+      : 'border-[#2D5A57]/20 bg-white text-[#2D5A57] shadow-md hover:bg-white disabled:opacity-30'
+
+  return (
+    <Carousel opts={{ align: 'start', loop: false }} className="relative w-full px-7 md:px-9">
+      <CarouselContent className="-ml-3 md:-ml-4">
+        {products.map((product) => (
+          <CarouselItem
+            key={product.id}
+            className="basis-[calc(50%-0.375rem)] pl-3 md:basis-[calc(33.333%-0.75rem)] md:pl-4 lg:basis-[calc(25%-0.75rem)]"
+          >
+            <ProductCard
+              product={product}
+              items={items}
+              addItem={addItem}
+              updateQuantity={updateQuantity}
+              cardBg={cardBg}
+            />
+          </CarouselItem>
+        ))}
+      </CarouselContent>
+      {products.length > 2 && (
+        <>
+          <CarouselPrevious
+            className={cn(
+              'top-1/2 left-0 h-9 w-9 -translate-y-1/2 md:-left-3',
+              navClass,
+            )}
+          />
+          <CarouselNext
+            className={cn(
+              'top-1/2 right-0 h-9 w-9 -translate-y-1/2 md:-right-3',
+              navClass,
+            )}
+          />
+        </>
+      )}
+    </Carousel>
+  )
+}
+
+export function CustomerLanding() {
+  const router = useRouter()
+  const { settings } = useBusiness()
+  const { items, itemCount, addItem, updateQuantity } = useCart()
+  const { products, promotions } = useCatalog()
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const featuredProducts = products.filter((product) => product.featured && product.available)
+  const availableProducts = products.filter((product) => product.available)
+  const carouselProducts = (featuredProducts.length > 0 ? featuredProducts : availableProducts).slice(0, 12)
+  const activePromo = promotions.find((promo) => promo.active)
+
+  const handleSearch = (event: React.FormEvent) => {
+    event.preventDefault()
+    if (searchQuery.trim()) {
+      router.push(`/menu?search=${encodeURIComponent(searchQuery.trim())}`)
+      return
+    }
+    router.push('/menu')
+  }
+
+  const whatsappUrl = settings.whatsapp
+    ? `https://wa.me/${settings.whatsapp.replace(/\D/g, '')}`
+    : '#'
+  const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(settings.address)}`
+
+  return (
+    <div className="coly-landing min-h-screen bg-[#FDFBF9] pb-24">
+      {/* Header + Hero */}
+      <header
+        className="rounded-b-4xl md:rounded-b-[2.5rem]"
+        style={{ backgroundColor: COTY_TEAL }}
+      >
+        <div className="mx-auto max-w-6xl px-4 pb-5 pt-6 md:px-8 md:pb-8 md:pt-8">
+          <div className="mb-4 flex flex-col gap-4 md:mb-6 md:flex-row md:items-center md:gap-8">
+            <Link href="/" className="flex shrink-0 justify-center md:justify-start">
+              <CotyLogo size="md" className="mix-blend-screen" />
+            </Link>
+
+            <form onSubmit={handleSearch} className="flex-1 md:max-w-xl md:mx-auto">
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 md:h-5 md:w-5" />
+                <input
+                  type="search"
+                  placeholder="Buscar"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  className="w-full rounded-full bg-white py-3 pl-11 pr-4 text-sm text-foreground placeholder:text-gray-400 focus:outline-none md:py-3.5 md:pl-12 md:text-base"
+                />
+              </div>
+            </form>
+
+            <div className="hidden shrink-0 items-center gap-3 md:flex">
+              <Link
+                href="/menu"
+                className="text-sm font-medium text-white/85 transition-colors hover:text-white"
+              >
+                Menú
+              </Link>
+              <Link
+                href="/menu"
+                className="relative flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/25"
+              >
+                <ShoppingBag className="h-4 w-4" />
+                Carrito
                 {itemCount > 0 && (
-                  <Badge className="absolute -right-1 -top-1 h-5 w-5 rounded-full p-0 text-xs">
+                  <Badge className="h-5 min-w-5 rounded-full bg-[#00C9B7] px-1 text-[10px] text-white">
                     {itemCount}
                   </Badge>
                 )}
-              </Button>
-            </Link>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              onClick={() => setMenuOpen(true)}
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            <nav className="hidden items-center gap-5 md:flex">
-              <Link href="/menu" className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
-                Menú
               </Link>
-              <a
-                href={settings.instagram ? `https://instagram.com/${settings.instagram}` : 'https://instagram.com/coty_cafe'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
-              >
-                Instagram
-              </a>
-              <Link href="/login" className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
-                Acceso Personal
-              </Link>
-            </nav>
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden rounded-2xl md:rounded-3xl">
+            <img
+              src={HERO_IMAGE}
+              alt="Especialidad del local"
+              className="h-44 w-full object-cover md:h-72 lg:h-80"
+            />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+              <div className="flex h-28 w-28 items-center justify-center rounded-full bg-white/95 p-2 shadow-lg md:h-36 md:w-36 md:p-3">
+                <CotyLogo size="sm" className="h-full w-full" />
+              </div>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Mobile Menu */}
-      <AnimatePresence>
-        {menuOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/50 md:hidden"
-            onClick={() => setMenuOpen(false)}
-          >
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25 }}
-              className="absolute right-0 top-0 h-full w-72 bg-background p-6"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-serif text-lg font-bold">Menú</span>
-                <Button variant="ghost" size="icon" onClick={() => setMenuOpen(false)}>
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-              <nav className="mt-8 flex flex-col gap-4">
+      <main className="mx-auto max-w-6xl px-4 md:px-8">
+        {/* Categories */}
+        <section className="py-6 md:py-10">
+          <h2 className="mb-4 text-lg font-bold md:mb-6 md:text-2xl">Categories</h2>
+          <div className="grid grid-cols-4 gap-3 md:grid-cols-8 md:gap-4 lg:gap-6">
+            {LANDING_CATEGORIES.map((category) => {
+              const Icon = category.icon
+              const href =
+                category.slug === 'promo'
+                  ? '/menu'
+                  : `/menu?category=${category.slug}`
+
+              return (
                 <Link
-                  href="/menu"
-                  className="flex items-center justify-between rounded-lg p-3 hover:bg-muted"
-                  onClick={() => setMenuOpen(false)}
+                  key={category.name}
+                  href={href}
+                  className="group flex flex-col items-center gap-2 transition-transform hover:-translate-y-0.5"
                 >
-                  <span className="font-medium">Ver Menú</span>
-                  <ChevronRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  href="/login"
-                  className="flex items-center justify-between rounded-lg p-3 hover:bg-muted"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <span className="font-medium">Acceso Personal</span>
-                  <ChevronRight className="h-4 w-4" />
-                </Link>
-                <a
-                  href={settings.instagram ? `https://instagram.com/${settings.instagram}` : 'https://instagram.com/coty_cafe'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between rounded-lg p-3 hover:bg-muted"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <span className="font-medium">Instagram</span>
-                  <ChevronRight className="h-4 w-4" />
-                </a>
-              </nav>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Hero Section */}
-      <section className="relative overflow-hidden px-4 py-10 md:px-6 md:py-16">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(190,145,94,0.18),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(111,77,54,0.14),transparent_28%)]" />
-        <div className="relative mx-auto max-w-6xl">
-          <div className="overflow-hidden rounded-4xl border border-border/70 bg-[linear-gradient(135deg,rgba(255,251,246,0.94)_0%,rgba(248,238,228,0.96)_48%,rgba(241,226,206,0.98)_100%)] shadow-[0_24px_80px_rgba(70,46,29,0.12)]">
-            <div className="grid gap-10 px-6 py-10 md:grid-cols-[1.1fr_0.9fr] md:px-10 md:py-14">
-              <div className="text-left">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.22em] text-primary"
-                >
-                  Inspirado en @coty_cafe
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mb-6 inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/90 px-4 py-2 shadow-sm"
-                >
-                  <span className={`h-2 w-2 rounded-full ${settings.isOpen ? 'bg-green-500' : 'bg-red-500'}`} />
-                  <span className="text-sm font-medium">
-                    {settings.isOpen ? 'Abierto ahora' : 'Cerrado'}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    • {settings.openTime} - {settings.closeTime}
-                  </span>
-                </motion.div>
-
-                <motion.h1
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                  className="max-w-2xl font-serif text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl"
-                >
-                  Un espacio cálido para café, charlas y antojos con identidad propia.
-                </motion.h1>
-
-                <motion.p
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="mt-5 max-w-xl text-base leading-7 text-muted-foreground md:text-lg"
-                >
-                  Llevamos la interfaz a una estética más editorial y gastronómica: tonos espresso,
-                  superficies crema y foco total en producto, promos y conversión móvil.
-                </motion.p>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                  className="mt-8 flex flex-col items-start gap-4 sm:flex-row"
-                >
-                  <Link href="/menu">
-                    <Button size="lg" className="gap-2 rounded-full px-7 shadow-lg shadow-primary/20">
-                      <ShoppingBag className="h-5 w-5" />
-                      Ordenar Ahora
-                    </Button>
-                  </Link>
-                  <Link href="/menu">
-                    <Button size="lg" variant="outline" className="gap-2 rounded-full border-border/70 bg-card/70 px-7">
-                      <Coffee className="h-5 w-5" />
-                      Ver Menú
-                    </Button>
-                  </Link>
-                  <a
-                    href={settings.instagram ? `https://instagram.com/${settings.instagram}` : 'https://instagram.com/coty_cafe'}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <div
+                    className="flex h-14 w-14 items-center justify-center rounded-xl transition-shadow group-hover:shadow-md md:h-16 md:w-16 md:rounded-2xl lg:h-[4.5rem] lg:w-[4.5rem]"
+                    style={{ backgroundColor: COTY_TEAL }}
                   >
-                    <Button size="lg" variant="ghost" className="gap-2 rounded-full px-6">
-                      <Instagram className="h-5 w-5" />
-                      Ver Instagram
-                    </Button>
-                  </a>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                  className="mt-8 flex flex-wrap items-center gap-5"
-                >
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Truck className="h-4 w-4" />
-                    <span>Delivery disponible</span>
+                    <Icon className="h-6 w-6 text-[#7EC8C4] md:h-7 md:w-7" strokeWidth={1.75} />
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Store className="h-4 w-4" />
-                    <span>Retiro en local</span>
-                  </div>
-                </motion.div>
-              </div>
-
-              <div className="grid gap-4 md:content-start">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.25 }}
-                  className="overflow-hidden rounded-[1.75rem] border border-white/50 bg-[#2f221b] p-5 text-white shadow-2xl"
-                >
-                  <div className="flex items-center gap-3">
-                    <img src="/icon.svg" alt="Coty Café" className="h-12 w-12 rounded-2xl bg-white" />
-                    <div>
-                      <p className="text-sm uppercase tracking-[0.24em] text-white/60">Brand mood</p>
-                      <p className="font-serif text-2xl">Cálido, artesanal y social</p>
-                    </div>
-                  </div>
-                  <div className="mt-6 grid grid-cols-3 gap-3">
-                    <div className="rounded-2xl bg-white/10 p-3">
-                      <p className="text-xs uppercase tracking-[0.2em] text-white/55">Feed</p>
-                      <p className="mt-2 text-lg font-semibold">Visual</p>
-                    </div>
-                    <div className="rounded-2xl bg-white/10 p-3">
-                      <p className="text-xs uppercase tracking-[0.2em] text-white/55">Tono</p>
-                      <p className="mt-2 text-lg font-semibold">Humano</p>
-                    </div>
-                    <div className="rounded-2xl bg-white/10 p-3">
-                      <p className="text-xs uppercase tracking-[0.2em] text-white/55">Producto</p>
-                      <p className="mt-2 text-lg font-semibold">Protagonista</p>
-                    </div>
-                  </div>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.35 }}
-                  className="grid gap-4 sm:grid-cols-2"
-                >
-                  <div className="rounded-3xl border border-border/70 bg-card/80 p-5 shadow-sm">
-                    <p className="text-xs uppercase tracking-[0.24em] text-primary">Especialidad</p>
-                    <p className="mt-2 font-serif text-2xl">Café y pastelería</p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Una experiencia más boutique y menos “catálogo genérico”.
-                    </p>
-                  </div>
-                  <div className="rounded-3xl border border-border/70 bg-card/80 p-5 shadow-sm">
-                    <p className="text-xs uppercase tracking-[0.24em] text-primary">Canal principal</p>
-                    <p className="mt-2 font-serif text-2xl">Instagram first</p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Más contraste, fotografía protagonista y bloques listos para convertir.
-                    </p>
-                  </div>
-                </motion.div>
-              </div>
-            </div>
+                  <span className="text-center text-[10px] font-medium leading-tight md:text-xs lg:text-sm">
+                    {category.name}
+                  </span>
+                </Link>
+              )
+            })}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Promotions Carousel */}
-      {activePromotions.length > 0 && (
-        <section className="px-4 py-8 md:px-6 md:py-12">
-          <div className="mx-auto max-w-6xl">
-            <div className="mb-6">
-              <p className="text-xs uppercase tracking-[0.24em] text-primary">Momentos para compartir</p>
-              <h2 className="mt-2 font-serif text-3xl font-bold">Promociones</h2>
-            </div>
-            <div className="flex gap-4 overflow-x-auto justify-around pb-4 scrollbar-hide">
-              {activePromotions.map((promo, index) => (
-                <motion.div
-                  key={promo.id}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="relative min-w-[320px] overflow-hidden rounded-[1.75rem] border border-black/5 shadow-xl md:min-w-[430px]"
-                >
-                  <img
-                    src={promo.image}
-                    alt={promo.title}
-                    className="h-40 w-full object-cover md:h-48"
-                  />
-                  <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/40 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                    <Badge className="mb-2 bg-accent text-accent-foreground">
-                      {promo.discount}% OFF
-                    </Badge>
-                    <h3 className="font-serif text-lg font-bold">{promo.title}</h3>
-                    <p className="text-sm text-white/80">{promo.description}</p>
-                  </div>
-                </motion.div>
-              ))}
+        {/* Mas vendidos */}
+        <section className="pb-6 md:pb-10">
+          <h2 className="mb-4 text-lg font-bold md:mb-6 md:text-2xl">Mas vendidos</h2>
+          <ProductCarousel
+            products={carouselProducts}
+            items={items}
+            addItem={addItem}
+            updateQuantity={updateQuantity}
+          />
+        </section>
+
+        {/* Promo banner */}
+        <section className="pb-6 md:pb-10">
+          <div className="relative overflow-hidden rounded-2xl bg-black md:rounded-3xl">
+            <img
+              src={activePromo?.image ?? PROMO_IMAGE}
+              alt={activePromo?.title ?? 'Promoción'}
+              className="h-28 w-full object-cover opacity-60 md:h-40 lg:h-48"
+            />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40 px-4">
+              <p className="coly-promo-outline text-center text-3xl font-black uppercase leading-none md:text-5xl lg:text-6xl">
+                {activePromo?.title?.toUpperCase() ?? '2X1 EN PINTAS'}
+              </p>
             </div>
           </div>
         </section>
-      )}
+      </main>
 
-      {/* Categories */}
-      <section className="py-8 md:py-12">
-        <div className="container px-4 mx-auto">
-          <p className="mb-2 text-xs uppercase tracking-[0.24em] text-primary">Explorá el menú</p>
-          <h2 className="mb-6 font-serif text-3xl font-bold">Categorías</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
-            {categories.map((category, index) => (
-              <motion.div
-                key={category.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
+      {/* Combos del día — full bleed teal */}
+      <section className="pb-6 md:pb-10">
+        <div
+          className="rounded-tr-[3rem] md:rounded-tr-[4rem]"
+          style={{ backgroundColor: COTY_TEAL }}
+        >
+          <div className="mx-auto max-w-6xl px-4 pb-6 pt-5 md:px-8 md:pb-10 md:pt-8">
+            <h2 className="mb-4 text-lg font-bold text-white md:mb-6 md:text-2xl">Combos del día</h2>
+            <ProductCarousel
+              products={carouselProducts}
+              items={items}
+              addItem={addItem}
+              updateQuantity={updateQuantity}
+              cardBg="transparent"
+              navVariant="on-teal"
+            />
+          </div>
+        </div>
+      </section>
+
+      <main className="mx-auto max-w-6xl px-4 md:px-8">
+        {/* CTA */}
+        <section className="pb-6 md:pb-10">
+          <div className="relative overflow-hidden rounded-2xl md:rounded-3xl">
+            <img
+              src={CTA_IMAGE}
+              alt="Hacé tu pedido"
+              className="h-28 w-full object-cover md:h-40 lg:h-48"
+            />
+            <div className="absolute inset-0 flex items-center justify-between bg-black/45 px-4 md:px-8 lg:px-12">
+              <CotyLogo size="sm" className="mix-blend-screen md:h-20" />
+              <Link
+                href="/menu"
+                className="flex items-center gap-2 rounded-full bg-linear-to-r from-[#00C9B7] to-[#00E5D0] px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-transform hover:scale-105 md:px-8 md:py-3.5 md:text-base"
               >
-                <Link
-                  href={`/menu?category=${category.id}`}
-                  className="flex flex-col items-center gap-2 rounded-3xl border border-border/70 bg-card/80 p-4 transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                    <Coffee className="h-6 w-6 text-primary" />
-                  </div>
-                  <span className="text-sm font-medium">{category.name}</span>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Featured Products */}
-      <section className="py-8 md:py-12">
-        <div className="container px-4 mx-auto">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-primary">Selección visual</p>
-              <h2 className="font-serif text-3xl font-bold">Destacados</h2>
+                Hace tu pedido
+                <ArrowRight className="h-4 w-4 md:h-5 md:w-5" />
+              </Link>
             </div>
-            <Link href="/menu">
-              <Button variant="ghost" className="gap-1 rounded-full">
-                Ver todo
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </Link>
           </div>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            {featuredProducts.map((product, index) => (
-              <motion.div
-                key={product.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
+        </section>
+      </main>
+
+      {/* Info footer — full bleed cream */}
+      <section className="bg-[#F5F0EA] py-8 md:py-12">
+        <div className="mx-auto max-w-6xl px-4 md:px-8">
+          <div className="grid grid-cols-3 gap-4 md:gap-8 lg:gap-12">
+            <div className="flex flex-col items-center text-center">
+              <Clock className="mb-2 h-5 w-5 md:mb-3 md:h-6 md:w-6" style={{ color: COTY_TEAL }} />
+              <p className="text-[11px] font-semibold md:text-sm">Horarios</p>
+              <p className="mt-1 text-[10px] leading-snug text-muted-foreground md:mt-2 md:text-sm">
+                Lun a Sáb {settings.openTime} - {settings.closeTime} hs
+              </p>
+              <span
+                className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-medium md:mt-3 md:px-3 md:py-1 md:text-xs ${
+                  settings.isOpen
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-red-100 text-red-700'
+                }`}
               >
-                <Link
-                  href={`/menu?product=${product.id}`}
-                  className="group block overflow-hidden rounded-3xl border border-border/70 bg-card/85 transition-all hover:-translate-y-1 hover:shadow-xl"
-                >
-                  <div className="relative aspect-square overflow-hidden">
-                    <img
-                      src={product.image}
-                      alt={product.name}
-                      className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                    />
-                    {product.featured && (
-                      <Badge className="absolute left-2 top-2 bg-accent text-accent-foreground">
-                        Popular
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="p-3">
-                    <h3 className="font-medium">{product.name}</h3>
-                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                      {product.description}
-                    </p>
-                    <p className="mt-2 font-serif text-lg font-bold text-primary">
-                      ${product.price}
-                    </p>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+                <span className={`h-1.5 w-1.5 rounded-full md:h-2 md:w-2 ${settings.isOpen ? 'bg-green-500' : 'bg-red-500'}`} />
+                {settings.isOpen ? 'Abierto ahora' : 'Cerrado'}
+              </span>
+            </div>
 
-      {/* Info Section */}
-      <section className="border-t border-border/60 bg-muted/40 py-12">
-        <div className="container px-4 mx-auto">
-          <div className="grid gap-8 md:grid-cols-3">
-            <div className="flex items-start gap-4">
-              <div className="rounded-full bg-primary/10 p-3 shadow-sm">
-                <MapPin className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-medium">Ubicación</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{settings.address}</p>
-              </div>
+            <div className="flex flex-col items-center text-center">
+              <MapPin className="mb-2 h-5 w-5 md:mb-3 md:h-6 md:w-6" style={{ color: COTY_TEAL }} />
+              <p className="text-[11px] font-semibold md:text-sm">Ubicación</p>
+              <p className="mt-1 text-[10px] leading-snug text-muted-foreground md:mt-2 md:max-w-xs md:text-sm">
+                {settings.address}
+              </p>
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 rounded-full border border-[#2D5A57]/20 bg-white px-2 py-0.5 text-[9px] font-medium text-[#2D5A57] transition-colors hover:bg-[#2D5A57]/5 md:mt-3 md:px-4 md:py-1.5 md:text-xs"
+              >
+                Ver en el mapa
+              </a>
             </div>
-            <div className="flex items-start gap-4">
-              <div className="rounded-full bg-primary/10 p-3 shadow-sm">
-                <Clock className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-medium">Horario</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Lun - Dom: {settings.openTime} - {settings.closeTime}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-4">
-              <div className="rounded-full bg-primary/10 p-3 shadow-sm">
-                <Phone className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-medium">Contacto</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{settings.phone}</p>
-              </div>
+
+            <div className="flex flex-col items-center text-center">
+              <Phone className="mb-2 h-5 w-5 md:mb-3 md:h-6 md:w-6" style={{ color: COTY_TEAL }} />
+              <p className="text-[11px] font-semibold md:text-sm">Contacto</p>
+              <p className="mt-1 text-[10px] leading-snug text-muted-foreground md:mt-2 md:text-sm">
+                {settings.phone}
+                {settings.instagram ? ` ${settings.instagram}` : ''}
+              </p>
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 rounded-full border border-[#2D5A57]/20 bg-white px-2 py-0.5 text-[9px] font-medium text-[#2D5A57] transition-colors hover:bg-[#2D5A57]/5 md:mt-3 md:px-4 md:py-1.5 md:text-xs"
+              >
+                WhatsApp
+              </a>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-border/60 py-8">
-        <div className="container px-4 mx-auto">
-          <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-            <div className="flex items-center gap-2">
-              <img src="/icon.svg" alt="Coty Café" className="h-8 w-8 rounded-xl" />
-              <span className="font-serif text-lg font-bold">Coty Café</span>
-            </div>
-            <div className="flex items-center gap-4">
-              {settings.instagram && (
-                <a
-                  href={`https://instagram.com/${settings.instagram}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-muted-foreground hover:text-primary"
-                >
-                  <Instagram className="h-5 w-5" />
-                </a>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              © 2024 Coty Café. Todos los derechos reservados.
-            </p>
-          </div>
-        </div>
+      {/* Final footer */}
+      <footer className="mx-auto flex max-w-6xl flex-col items-center px-4 pb-10 pt-6 md:px-8 md:pb-14 md:pt-10">
+        <CotyLogo size="lg" />
+        <p className="mt-4 text-center text-[10px] text-muted-foreground md:text-xs">
+          Coty Café - Resto Bar. Todos los derechos reservados.
+        </p>
       </footer>
+
+      {/* Floating cart — mobile centered, desktop bottom-right */}
+      {itemCount > 0 && (
+        <div className="fixed bottom-[72px] left-1/2 z-50 w-full max-w-[390px] -translate-x-1/2 px-4 md:left-auto md:right-8 md:max-w-sm md:translate-x-0 lg:right-12">
+          <Link
+            href="/checkout"
+            className="flex items-center justify-center gap-2 rounded-full py-3.5 text-sm font-semibold text-white shadow-xl transition-transform hover:scale-[1.02] md:py-4 md:text-base"
+            style={{ backgroundColor: COTY_TEAL }}
+          >
+            <ShoppingBag className="h-4 w-4 md:h-5 md:w-5" />
+            Ver pedido ({itemCount})
+          </Link>
+        </div>
+      )}
     </div>
   )
 }

@@ -17,6 +17,8 @@ const allowedDevOrigins = Array.from(
 )
 
 const nextConfig = {
+  devIndicators: false,
+  reactStrictMode: false,
   typescript: {
     ignoreBuildErrors: true,
   },

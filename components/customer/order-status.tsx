@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
 import {
   Coffee,
   ChevronLeft,
@@ -45,7 +44,7 @@ export function OrderStatusPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-24">
       {/* Header */}
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center px-4">
@@ -85,18 +84,13 @@ export function OrderStatusPage() {
           />
         ) : (
           <div className="space-y-6">
-            {filteredOrders.map((order, index) => {
+            {filteredOrders.map((order) => {
               const currentStep = getStepIndex(order.status)
               const isCancelled = order.status === 'cancelled'
               const isComplete = order.status === 'completed' || order.status === 'delivered'
 
               return (
-                <motion.div
-                  key={order.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                >
+                <div key={order.id}>
                   <Card>
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
@@ -191,7 +185,7 @@ export function OrderStatusPage() {
                       </div>
                     </CardContent>
                   </Card>
-                </motion.div>
+                </div>
               )
             })}
           </div>

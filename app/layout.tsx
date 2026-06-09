@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Playfair_Display } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
-import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
@@ -26,8 +25,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f8f5f2' },
-    { media: '(prefers-color-scheme: dark)', color: '#2d261f' },
+    { media: '(prefers-color-scheme: light)', color: '#2d5a57' },
+    { media: '(prefers-color-scheme: dark)', color: '#2d5a57' },
   ],
   width: 'device-width',
   initialScale: 1,
@@ -41,17 +40,13 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="es" suppressHydrationWarning className="bg-background">
-      <body className={`${inter.variable} ${playfair.variable} font-sans antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-          <Toaster richColors position="top-center" />
-        </ThemeProvider>
+    <html lang="es" suppressHydrationWarning className="light bg-background">
+      <body
+        suppressHydrationWarning
+        className={`${inter.variable} ${playfair.variable} font-sans antialiased`}
+      >
+        {children}
+        <Toaster richColors position="top-center" />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

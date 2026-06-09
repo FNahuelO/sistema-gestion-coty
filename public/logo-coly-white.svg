@@ -1,0 +1,5 @@
+<svg width="120" height="48" viewBox="0 0 120 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M60 6C58 6 56.5 7 55.5 8.5C54.5 7 53 6 51 6C47.5 6 45 9 45 12.5C45 16 47.5 19 51 19C53 19 54.5 18 55.5 16.5C56.5 18 58 19 60 19C63.5 19 66 16 66 12.5C66 9 63.5 6 60 6Z" fill="white" opacity="0.9"/>
+  <path d="M55.5 16.5C54 14.5 52 13.5 50 13.5C48.5 13.5 47 14.5 46 16C47 17.5 48.5 18.5 50 18.5C52 18.5 54 17.5 55.5 16.5Z" fill="#2D5A57"/>
+  <text x="60" y="38" text-anchor="middle" fill="white" font-family="Georgia, serif" font-size="18" font-style="italic" font-weight="600">Coly Caf�</text>
+</svg>

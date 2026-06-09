@@ -1,24 +1,14 @@
 'use client'
 
-import { motion } from 'framer-motion'
 import { Coffee } from 'lucide-react'
 
 export function LoadingScreen() {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="flex flex-col items-center gap-4"
-      >
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-        >
-          <Coffee className="h-12 w-12 text-primary" />
-        </motion.div>
-        <p className="text-lg font-medium text-muted-foreground">Cargando...</p>
-      </motion.div>
+    <div className="flex min-h-[50vh] items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <Coffee className="h-10 w-10 animate-pulse text-primary" />
+        <p className="text-sm font-medium text-muted-foreground">Cargando...</p>
+      </div>
     </div>
   )
 }
