@@ -503,6 +503,27 @@ export function serializeTable(table: Prisma.DiningTableGetPayload<{ include: ty
   }
 }
 
+export async function getPublicTable(tableId: string) {
+  const table = await prisma.diningTable.findFirst({
+    where: {
+      id: tableId,
+      active: true,
+      deletedAt: null,
+    },
+    select: {
+      id: true,
+      number: true,
+    },
+  })
+
+  if (!table) return null
+
+  return {
+    id: table.id,
+    number: table.number,
+  }
+}
+
 export async function getPublicCatalog() {
   const [settings, categories, products, promotions] = await Promise.all([
     prisma.businessSettings.findUnique({ where: { id: 'main' } }),
@@ -752,7 +773,12 @@ export async function createOrderFromPayload(payload: z.infer<typeof createOrder
             : input.paymentMethod === 'mercado_pago'
               ? 'MERCADO_PAGO'
               : 'CASH',
-      customerName: input.type === 'table' && diningTable ? `Mesa ${diningTable.number}` : input.customerName,
+      customerName:
+        input.type === 'table' && diningTable
+          ? input.customerName.trim()
+            ? `${input.customerName.trim()} · Mesa ${diningTable.number}`
+            : `Mesa ${diningTable.number}`
+          : input.customerName,
       customerPhone: input.customerPhone,
       customerAddress: input.type === 'delivery' ? input.customerAddress : undefined,
       notes: input.notes,

@@ -1,7 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireSessionRole, occupyTable, serializeTable, upsertTable } from '@/lib/server-data'
+import { getPublicTable, requireSessionRole, occupyTable, serializeTable, upsertTable } from '@/lib/server-data'
+
+export async function GET(_request: NextRequest, context: { params: Promise<{ tableId: string }> }) {
+  try {
+    const { tableId } = await context.params
+    const table = await getPublicTable(tableId)
+
+    if (!table) {
+      return NextResponse.json({ error: 'Mesa no encontrada' }, { status: 404 })
+    }
+
+    return NextResponse.json(table)
+  } catch (error) {
+    console.error('GET /api/tables/[tableId]', error)
+    return NextResponse.json({ error: 'No se pudo cargar la mesa' }, { status: 500 })
+  }
+}
 
 const patchSchema = z.object({
   number: z.number().int().positive().optional(),

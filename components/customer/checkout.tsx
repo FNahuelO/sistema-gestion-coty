@@ -16,6 +16,7 @@ import {
   CreditCard,
   Banknote,
   Building2,
+  Users,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,7 +24,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { SimpleModal } from '@/components/ui/simple-modal'
-import { useCart, useBusiness, useCatalog, useOrders } from '@/lib/store'
+import { useCart, useBusiness, useCatalog, useOrders, useTableSession } from '@/lib/store'
+import { buildMenuPathWithTable } from '@/lib/menu-url'
+import { TableSessionBanner } from '@/components/customer/table-session-banner'
 import { useCartPricing } from '@/hooks/use-cart-pricing'
 import { CartProductCard } from '@/components/customer/cart-product-card'
 import { CheckoutFormSkeleton, CheckoutLoadingSkeleton, LoadingSkeleton } from '@/components/shared/loading'
@@ -101,6 +104,7 @@ export function CheckoutPage() {
   const { promotions } = useCatalog()
   const { subtotal, discount, total } = useCartPricing(items, promotions)
   const { addOrder } = useOrders()
+  const { tableSession, isTableMode, hydrated: tableSessionHydrated } = useTableSession()
 
   const [orderType, setOrderType] = useState<OrderType>('pickup')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
@@ -114,10 +118,22 @@ export function CheckoutPage() {
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   const isEmpty = items.length === 0 && !orderComplete
-  const deliveryFee = orderType === 'delivery' ? settings.deliveryFee : 0
+  const activeOrderType = isTableMode ? 'table' : orderType
+  const deliveryFee = activeOrderType === 'delivery' ? settings.deliveryFee : 0
   const finalTotal = total + deliveryFee
-  const isClosed = !settings.isOpen
-  const belowMinOrder = settings.minOrderAmount > 0 && subtotal < settings.minOrderAmount
+  const isClosed = !settings.isOpen && activeOrderType !== 'table'
+  const belowMinOrder = activeOrderType !== 'table' && settings.minOrderAmount > 0 && subtotal < settings.minOrderAmount
+  const menuHref = tableSession ? buildMenuPathWithTable(tableSession.tableId) : '/menu'
+
+  useEffect(() => {
+    if (!tableSessionHydrated) return
+    if (tableSession) {
+      setOrderType('table')
+      setPaymentMethod((current) => (current === 'mercado_pago' ? 'cash' : current))
+      return
+    }
+    setOrderType((current) => (current === 'table' ? 'pickup' : current))
+  }, [tableSession, tableSessionHydrated])
 
   useEffect(() => {
     if (items.length === 0) {
@@ -147,8 +163,13 @@ export function CheckoutPage() {
       return
     }
 
-    if (orderType === 'delivery' && !customerAddress) {
+    if (orderType === 'delivery' && !isTableMode && !customerAddress) {
       toast.error('Por favor ingresá tu dirección de entrega')
+      return
+    }
+
+    if (isTableMode && !tableSession) {
+      toast.error('No se pudo identificar la mesa')
       return
     }
 
@@ -161,11 +182,12 @@ export function CheckoutPage() {
 
     try {
       const createdOrder = await addOrder({
-        type: orderType,
-        paymentMethod,
+        type: activeOrderType,
+        paymentMethod: isTableMode && paymentMethod === 'mercado_pago' ? 'cash' : paymentMethod,
         customerName,
         customerPhone,
-        customerAddress: orderType === 'delivery' ? customerAddress : undefined,
+        customerAddress: activeOrderType === 'delivery' ? customerAddress : undefined,
+        tableId: isTableMode ? tableSession?.tableId : undefined,
         notes: notes || undefined,
         items: items.map((item) => ({
           productId: item.product.id,
@@ -245,7 +267,7 @@ export function CheckoutPage() {
               <p className="mt-2 max-w-xs text-sm text-muted-foreground">
                 Todavía no agregaste productos. Explorá el menú y armá tu pedido.
               </p>
-              <Link href="/menu" className="mt-8 w-full max-w-xs">
+              <Link href={menuHref} className="mt-8 w-full max-w-xs">
                 <Button
                   className="w-full rounded-full py-6 text-base font-bold shadow-lg"
                   style={{ backgroundColor: COTY_TEAL }}
@@ -270,15 +292,19 @@ export function CheckoutPage() {
               </div>
               <h2 className="text-2xl font-bold">¡Pedido confirmado!</h2>
               <p className="mt-2 text-muted-foreground">
-                Tu pedido #{orderId} ha sido enviado por WhatsApp
+                {isTableMode
+                  ? `Tu pedido #${orderId} fue enviado a la Mesa ${tableSession?.tableNumber}`
+                  : `Tu pedido #${orderId} ha sido enviado por WhatsApp`}
               </p>
               <div className="mt-6 w-full max-w-xs space-y-3">
-                <Link href="/order-status">
-                  <Button className="w-full rounded-full py-6 font-bold" style={{ backgroundColor: COTY_TEAL }}>
-                    Ver estado del pedido
-                  </Button>
-                </Link>
-                <Link href="/menu">
+                {!isTableMode ? (
+                  <Link href="/order-status">
+                    <Button className="w-full rounded-full py-6 font-bold" style={{ backgroundColor: COTY_TEAL }}>
+                      Ver estado del pedido
+                    </Button>
+                  </Link>
+                ) : null}
+                <Link href={menuHref}>
                   <Button variant="outline" className="w-full rounded-full py-6 font-bold">
                     Hacer otro pedido
                   </Button>
@@ -292,6 +318,7 @@ export function CheckoutPage() {
           <CheckoutHeader />
 
           <CheckoutMain className="pb-4 pt-6 md:pt-8">
+            <TableSessionBanner className="mb-4" showClear={false} />
             {isClosed && (
               <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 El local está cerrado. Horario: {settings.openTime} – {settings.closeTime}
@@ -343,42 +370,57 @@ export function CheckoutPage() {
                     <div className="border-t border-black/8" />
 
                     <CheckoutSection
-                      icon={<Image src="/icons/delivery.svg" alt="Delivery" width={22} height={22} />}
-                      title="Método de entrega"
+                      icon={
+                        isTableMode ? (
+                          <Users className="h-5 w-5 text-white" />
+                        ) : (
+                          <Image src="/icons/delivery.svg" alt="Delivery" width={22} height={22} />
+                        )
+                      }
+                      title={isTableMode ? 'Pedido en mesa' : 'Método de entrega'}
                     >
-                      <RadioGroup
-                        value={orderType}
-                        onValueChange={(v) => setOrderType(v as OrderType)}
-                        className="mt-2 space-y-3"
-                      >
-                        <label htmlFor="pickup" className="flex cursor-pointer items-center gap-3">
-                          <RadioGroupItem
-                            value="pickup"
-                            id="pickup"
-                            className="border-[#2D5A57] text-[#2D5A57] data-[state=checked]:border-[#2D5A57]"
-                          />
-                          <span className="text-sm font-medium">Retiro en el local</span>
-                          <span
-                            className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold text-[#2D5A57]"
-                            style={{ backgroundColor: COTY_QTY_BG }}
-                          >
-                            Gratis
-                          </span>
-                        </label>
-                        <label htmlFor="delivery" className="flex cursor-pointer items-center gap-3">
-                          <RadioGroupItem
-                            value="delivery"
-                            id="delivery"
-                            className="border-[#2D5A57] text-[#2D5A57]"
-                          />
-                          <span className="text-sm font-medium">Delivery</span>
-                          {settings.deliveryFee > 0 && (
-                            <span className="ml-auto text-xs text-muted-foreground">
-                              +{formatPrice(settings.deliveryFee)}
+                      {isTableMode ? (
+                        <div className="mt-2 rounded-xl border border-black/8 bg-[#F8FBFA] px-3 py-3 text-sm">
+                          <p className="font-medium text-[#2D5A57]">Mesa {tableSession?.tableNumber}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            El pedido llega al salón y podés seguir agregando productos durante tu visita.
+                          </p>
+                        </div>
+                      ) : (
+                        <RadioGroup
+                          value={orderType}
+                          onValueChange={(v) => setOrderType(v as OrderType)}
+                          className="mt-2 space-y-3"
+                        >
+                          <label htmlFor="pickup" className="flex cursor-pointer items-center gap-3">
+                            <RadioGroupItem
+                              value="pickup"
+                              id="pickup"
+                              className="border-[#2D5A57] text-[#2D5A57] data-[state=checked]:border-[#2D5A57]"
+                            />
+                            <span className="text-sm font-medium">Retiro en el local</span>
+                            <span
+                              className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold text-[#2D5A57]"
+                              style={{ backgroundColor: COTY_QTY_BG }}
+                            >
+                              Gratis
                             </span>
-                          )}
-                        </label>
-                      </RadioGroup>
+                          </label>
+                          <label htmlFor="delivery" className="flex cursor-pointer items-center gap-3">
+                            <RadioGroupItem
+                              value="delivery"
+                              id="delivery"
+                              className="border-[#2D5A57] text-[#2D5A57]"
+                            />
+                            <span className="text-sm font-medium">Delivery</span>
+                            {settings.deliveryFee > 0 && (
+                              <span className="ml-auto text-xs text-muted-foreground">
+                                +{formatPrice(settings.deliveryFee)}
+                              </span>
+                            )}
+                          </label>
+                        </RadioGroup>
+                      )}
                     </CheckoutSection>
 
                     <div className="border-t border-black/8" />
@@ -399,7 +441,7 @@ export function CheckoutPage() {
                           </div>
                         )}
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Envío</span>
+                          <span className="text-muted-foreground">{isTableMode ? 'Servicio' : 'Envío'}</span>
                           <span className="font-medium">{formatPrice(deliveryFee)}</span>
                         </div>
                         <div className="my-2 border-t border-black/8" />
@@ -471,7 +513,7 @@ export function CheckoutPage() {
                   required
                 />
               </div>
-              {orderType === 'delivery' && (
+              {orderType === 'delivery' && !isTableMode && (
                 <div className="space-y-2">
                   <Label htmlFor="address" className="flex items-center gap-2">
                     <MapPin className="h-4 w-4" />
@@ -501,7 +543,9 @@ export function CheckoutPage() {
                     { value: 'cash', label: 'Efectivo', icon: Banknote },
                     { value: 'card', label: 'Tarjeta (al recibir)', icon: CreditCard },
                     { value: 'transfer', label: 'Transferencia', icon: Building2 },
-                    { value: 'mercado_pago', label: 'Mercado Pago', icon: CreditCard },
+                    ...(isTableMode
+                      ? []
+                      : [{ value: 'mercado_pago' as const, label: 'Mercado Pago', icon: CreditCard }]),
                   ].map(({ value, label, icon: Icon }) => (
                     <label
                       key={value}

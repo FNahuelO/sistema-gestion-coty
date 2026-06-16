@@ -43,6 +43,8 @@ import { ImageUploadField } from '@/components/admin/image-upload-field'
 import { CategoryIconPicker } from '@/components/admin/category-icon-picker'
 import { MultiSelectField } from '@/components/admin/multi-select-field'
 import { ProductOptionsEditor, normalizeProductOptions } from '@/components/admin/product-options-editor'
+import { MenuQrSection } from '@/components/admin/menu-qr-section'
+import { TableQrButton, TableQrDialog } from '@/components/admin/table-qr-dialog'
 
 type ProductFormState = {
   id?: string
@@ -215,6 +217,7 @@ export function AdminDashboard() {
   const [activeSection, setActiveSection] = useState<AdminSection>('dashboard')
   const [menuOpen, setMenuOpen] = useState(false)
   const [formPanelsOpen, setFormPanelsOpen] = useState(DEFAULT_FORM_PANELS)
+  const [qrTable, setQrTable] = useState<Table | null>(null)
 
   const setFormPanelOpen = (section: FormSection, open: boolean) => {
     setFormPanelsOpen((previous) => ({ ...previous, [section]: open }))
@@ -630,9 +633,9 @@ export function AdminDashboard() {
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {(admin.analytics?.topProducts ?? []).map((product) => (
-                    <div key={product.productId} className={cn(ADMIN_LIST_ROW, 'flex items-center justify-between text-sm')}>
-                      <div>
-                        <p className="font-medium">{product.productName}</p>
+                    <div key={product.productId} className={cn(ADMIN_LIST_ROW, 'flex items-center justify-between gap-2 text-sm')}>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{product.productName}</p>
                         <p className="text-xs text-muted-foreground">{product.quantity} unidades</p>
                       </div>
                       <CotyPriceBadge>{formatPrice(product.revenue)}</CotyPriceBadge>
@@ -775,15 +778,15 @@ export function AdminDashboard() {
               </CardHeader>
               <CardContent className="space-y-2">
                 {admin.products.map((product) => (
-                  <div key={product.id} className={cn(ADMIN_LIST_ROW, 'flex flex-col gap-3 md:flex-row md:items-center md:justify-between')}>
-                    <div className="flex items-center gap-3">
-                      <img src={product.image} alt={product.name} className="h-14 w-14 rounded-xl object-cover ring-1 ring-gray-100" />
-                      <div>
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-xs text-muted-foreground">{formatPrice(product.price)} · {product.preparationTime} min</p>
+                  <div key={product.id} className={cn(ADMIN_LIST_ROW, 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between')}>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <img src={product.image} alt={product.name} className="h-14 w-14 shrink-0 rounded-xl object-cover ring-1 ring-gray-100" />
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{product.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{formatPrice(product.price)} · {product.preparationTime} min</p>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex shrink-0 gap-2 self-end sm:self-auto">
                       <Button variant="outline" size="sm" className={ADMIN_OUTLINE_BTN} onClick={() => loadProduct(product)}>Editar</Button>
                       <Button variant="destructive" size="sm" onClick={() => void admin.deleteProduct(product.id).then(() => toast.success('Producto eliminado'))}>Eliminar</Button>
                     </div>
@@ -835,19 +838,19 @@ export function AdminDashboard() {
                 {admin.categories.map((category) => {
                   const CategoryIcon = getCategoryIcon(category.icon)
                   return (
-                  <div key={category.id} className={cn(ADMIN_LIST_ROW, 'flex items-center justify-between')}>
-                    <div className="flex items-center gap-3">
+                  <div key={category.id} className={cn(ADMIN_LIST_ROW, 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between')}>
+                    <div className="flex min-w-0 items-center gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F8FBFA]">
                         <CategoryIcon className="h-5 w-5" style={{ color: COTY_TEAL }} />
                       </div>
-                      <div>
-                        <p className="font-medium">{category.name}</p>
-                        <p className="text-xs capitalize text-muted-foreground">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{category.name}</p>
+                        <p className="truncate text-xs capitalize text-muted-foreground">
                           {formatCategoryIconLabel(category.icon)} · orden {category.order}
                         </p>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex shrink-0 gap-2 self-end sm:self-auto">
                       <Button variant="outline" size="sm" className={ADMIN_OUTLINE_BTN} onClick={() => loadCategory(category)}>Editar</Button>
                       <Button variant="destructive" size="sm" onClick={() => void admin.deleteCategory(category.id).then(() => toast.success('Categoría eliminada'))}>Eliminar</Button>
                     </div>
@@ -922,12 +925,12 @@ export function AdminDashboard() {
               <CardHeader><CardTitle className={ADMIN_TITLE}>Listado</CardTitle></CardHeader>
               <CardContent className="space-y-2">
                 {admin.promotions.map((promotion) => (
-                  <div key={promotion.id} className={cn(ADMIN_LIST_ROW, 'flex flex-col gap-3 md:flex-row md:items-center md:justify-between')}>
-                    <div>
-                      <p className="font-medium">{promotion.title}</p>
-                      <p className="text-xs text-muted-foreground">{promotion.discount}% · hasta {format(promotion.validTo, 'dd/MM/yyyy', { locale: es })}</p>
+                  <div key={promotion.id} className={cn(ADMIN_LIST_ROW, 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between')}>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{promotion.title}</p>
+                      <p className="truncate text-xs text-muted-foreground">{promotion.discount}% · hasta {format(promotion.validTo, 'dd/MM/yyyy', { locale: es })}</p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex shrink-0 gap-2 self-end sm:self-auto">
                       <Button variant="outline" size="sm" className={ADMIN_OUTLINE_BTN} onClick={() => loadPromotion(promotion)}>Editar</Button>
                       <Button variant="destructive" size="sm" onClick={() => void admin.deletePromotion(promotion.id).then(() => toast.success('Promoción eliminada'))}>Eliminar</Button>
                     </div>
@@ -989,7 +992,8 @@ export function AdminDashboard() {
                     </div>
                     <p className="mt-2 text-xs text-muted-foreground">{table.capacity} personas</p>
                     <p className="text-xs text-muted-foreground">Total actual: {formatPrice(table.currentTotal ?? 0)}</p>
-                    <div className="mt-4 flex gap-2">
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <TableQrButton onClick={() => setQrTable(table)} />
                       <Button variant="outline" size="sm" className={ADMIN_OUTLINE_BTN} onClick={() => loadTable(table)}>Editar</Button>
                       <Button variant="destructive" size="sm" onClick={() => void admin.deleteTable(table.id).then(() => toast.success('Mesa desactivada'))}>Eliminar</Button>
                     </div>
@@ -1061,11 +1065,11 @@ export function AdminDashboard() {
               <CardHeader><CardTitle className={ADMIN_TITLE}>Equipo</CardTitle></CardHeader>
               <CardContent className="space-y-2">
                 {admin.users.map((user) => (
-                  <div key={user.id} className={cn(ADMIN_LIST_ROW, 'flex flex-col gap-3 md:flex-row md:items-center md:justify-between')}>
-                    <div>
-                      <p className="font-medium">{user.name}</p>
-                      <p className="text-xs text-muted-foreground">{user.email}</p>
-                      <div className="mt-2 flex items-center gap-2">
+                  <div key={user.id} className={cn(ADMIN_LIST_ROW, 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between')}>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{user.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
                         <Badge variant="outline" className="border-[#C5DDD9] text-[#2D5A57]">
                           {user.role === 'staff' ? 'Personal' : user.role}
                         </Badge>
@@ -1079,7 +1083,7 @@ export function AdminDashboard() {
                         </Badge>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex shrink-0 gap-2 self-end sm:self-auto">
                       <Button variant="outline" size="sm" className={ADMIN_OUTLINE_BTN} onClick={() => loadUser(user)}>Editar</Button>
                       {user.active ? (
                         <Button
@@ -1159,6 +1163,18 @@ export function AdminDashboard() {
             </AdminFormPanel>
 
             <Card className={ADMIN_CARD}>
+              <CardHeader>
+                <CardTitle className={ADMIN_TITLE}>Códigos QR</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Generá y descargá los QR del menú para imprimir en mesas o mostrador.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <MenuQrSection businessName={admin.settings?.name ?? 'Menú'} />
+              </CardContent>
+            </Card>
+
+            <Card className={ADMIN_CARD}>
               <CardHeader><CardTitle className={ADMIN_TITLE}>Control operativo</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -1192,6 +1208,12 @@ export function AdminDashboard() {
           )}
         </main>
       </div>
+
+      <TableQrDialog
+        table={qrTable}
+        businessName={admin.settings?.name ?? 'Menú'}
+        onClose={() => setQrTable(null)}
+      />
     </div>
   )
 }
@@ -1301,7 +1323,7 @@ function HistoryOrderRow({ order, compact = false }: { order: Order; compact?: b
           <Icon className="h-4 w-4" style={{ color: COTY_TEAL }} />
         </div>
         <div className="min-w-0">
-          <p className="font-semibold text-foreground">{order.displayCode ?? order.id}</p>
+          <p className="truncate font-semibold text-foreground">{order.displayCode ?? order.id}</p>
           <p className="truncate text-xs text-muted-foreground">
             {order.customerName} · {meta.label} · {format(order.createdAt, 'dd/MM/yyyy HH:mm', { locale: es })}
           </p>

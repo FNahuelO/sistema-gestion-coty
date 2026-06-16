@@ -7,6 +7,12 @@ import type { AnalyticsOverview, BusinessSettings, CartItem, Category, Order, Or
 
 const CART_STORAGE_KEY = 'coty-cafe-cart'
 const TRACKING_CODES_KEY = 'coty-cafe-tracking-codes'
+const TABLE_SESSION_STORAGE_KEY = 'coty-cafe-table-session'
+
+type TableSession = {
+  tableId: string
+  tableNumber: number
+}
 
 type CreateOrderItemInput = {
   productId: string
@@ -145,7 +151,103 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export const BusinessProvider = noopProvider
 export const OrdersProvider = noopProvider
-export const TablesProvider = noopProvider
+
+type TableSessionContextType = {
+  tableSession: TableSession | null
+  hydrated: boolean
+  isLoading: boolean
+  error: string | null
+  isTableMode: boolean
+  resolveTable: (tableId: string) => Promise<TableSession>
+  clearTableSession: () => void
+}
+
+const TableSessionContext = createContext<TableSessionContextType | null>(null)
+
+export function TablesProvider({ children }: { children: ReactNode }) {
+  const [tableSession, setTableSession] = useState<TableSession | null>(null)
+  const [hydrated, setHydrated] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(TABLE_SESSION_STORAGE_KEY)
+      if (stored) {
+        setTableSession(JSON.parse(stored) as TableSession)
+      }
+    } catch {
+      setTableSession(null)
+    } finally {
+      setHydrated(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!hydrated) return
+    if (tableSession) {
+      window.localStorage.setItem(TABLE_SESSION_STORAGE_KEY, JSON.stringify(tableSession))
+    } else {
+      window.localStorage.removeItem(TABLE_SESSION_STORAGE_KEY)
+    }
+  }, [tableSession, hydrated])
+
+  const resolveTable = useCallback(async (tableId: string) => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/tables/${tableId}`)
+      const payload = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? 'Mesa no encontrada')
+      }
+
+      const session = {
+        tableId: payload.id as string,
+        tableNumber: payload.number as number,
+      }
+
+      setTableSession(session)
+      return session
+    } catch (resolveError) {
+      setTableSession(null)
+      setError(resolveError instanceof Error ? resolveError.message : 'Mesa no encontrada')
+      throw resolveError
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  const clearTableSession = useCallback(() => {
+    setTableSession(null)
+    setError(null)
+  }, [])
+
+  const value = useMemo<TableSessionContextType>(
+    () => ({
+      tableSession,
+      hydrated,
+      isLoading,
+      error,
+      isTableMode: Boolean(tableSession),
+      resolveTable,
+      clearTableSession,
+    }),
+    [tableSession, hydrated, isLoading, error, resolveTable, clearTableSession]
+  )
+
+  return <TableSessionContext.Provider value={value}>{children}</TableSessionContext.Provider>
+}
+
+export function useTableSession() {
+  const context = useContext(TableSessionContext)
+  if (!context) {
+    throw new Error('useTableSession must be used within a TablesProvider')
+  }
+  return context
+}
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])

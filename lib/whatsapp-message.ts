@@ -5,7 +5,7 @@ type OrderMessageItem = Pick<CartItem, 'quantity' | 'product' | 'selectedOptions
 
 type OrderMessageInput = Pick<
   Order,
-  'displayCode' | 'id' | 'customerName' | 'customerPhone' | 'customerAddress' | 'total' | 'paymentMethod' | 'type' | 'notes'
+  'displayCode' | 'id' | 'customerName' | 'customerPhone' | 'customerAddress' | 'total' | 'paymentMethod' | 'type' | 'notes' | 'tableNumber'
 > & {
   items: OrderMessageItem[]
 }
@@ -41,7 +41,7 @@ export function buildWhatsAppOrderMessage(order: OrderMessageInput, businessName
   return `🧾 *Nuevo Pedido - ${businessName}*
 
 📋 *Pedido ${code}*
-👤 *Cliente:* ${order.customerName}
+${order.tableNumber ? `🪑 *Mesa:* ${order.tableNumber}\n` : ''}👤 *Cliente:* ${order.customerName}
 📱 *Teléfono:* ${order.customerPhone}
 ${order.customerAddress ? `📍 *Dirección:* ${order.customerAddress}\n` : ''}🛒 *Productos:*
 ${itemsList}
