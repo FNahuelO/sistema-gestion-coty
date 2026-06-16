@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     const format = new URL(request.url).searchParams.get('format') === 'csv' ? 'csv' : 'xlsx'
     const orders = await getOrderHistory()
 
-    const rows = orders.map((order) => ({
+    const orderRows = orders.map((order) => ({
       codigo: order.displayCode ?? order.id,
       tracking: order.publicTrackingCode ?? '',
       tipo: order.type,
@@ -26,9 +26,22 @@ export async function GET(request: NextRequest) {
       actualizado: order.updatedAt.toISOString(),
     }))
 
-    const worksheet = XLSX.utils.json_to_sheet(rows)
+    const itemRows = orders.flatMap((order) =>
+      order.items.map((item) => ({
+        codigoPedido: order.displayCode ?? order.id,
+        producto: item.product.name,
+        cantidad: item.quantity,
+        precioUnitario: item.product.price,
+        subtotal: item.product.price * item.quantity,
+        notas: item.notes ?? '',
+      }))
+    )
+
+    const ordersSheet = XLSX.utils.json_to_sheet(orderRows)
+    const itemsSheet = XLSX.utils.json_to_sheet(itemRows)
     const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Ventas')
+    XLSX.utils.book_append_sheet(workbook, ordersSheet, 'Pedidos')
+    XLSX.utils.book_append_sheet(workbook, itemsSheet, 'Items')
     const buffer = XLSX.write(workbook, {
       type: 'buffer',
       bookType: format,

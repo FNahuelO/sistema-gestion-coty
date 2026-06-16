@@ -28,6 +28,7 @@ import { useCartPricing } from '@/hooks/use-cart-pricing'
 import { CartProductCard } from '@/components/customer/cart-product-card'
 import { CheckoutFormSkeleton, CheckoutLoadingSkeleton, LoadingSkeleton } from '@/components/shared/loading'
 import { COTY_HEADER, COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
+import { buildWhatsAppUrl } from '@/lib/whatsapp-message'
 import { cn } from '@/lib/utils'
 import type { OrderType, PaymentMethod, Order } from '@/lib/types'
 import { toast } from 'sonner'
@@ -129,42 +130,8 @@ export function CheckoutPage() {
   }, [pathname])
 
   const generateWhatsAppMessage = (order: Order) => {
-    const itemsList = order.items
-      .map((item) => {
-        const options = item.selectedOptions
-          ?.map((opt) => {
-            const productOpt = item.product.options?.find((o) => o.id === opt.optionId)
-            return opt.choiceIds
-              .map((cId) => productOpt?.choices.find((c) => c.id === cId)?.name)
-              .join(', ')
-          })
-          .join(' | ')
-        return `• ${item.quantity}x ${item.product.name}${options ? ` (${options})` : ''}`
-      })
-      .join('\n')
-
-    const message = `🧾 *Nuevo Pedido - ${settings.name}*
-
-📋 *Pedido #${order.id}*
-👤 *Cliente:* ${order.customerName}
-📱 *Teléfono:* ${order.customerPhone}
-${order.type === 'delivery' ? `📍 *Dirección:* ${order.customerAddress}\n` : ''}
-🛒 *Productos:*
-${itemsList}
-
-💰 *Total:* $${order.total.toFixed(2)}
-💳 *Pago:* ${paymentMethod === 'cash'
-        ? 'Efectivo'
-        : paymentMethod === 'card'
-          ? 'Tarjeta'
-          : paymentMethod === 'transfer'
-            ? 'Transferencia'
-            : 'Mercado Pago'
-      }
-${order.type === 'delivery' ? '🚚 *Tipo:* Delivery' : '🏪 *Tipo:* Recoger en tienda'}
-${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`
-
-    return encodeURIComponent(message)
+    if (!settings.whatsapp) return null
+    return buildWhatsAppUrl(settings.whatsapp, order, settings.name)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -223,6 +190,11 @@ ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`
           return payload as Order
         })
 
+        const whatsappUrl = generateWhatsAppMessage(createdOrder)
+        if (whatsappUrl) {
+          window.open(whatsappUrl, '_blank')
+        }
+
         clearCart()
         window.location.href = paymentOrder.paymentUrl ?? '/order-status'
         return
@@ -232,8 +204,10 @@ ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`
       setConfirmOpen(false)
       clearCart()
 
-      const whatsappUrl = `https://wa.me/${settings.whatsapp}?text=${generateWhatsAppMessage(createdOrder)}`
-      window.open(whatsappUrl, '_blank')
+      const whatsappUrl = generateWhatsAppMessage(createdOrder)
+      if (whatsappUrl) {
+        window.open(whatsappUrl, '_blank')
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo procesar el pedido')
     } finally {

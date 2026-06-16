@@ -53,6 +53,7 @@ export function MenuPage() {
         categoryProducts={categoryProducts}
         activeCategoryName={activeCategoryName}
         activeCategoryIcon={activeCategoryIcon}
+        promotions={promotions}
         items={items}
         addItem={addItem}
         removeItem={removeItem}

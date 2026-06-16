@@ -243,6 +243,33 @@ export function AdminDashboard() {
     [admin.analytics?.todayOrders, yesterday.orders]
   )
 
+  const HISTORY_PAGE_SIZE = 15
+  const [historySearch, setHistorySearch] = useState('')
+  const [historyPage, setHistoryPage] = useState(0)
+
+  const filteredHistory = useMemo(() => {
+    const query = historySearch.trim().toLowerCase()
+    if (!query) return admin.history
+    return admin.history.filter(
+      (order) =>
+        order.displayCode?.toLowerCase().includes(query) ||
+        order.publicTrackingCode?.toLowerCase().includes(query) ||
+        order.id.toLowerCase().includes(query) ||
+        order.customerName.toLowerCase().includes(query) ||
+        order.customerPhone.includes(query)
+    )
+  }, [admin.history, historySearch])
+
+  const historyPageCount = Math.max(1, Math.ceil(filteredHistory.length / HISTORY_PAGE_SIZE))
+  const paginatedHistory = filteredHistory.slice(
+    historyPage * HISTORY_PAGE_SIZE,
+    (historyPage + 1) * HISTORY_PAGE_SIZE
+  )
+
+  useEffect(() => {
+    setHistoryPage(0)
+  }, [historySearch])
+
   const navigateTo = (section: AdminSection) => {
     setActiveSection(section)
     setMenuOpen(false)
@@ -618,9 +645,15 @@ export function AdminDashboard() {
               </Card>
 
               <section>
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <h2 className="text-sm font-semibold text-foreground">Historial reciente</h2>
-                  <div className="flex gap-2">
+                <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <h2 className="text-sm font-semibold text-foreground">Historial de ventas</h2>
+                  <div className="flex flex-wrap gap-2">
+                    <Input
+                      placeholder="Buscar pedido..."
+                      value={historySearch}
+                      onChange={(event) => setHistorySearch(event.target.value)}
+                      className="h-9 w-full border-gray-200 bg-[#F8FBFA] sm:w-48"
+                    />
                     <Button
                       variant="outline"
                       size="sm"
@@ -639,15 +672,42 @@ export function AdminDashboard() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  {admin.history.slice(0, 10).map((order) => (
+                  {paginatedHistory.map((order) => (
                     <HistoryOrderRow key={order.id} order={order} />
                   ))}
-                  {admin.history.length === 0 && (
+                  {filteredHistory.length === 0 && (
                     <div className={cn(ADMIN_LIST_ROW, 'py-8 text-center text-xs text-muted-foreground')}>
-                      No hay pedidos en el historial
+                      {historySearch ? 'No hay pedidos que coincidan con la búsqueda' : 'No hay pedidos en el historial'}
                     </div>
                   )}
                 </div>
+                {filteredHistory.length > HISTORY_PAGE_SIZE && (
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      {filteredHistory.length} pedidos · página {historyPage + 1} de {historyPageCount}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={ADMIN_OUTLINE_BTN}
+                        disabled={historyPage === 0}
+                        onClick={() => setHistoryPage((page) => Math.max(0, page - 1))}
+                      >
+                        Anterior
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={ADMIN_OUTLINE_BTN}
+                        disabled={historyPage >= historyPageCount - 1}
+                        onClick={() => setHistoryPage((page) => Math.min(historyPageCount - 1, page + 1))}
+                      >
+                        Siguiente
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </section>
             </div>
           )}

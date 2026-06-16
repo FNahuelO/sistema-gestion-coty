@@ -1,13 +1,17 @@
 'use client'
 
 import { Plus, Minus, Trash2 } from 'lucide-react'
-import type { CartItem, Product } from '@/lib/types'
+import type { CartItem, Product, Promotion } from '@/lib/types'
 import { useCart } from '@/lib/store'
-import { COTY_QTY_BG, formatPrice } from '@/lib/coty-theme'
+import { COTY_QTY_BG } from '@/lib/coty-theme'
 import { getDefaultCartItem } from '@/lib/menu-cart-utils'
+import { ProductPriceDisplay } from '@/components/customer/product-price-display'
+import { getProductDiscountPercent } from '@/lib/promotions'
+import { Badge } from '@/components/ui/badge'
 
 interface MenuListProductCardProps {
   product: Product
+  promotions?: Promotion[]
   items: CartItem[]
   addItem: ReturnType<typeof useCart>['addItem']
   removeItem: ReturnType<typeof useCart>['removeItem']
@@ -17,6 +21,7 @@ interface MenuListProductCardProps {
 
 export function MenuListProductCard({
   product,
+  promotions = [],
   items,
   addItem,
   removeItem,
@@ -26,6 +31,7 @@ export function MenuListProductCard({
   const cartItem = getDefaultCartItem(items, product.id)
   const quantity = cartItem?.quantity ?? 0
   const hasRequiredOptions = product.options?.some((option) => option.required)
+  const discount = getProductDiscountPercent(product, promotions)
 
   const handleIncrease = () => {
     if (hasRequiredOptions) {
@@ -56,9 +62,14 @@ export function MenuListProductCard({
       <button
         type="button"
         onClick={onOpenDetail}
-        className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl md:h-[96px] md:w-[96px]"
+        className="relative h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl md:h-[96px] md:w-[96px]"
       >
         <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+        {discount > 0 && (
+          <Badge className="absolute left-1 top-1 bg-[#EAB308] px-1 text-[9px] text-white hover:bg-[#EAB308]">
+            Promo
+          </Badge>
+        )}
       </button>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -68,7 +79,9 @@ export function MenuListProductCard({
         <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground md:text-xs">
           {product.description}
         </p>
-        <p className="mt-1.5 text-sm font-bold md:text-base">{formatPrice(product.price)}</p>
+        <div className="mt-1.5">
+          <ProductPriceDisplay product={product} promotions={promotions} priceClassName="text-sm font-bold md:text-base" />
+        </div>
 
         <div className="mt-auto flex items-end justify-between pt-2">
           <div

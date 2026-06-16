@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireSessionRole, serializeTable, upsertTable } from '@/lib/server-data'
+import { requireSessionRole, occupyTable, serializeTable, upsertTable } from '@/lib/server-data'
 
 const patchSchema = z.object({
   number: z.number().int().positive().optional(),
@@ -12,7 +12,7 @@ const patchSchema = z.object({
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ tableId: string }> }) {
   try {
-    await requireSessionRole(['admin', 'staff'])
+    const user = await requireSessionRole(['admin', 'staff'])
     const { tableId } = await context.params
     const body = patchSchema.parse(await request.json())
 
@@ -22,6 +22,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ t
 
     if (!existing) {
       return NextResponse.json({ error: 'Mesa no encontrada' }, { status: 404 })
+    }
+
+    if (body.status === 'occupied') {
+      const table = await occupyTable(tableId, user.id)
+      return NextResponse.json(table)
     }
 
     const table = await upsertTable(tableId, {

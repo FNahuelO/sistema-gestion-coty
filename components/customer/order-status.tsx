@@ -32,10 +32,10 @@ export function OrderStatusPage() {
   const [searchId, setSearchId] = useState('')
   const { orders } = useTrackedOrders(searchId)
 
-  const filteredOrders = orders.filter(order => 
-    order.type !== 'table' && 
-    (searchId === '' || order.id.toLowerCase().includes(searchId.toLowerCase()))
-  )
+  const filteredOrders = orders.filter((order) => order.type !== 'table')
+
+  const getOrderLabel = (order: (typeof orders)[number]) =>
+    order.displayCode ?? order.publicTrackingCode ?? order.id.slice(0, 8).toUpperCase()
 
   const getStepIndex = (status: OrderStatus) => {
     if (status === 'cancelled') return -1
@@ -62,7 +62,7 @@ export function OrderStatusPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar por número de pedido..."
+              placeholder="Buscar por código de pedido..."
               value={searchId}
               onChange={(e) => setSearchId(e.target.value)}
               className="pl-9"
@@ -95,7 +95,7 @@ export function OrderStatusPage() {
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-base">
-                          Pedido #{order.id}
+                          Pedido {getOrderLabel(order)}
                         </CardTitle>
                         <StatusBadge status={order.status} />
                       </div>

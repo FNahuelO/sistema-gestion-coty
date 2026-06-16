@@ -14,5 +14,21 @@
       "type": "image/svg+xml",
       "purpose": "any"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Panel staff",
+      "short_name": "Staff",
+      "description": "Acceso rápido al panel de mesas y pedidos",
+      "url": "/staff",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Iniciar sesión",
+      "short_name": "Login",
+      "description": "Ingreso para personal",
+      "url": "/login",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
   ]
 }

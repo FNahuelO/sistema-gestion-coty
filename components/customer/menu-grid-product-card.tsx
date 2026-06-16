@@ -1,13 +1,17 @@
 'use client'
 
 import { Plus, Minus } from 'lucide-react'
-import type { CartItem, Product } from '@/lib/types'
+import type { CartItem, Product, Promotion } from '@/lib/types'
 import { useCart } from '@/lib/store'
-import { COTY_TEAL, formatPrice } from '@/lib/coty-theme'
+import { COTY_TEAL } from '@/lib/coty-theme'
 import { getDefaultCartItem } from '@/lib/menu-cart-utils'
+import { ProductPriceDisplay } from '@/components/customer/product-price-display'
+import { getProductDiscountPercent } from '@/lib/promotions'
+import { Badge } from '@/components/ui/badge'
 
 interface MenuGridProductCardProps {
   product: Product
+  promotions?: Promotion[]
   items: CartItem[]
   addItem: ReturnType<typeof useCart>['addItem']
   updateQuantity: ReturnType<typeof useCart>['updateQuantity']
@@ -56,6 +60,7 @@ function MenuGridQuantityControl({
 
 export function MenuGridProductCard({
   product,
+  promotions = [],
   items,
   addItem,
   updateQuantity,
@@ -64,6 +69,8 @@ export function MenuGridProductCard({
   const cartItem = getDefaultCartItem(items, product.id)
   const quantity = cartItem?.quantity ?? 0
   const hasRequiredOptions = product.options?.some((option) => option.required)
+  const discount = getProductDiscountPercent(product, promotions)
+  const isFeatured = product.featured
 
   const handleIncrease = () => {
     if (hasRequiredOptions) {
@@ -85,15 +92,27 @@ export function MenuGridProductCard({
 
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm">
-      <button type="button" onClick={onOpenDetail} className="aspect-square overflow-hidden text-left">
+      <button type="button" onClick={onOpenDetail} className="relative aspect-square overflow-hidden text-left">
         <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+        {(discount > 0 || isFeatured) && (
+          <div className="absolute left-2 top-2 flex flex-col gap-1">
+            {discount > 0 && (
+              <Badge className="bg-[#EAB308] text-[10px] text-white hover:bg-[#EAB308]">Promo</Badge>
+            )}
+            {isFeatured && (
+              <Badge className="bg-[#2D5A57] text-[10px] text-white hover:bg-[#2D5A57]">Destacado</Badge>
+            )}
+          </div>
+        )}
       </button>
       <div className="flex flex-1 flex-col p-3">
         <h3 className="text-sm font-bold leading-tight">{product.name}</h3>
         <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
           {product.description}
         </p>
-        <p className="mt-2 text-sm font-bold">{formatPrice(product.price)}</p>
+        <div className="mt-2">
+          <ProductPriceDisplay product={product} promotions={promotions} />
+        </div>
         <div className="mt-auto pt-2">
           <MenuGridQuantityControl
             quantity={quantity}

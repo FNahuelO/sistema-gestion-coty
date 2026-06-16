@@ -11,11 +11,15 @@ import {
   User,
   ShoppingBag,
   Search,
+  Instagram,
+  Facebook,
+  MessageSquare,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { COTY_HEADER, LOGO_SRC_SVG } from '@/lib/coty-theme'
-import { useCart } from '@/lib/store'
+import { useCart, useCatalog } from '@/lib/store'
+import { buildFacebookUrl, buildInstagramUrl } from '@/lib/social-links'
 import Image from 'next/image'
 
 const NAV_ITEMS = [
@@ -69,7 +73,11 @@ export function CustomerTopNav() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { itemCount } = useCart()
+  const { settings } = useCatalog()
   const isHome = pathname === '/'
+  const instagramUrl = buildInstagramUrl(settings?.instagram)
+  const facebookUrl = buildFacebookUrl(settings?.facebook)
+  const whatsappUrl = settings?.whatsapp ? `https://wa.me/${settings.whatsapp.replace(/\D/g, '')}` : null
 
   return (
     <header
@@ -117,18 +125,58 @@ export function CustomerTopNav() {
             })}
           </nav>
 
-          <Link
-            href="/checkout"
-            className="relative flex shrink-0 items-center gap-2 rounded-full bg-white/15 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/25"
-          >
-            <ShoppingBag className="h-4 w-4" />
-            Carrito
-            {itemCount > 0 && (
-              <Badge className="h-5 min-w-5 rounded-full bg-[#00C9B7] px-1 text-[10px] text-white">
-                {itemCount}
-              </Badge>
+          <div className="flex shrink-0 items-center gap-2">
+            {(instagramUrl || facebookUrl || whatsappUrl) && (
+              <div className="hidden items-center gap-1 lg:flex">
+                {whatsappUrl && (
+                  <a
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full p-2 text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+                    aria-label="WhatsApp"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                  </a>
+                )}
+                {instagramUrl && (
+                  <a
+                    href={instagramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full p-2 text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+                    aria-label="Instagram"
+                  >
+                    <Instagram className="h-4 w-4" />
+                  </a>
+                )}
+                {facebookUrl && (
+                  <a
+                    href={facebookUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full p-2 text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+                    aria-label="Facebook"
+                  >
+                    <Facebook className="h-4 w-4" />
+                  </a>
+                )}
+              </div>
             )}
-          </Link>
+
+            <Link
+              href="/checkout"
+              className="relative flex shrink-0 items-center gap-2 rounded-full bg-white/15 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/25"
+            >
+              <ShoppingBag className="h-4 w-4" />
+              Carrito
+              {itemCount > 0 && (
+                <Badge className="h-5 min-w-5 rounded-full bg-[#00C9B7] px-1 text-[10px] text-white">
+                  {itemCount}
+                </Badge>
+              )}
+            </Link>
+          </div>
         </div>
 
         {isHome && <HomeSearchBar />}

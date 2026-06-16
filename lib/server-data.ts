@@ -595,29 +595,7 @@ function buildTrackingCode() {
   return `TRK-${randomUUID().slice(0, 8).toUpperCase()}`
 }
 
-function buildWhatsAppMessage(order: Order, settings: BusinessSettings) {
-  const itemsList = order.items
-    .map((item) => {
-      const options = item.selectedOptions
-        .map((option) => `${option.optionId}: ${option.choiceIds.join(', ')}`)
-        .join(' | ')
-      return `• ${item.quantity}x ${item.product.name}${options ? ` (${options})` : ''}`
-    })
-    .join('\n')
-
-  return `Nuevo pedido - ${settings.name}
-
-Pedido ${order.displayCode ?? order.id}
-Cliente: ${order.customerName}
-Telefono: ${order.customerPhone}
-${order.customerAddress ? `Direccion: ${order.customerAddress}\n` : ''}Productos:
-${itemsList}
-
-Total: $${order.total.toFixed(2)}
-Pago: ${order.paymentMethod}
-Tipo: ${order.type}
-${order.notes ? `Notas: ${order.notes}` : ''}`.trim()
-}
+import { buildWhatsAppOrderMessage } from '@/lib/whatsapp-message'
 
 export async function createOrderFromPayload(payload: z.infer<typeof createOrderSchema>, createdByUserId?: string) {
   const input = createOrderSchema.parse(payload)
@@ -811,7 +789,12 @@ export async function createOrderFromPayload(payload: z.infer<typeof createOrder
                 : input.paymentMethod === 'mercado_pago'
                   ? 'MERCADO_PAGO'
                   : 'CASH',
-          status: input.paymentMethod === 'mercado_pago' ? 'PENDING' : 'APPROVED',
+          status:
+            input.paymentMethod === 'mercado_pago'
+              ? 'PENDING'
+              : input.type === 'table'
+                ? 'PENDING'
+                : 'APPROVED',
           amount: total,
         },
       },
@@ -843,7 +826,7 @@ export async function createOrderFromPayload(payload: z.infer<typeof createOrder
 
   const serialized = serializeOrder(createdOrder)
 
-  const whatsappMessage = buildWhatsAppMessage(serialized, serializeSettings(settings))
+  const whatsappMessage = buildWhatsAppOrderMessage(serialized, settings.name)
   await prisma.order.update({
     where: { id: createdOrder.id },
     data: {
@@ -1022,7 +1005,23 @@ export async function updateOrderStatus(orderId: string, status: Order['status']
   return serializeOrder(order)
 }
 
-export async function closeTableAndOrders(tableId: string, userId?: string) {
+export async function occupyTable(tableId: string, userId?: string) {
+  await ensureOpenTableSession(tableId, userId)
+
+  const updated = await prisma.diningTable.update({
+    where: { id: tableId },
+    data: { status: PrismaTableStatus.OCCUPIED },
+    include: tableInclude,
+  })
+
+  return serializeTable(updated)
+}
+
+export async function closeTableAndOrders(
+  tableId: string,
+  userId?: string,
+  paymentMethod: 'cash' | 'card' | 'transfer' = 'cash'
+) {
   const session = await prisma.tableSession.findFirst({
     where: {
       tableId,
@@ -1040,7 +1039,28 @@ export async function closeTableAndOrders(tableId: string, userId?: string) {
     throw new Error('TABLE_SESSION_NOT_FOUND')
   }
 
+  const prismaPaymentMethod =
+    paymentMethod === 'card' ? 'CARD' : paymentMethod === 'transfer' ? 'TRANSFER' : 'CASH'
+  const orderIds = session.orders.map((order) => order.id)
+
   await prisma.$transaction([
+    ...(orderIds.length > 0
+      ? [
+          prisma.payment.updateMany({
+            where: { orderId: { in: orderIds } },
+            data: {
+              method: prismaPaymentMethod,
+              status: 'APPROVED',
+            },
+          }),
+          prisma.order.updateMany({
+            where: { id: { in: orderIds } },
+            data: {
+              paymentMethod: prismaPaymentMethod,
+            },
+          }),
+        ]
+      : []),
     prisma.order.updateMany({
       where: {
         tableSessionId: session.id,
@@ -1072,6 +1092,7 @@ export async function closeTableAndOrders(tableId: string, userId?: string) {
         createdByUserId: userId,
         metadata: {
           tableSessionId: session.id,
+          paymentMethod,
         },
       },
     }),

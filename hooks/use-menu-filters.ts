@@ -39,6 +39,15 @@ export function useMenuFilters(products: Product[], categories: Category[], prom
   }, [searchParams, initialSearch, promoParam])
 
   useEffect(() => {
+    const productId = searchParams.get('product')
+    if (!productId || products.length === 0) return
+    const product = products.find((candidate) => candidate.id === productId)
+    if (product) {
+      setSelectedProduct(product)
+    }
+  }, [searchParams, products])
+
+  useEffect(() => {
     const timer = setTimeout(() => {
       const params = new URLSearchParams(window.location.search)
 

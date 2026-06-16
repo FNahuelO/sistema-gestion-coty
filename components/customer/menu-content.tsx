@@ -1,6 +1,6 @@
 'use client'
 
-import type { CartItem, Product } from '@/lib/types'
+import type { CartItem, Product, Promotion } from '@/lib/types'
 import { useCart } from '@/lib/store'
 import { EmptyState } from '@/components/shared/empty-state'
 import { CartItemSkeleton, LoadingSkeleton, ProductCardSkeleton } from '@/components/shared/loading'
@@ -21,6 +21,7 @@ interface MenuContentProps {
   activeCategoryName?: string
   activeCategoryIcon?: string
   items: CartItem[]
+  promotions: Promotion[]
   addItem: ReturnType<typeof useCart>['addItem']
   removeItem: ReturnType<typeof useCart>['removeItem']
   updateQuantity: ReturnType<typeof useCart>['updateQuantity']
@@ -39,6 +40,7 @@ export function MenuContent({
   activeCategoryName,
   activeCategoryIcon,
   items,
+  promotions,
   addItem,
   removeItem,
   updateQuantity,
@@ -61,6 +63,7 @@ export function MenuContent({
         <SearchResults
           results={searchResults}
           items={items}
+          promotions={promotions}
           addItem={addItem}
           removeItem={removeItem}
           updateQuantity={updateQuantity}
@@ -71,6 +74,7 @@ export function MenuContent({
         <AllCategoriesView
           menuSections={menuSections}
           items={items}
+          promotions={promotions}
           addItem={addItem}
           updateQuantity={updateQuantity}
           onOpenProduct={onOpenProduct}
@@ -82,6 +86,7 @@ export function MenuContent({
           categoryIcon={activeCategoryIcon}
           products={categoryProducts}
           items={items}
+          promotions={promotions}
           addItem={addItem}
           removeItem={removeItem}
           updateQuantity={updateQuantity}
@@ -129,6 +134,7 @@ function MenuLoadingSkeleton({ variant }: { variant: 'grid' | 'list' }) {
 function SearchResults({
   results,
   items,
+  promotions,
   addItem,
   removeItem,
   updateQuantity,
@@ -137,6 +143,7 @@ function SearchResults({
 }: {
   results: Product[]
   items: CartItem[]
+  promotions: Promotion[]
   addItem: ReturnType<typeof useCart>['addItem']
   removeItem: ReturnType<typeof useCart>['removeItem']
   updateQuantity: ReturnType<typeof useCart>['updateQuantity']
@@ -160,6 +167,7 @@ function SearchResults({
         <MenuListProductCard
           key={product.id}
           product={product}
+          promotions={promotions}
           items={items}
           addItem={addItem}
           removeItem={removeItem}
@@ -174,12 +182,14 @@ function SearchResults({
 function AllCategoriesView({
   menuSections,
   items,
+  promotions,
   addItem,
   updateQuantity,
   onOpenProduct,
 }: {
   menuSections: MenuSection[]
   items: CartItem[]
+  promotions: Promotion[]
   addItem: ReturnType<typeof useCart>['addItem']
   updateQuantity: ReturnType<typeof useCart>['updateQuantity']
   onOpenProduct: (product: Product) => void
@@ -210,6 +220,7 @@ function AllCategoriesView({
                 <MenuGridProductCard
                   key={product.id}
                   product={product}
+                  promotions={promotions}
                   items={items}
                   addItem={addItem}
                   updateQuantity={updateQuantity}
@@ -230,6 +241,7 @@ function SingleCategoryView({
   categoryIcon,
   products,
   items,
+  promotions,
   addItem,
   removeItem,
   updateQuantity,
@@ -241,6 +253,7 @@ function SingleCategoryView({
   categoryIcon?: string
   products: Product[]
   items: CartItem[]
+  promotions: Promotion[]
   addItem: ReturnType<typeof useCart>['addItem']
   removeItem: ReturnType<typeof useCart>['removeItem']
   updateQuantity: ReturnType<typeof useCart>['updateQuantity']

@@ -19,16 +19,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Label } from '@/components/ui/label'
 import { useCatalog, useOrders, useTables } from '@/lib/store'
 import { usePendingAction } from '@/hooks/use-pending-action'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
-import type { Table, Product, CartItem, TableStatus } from '@/lib/types'
+import { ProductDetailModal } from '@/components/customer/product-detail-modal'
+import type { Table, Product, CartItem, TableStatus, SelectedOption, PaymentMethod } from '@/lib/types'
 import { toast } from 'sonner'
 import { COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
 import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
+import { getDiscountedUnitPrice } from '@/lib/promotions'
+import { PAYMENT_METHOD_LABELS } from '@/lib/order-labels'
 
 const tableStatusColors: Record<TableStatus, string> = {
   free: 'bg-[#7EB8B3]',
@@ -44,16 +49,27 @@ const tableStatusIcons: Record<TableStatus, React.ElementType> = {
   finished: CreditCard,
 }
 
+const CLOSE_PAYMENT_METHODS: PaymentMethod[] = ['cash', 'card', 'transfer']
+
+function optionsKey(options: SelectedOption[], notes?: string) {
+  return `${JSON.stringify(options)}|${notes ?? ''}`
+}
+
 export function WaitressPanel({ embedded = false }: { embedded?: boolean }) {
   const { tables, updateTableStatus, closeTable, createTableOrder } = useTables()
   const { orders } = useOrders()
-  const { products, categories } = useCatalog()
+  const { products, categories, promotions, settings } = useCatalog()
   const { isPending, isBusy, run } = usePendingAction()
   const [selectedTable, setSelectedTable] = useState<Table | null>(null)
   const [orderItems, setOrderItems] = useState<CartItem[]>([])
   const [addProductOpen, setAddProductOpen] = useState(false)
+  const [productPicker, setProductPicker] = useState<Product | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState('tables')
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
+  const [closePaymentMethod, setClosePaymentMethod] = useState<PaymentMethod>('cash')
+
+  const taxRate = settings?.taxRate ?? 0.16
 
   const activeTableOrders = useMemo(
     () =>
@@ -65,45 +81,57 @@ export function WaitressPanel({ embedded = false }: { embedded?: boolean }) {
     [orders]
   )
 
-  const getTableOrder = (tableId: string) => {
-    const table = tables.find((t) => t.id === tableId)
-    if (table?.currentOrderId) {
-      return orders.find((o) => o.id === table.currentOrderId)
-    }
-    return null
-  }
+  const sessionOrders = useMemo(() => {
+    if (!selectedTable) return []
+    return orders.filter(
+      (order) =>
+        order.tableId === selectedTable.id &&
+        !['completed', 'cancelled'].includes(order.status)
+    )
+  }, [orders, selectedTable])
 
   const handleSelectTable = (table: Table) => {
     setSelectedTable(table)
-    const existingOrder = getTableOrder(table.id)
-    if (existingOrder) {
-      setOrderItems([...existingOrder.items])
-    } else {
-      setOrderItems([])
-    }
+    setOrderItems([])
   }
 
-  const handleAddProduct = (product: Product) => {
+  const handleAddProductItem = (
+    product: Product,
+    quantity: number,
+    selectedOptions: SelectedOption[],
+    notes?: string
+  ) => {
+    const key = optionsKey(selectedOptions, notes)
     setOrderItems((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id)
+      const existing = prev.find(
+        (item) => item.product.id === product.id && optionsKey(item.selectedOptions, item.notes) === key
+      )
       if (existing) {
         return prev.map((item) =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
+          item.id === existing.id ? { ...item, quantity: item.quantity + quantity } : item
         )
       }
       return [
         ...prev,
         {
-          id: `item-${Date.now()}`,
+          id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           product,
-          quantity: 1,
-          selectedOptions: [],
+          quantity,
+          selectedOptions,
+          notes,
         },
       ]
     })
     toast.success(`${product.name} agregado`)
+  }
+
+  const handleProductClick = (product: Product) => {
+    const hasOptions = Boolean(product.options?.length)
+    if (hasOptions) {
+      setProductPicker(product)
+      return
+    }
+    handleAddProductItem(product, 1, [])
   }
 
   const handleUpdateQuantity = (itemId: string, delta: number) => {
@@ -124,8 +152,24 @@ export function WaitressPanel({ embedded = false }: { embedded?: boolean }) {
     setOrderItems((prev) => prev.filter((item) => item.id !== itemId))
   }
 
-  const calculateTotal = () => {
-    return orderItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
+  const calculateNewItemsSubtotal = () =>
+    orderItems.reduce(
+      (sum, item) =>
+        sum + getDiscountedUnitPrice(item.product, item.selectedOptions, promotions) * item.quantity,
+      0
+    )
+
+  const handleOccupyTable = async (table: Table) => {
+    await run(`occupy:${table.id}`, async () => {
+      try {
+        await updateTableStatus(table.id, 'occupied')
+        toast.success(`Mesa ${table.number} ocupada`)
+        setSelectedTable((current) => (current?.id === table.id ? { ...current, status: 'occupied' } : current))
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'No se pudo ocupar la mesa')
+        throw error
+      }
+    })
   }
 
   const handleSendOrder = async () => {
@@ -142,8 +186,8 @@ export function WaitressPanel({ embedded = false }: { embedded?: boolean }) {
           })),
         })
         toast.success('Pedido enviado a cocina')
-        setSelectedTable(null)
         setOrderItems([])
+        setSelectedTable(null)
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'No se pudo enviar el pedido')
         throw error
@@ -151,38 +195,31 @@ export function WaitressPanel({ embedded = false }: { embedded?: boolean }) {
     })
   }
 
-  const handleCloseTable = async (table: Table) => {
-    await run(`close:${table.id}`, async () => {
-      try {
-        await closeTable(table.id)
-        toast.success(`Mesa ${table.number} cerrada`)
-        setSelectedTable(null)
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'No se pudo cerrar la mesa')
-        throw error
-      }
-    })
-  }
-
-  const handleMarkOccupied = async (table: Table) => {
-    await run(`occupied:${table.id}`, async () => {
-      try {
-        await updateTableStatus(table.id, 'occupied')
-        toast.success(`Mesa ${table.number} marcada como ocupada`)
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'No se pudo actualizar la mesa')
-        throw error
-      }
-    })
-  }
-
-  const handleMarkReady = async (table: Table) => {
+  const handleMarkReadyToPay = async (table: Table) => {
     await run(`ready:${table.id}`, async () => {
       try {
         await updateTableStatus(table.id, 'finished')
         toast.success(`Mesa ${table.number} lista para cobrar`)
+        setSelectedTable((current) => (current?.id === table.id ? { ...current, status: 'finished' } : current))
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'No se pudo actualizar la mesa')
+        throw error
+      }
+    })
+  }
+
+  const handleConfirmClose = async () => {
+    if (!selectedTable) return
+
+    await run(`close:${selectedTable.id}`, async () => {
+      try {
+        await closeTable(selectedTable.id, closePaymentMethod as 'cash' | 'card' | 'transfer')
+        toast.success(`Mesa ${selectedTable.number} cobrada y cerrada`)
+        setPaymentDialogOpen(false)
+        setSelectedTable(null)
+        setOrderItems([])
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'No se pudo cerrar la mesa')
         throw error
       }
     })
@@ -194,6 +231,11 @@ export function WaitressPanel({ embedded = false }: { embedded?: boolean }) {
       (p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.description.toLowerCase().includes(searchQuery.toLowerCase()))
   )
+
+  const newItemsSubtotal = calculateNewItemsSubtotal()
+  const newItemsTax = newItemsSubtotal * taxRate
+  const newItemsTotal = newItemsSubtotal + newItemsTax
+  const accumulatedTotal = selectedTable?.currentTotal ?? 0
 
   return (
     <div className={cn(!embedded && 'min-h-screen bg-[#FAFAFA]')}>
@@ -256,7 +298,7 @@ export function WaitressPanel({ embedded = false }: { embedded?: boolean }) {
                         {order.tableNumber ? `Mesa ${order.tableNumber}` : order.customerName}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {order.items.length} productos
+                        {order.items.length} productos · {order.displayCode ?? order.id.slice(0, 8)}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -278,7 +320,6 @@ export function WaitressPanel({ embedded = false }: { embedded?: boolean }) {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {tables.map((table, index) => {
                 const StatusIcon = tableStatusIcons[table.status]
-                const order = getTableOrder(table.id)
 
                 return (
                   <motion.button
@@ -291,9 +332,7 @@ export function WaitressPanel({ embedded = false }: { embedded?: boolean }) {
                     className={cn(
                       PANEL_CARD,
                       'relative overflow-hidden p-4 text-left transition-all hover:shadow-md',
-                      selectedTable?.id === table.id
-                        ? 'ring-2 ring-[#7EB8B3] ring-offset-2'
-                        : ''
+                      selectedTable?.id === table.id ? 'ring-2 ring-[#7EB8B3] ring-offset-2' : ''
                     )}
                   >
                     <div
@@ -324,12 +363,12 @@ export function WaitressPanel({ embedded = false }: { embedded?: boolean }) {
                       <span>{table.capacity} personas</span>
                     </div>
 
-                    {order && (
+                    {(table.currentTotal ?? 0) > 0 && (
                       <div
                         className="mt-2 rounded-lg px-2 py-1 text-xs font-medium"
                         style={{ backgroundColor: `${COTY_QTY_BG}99`, color: COTY_TEAL }}
                       >
-                        {order.items.length} productos · {formatPrice(order.total)}
+                        Total acumulado · {formatPrice(table.currentTotal!)}
                       </div>
                     )}
                   </motion.button>
@@ -350,15 +389,57 @@ export function WaitressPanel({ embedded = false }: { embedded?: boolean }) {
           </DialogHeader>
 
           <div className="flex max-h-[60vh] flex-col gap-4 overflow-hidden">
+            {accumulatedTotal > 0 && (
+              <div className={cn(PANEL_CARD, 'bg-[#F0FAF8] p-3')}>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-[#2D5A57]">Total acumulado de la mesa</span>
+                  <span className="font-serif text-lg font-bold text-[#2D5A57]">
+                    {formatPrice(accumulatedTotal)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {sessionOrders.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
+                  Pedidos en curso
+                </p>
+                {sessionOrders.map((order) => (
+                  <div key={order.id} className="rounded-xl border border-gray-100 bg-[#F8FBFA] p-3 text-sm">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="font-medium">{order.displayCode ?? 'Pedido'}</span>
+                      <StatusBadge status={order.status} />
+                    </div>
+                    <ul className="space-y-1 text-muted-foreground">
+                      {order.items.map((item) => (
+                        <li key={item.id}>
+                          {item.quantity}x {item.product.name} · {formatPrice(item.product.price * item.quantity)}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-right font-semibold text-[#2D5A57]">{formatPrice(order.total)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto">
               {orderItems.length === 0 ? (
                 <EmptyState
                   icon="cart"
-                  title="Sin productos"
-                  description="Agregá productos al pedido de esta mesa"
+                  title="Nuevos productos"
+                  description={
+                    selectedTable?.status === 'free'
+                      ? 'Ocupá la mesa para empezar a cargar productos'
+                      : 'Agregá productos al próximo pedido de esta mesa'
+                  }
                 />
               ) : (
                 <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
+                    Nuevo pedido
+                  </p>
                   {orderItems.map((item) => (
                     <div
                       key={item.id}
@@ -373,7 +454,7 @@ export function WaitressPanel({ embedded = false }: { embedded?: boolean }) {
                         <div>
                           <p className="font-medium">{item.product.name}</p>
                           <p className="text-sm text-muted-foreground">
-                            {formatPrice(item.product.price)} c/u
+                            {formatPrice(getDiscountedUnitPrice(item.product, item.selectedOptions, promotions))} c/u
                           </p>
                         </div>
                       </div>
@@ -413,100 +494,155 @@ export function WaitressPanel({ embedded = false }: { embedded?: boolean }) {
             {orderItems.length > 0 && (
               <div className={cn(PANEL_CARD, 'p-3')}>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span>{formatPrice(calculateTotal())}</span>
+                  <span className="text-muted-foreground">Subtotal nuevo pedido</span>
+                  <span>{formatPrice(newItemsSubtotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">IVA (16%)</span>
-                  <span>{formatPrice(calculateTotal() * 0.16)}</span>
+                  <span className="text-muted-foreground">IVA ({Math.round(taxRate * 100)}%)</span>
+                  <span>{formatPrice(newItemsTax)}</span>
                 </div>
                 <div className="mt-2 flex justify-between border-t border-gray-100 pt-2 font-bold">
-                  <span>Total</span>
-                  <span className="font-serif text-[#2D5A57]">
-                    {formatPrice(calculateTotal() * 1.16)}
-                  </span>
+                  <span>Total nuevo pedido</span>
+                  <span className="font-serif text-[#2D5A57]">{formatPrice(newItemsTotal)}</span>
                 </div>
               </div>
             )}
           </div>
 
           <DialogFooter className="flex-col gap-2 sm:flex-row">
-            <Button
-              variant="outline"
-              className={cn('gap-2', PANEL_OUTLINE_BTN)}
-              onClick={() => setAddProductOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Agregar producto
-            </Button>
-
-            {selectedTable?.status === 'waiting' && (
+            {selectedTable?.status === 'free' && (
               <Button
-                variant="secondary"
+                className={PANEL_PRIMARY_BTN}
                 disabled={isBusy}
-                onClick={() => selectedTable && void handleMarkOccupied(selectedTable)}
+                onClick={() => selectedTable && void handleOccupyTable(selectedTable)}
               >
-                {isPending(`occupied:${selectedTable.id}`) ? (
+                {isPending(`occupy:${selectedTable.id}`) ? (
                   <>
                     <Spinner className="mr-2" />
                     Procesando...
                   </>
                 ) : (
-                  'Marcar ocupada'
+                  'Ocupar mesa'
                 )}
               </Button>
             )}
 
-            {selectedTable?.status === 'occupied' && (
-              <Button
-                variant="secondary"
-                disabled={isBusy}
-                onClick={() => selectedTable && void handleMarkReady(selectedTable)}
-              >
-                {isPending(`ready:${selectedTable.id}`) ? (
-                  <>
-                    <Spinner className="mr-2" />
-                    Procesando...
-                  </>
-                ) : (
-                  'Marcar listo'
+            {selectedTable && ['occupied', 'waiting'].includes(selectedTable.status) && (
+              <>
+                <Button
+                  variant="outline"
+                  className={cn('gap-2', PANEL_OUTLINE_BTN)}
+                  onClick={() => setAddProductOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                  Agregar producto
+                </Button>
+
+                {orderItems.length > 0 && (
+                  <Button
+                    className={PANEL_PRIMARY_BTN}
+                    disabled={isBusy}
+                    onClick={() => void handleSendOrder()}
+                  >
+                    {isPending(`send:${selectedTable.id}`) ? (
+                      <>
+                        <Spinner className="mr-2" />
+                        Enviando...
+                      </>
+                    ) : (
+                      'Enviar pedido'
+                    )}
+                  </Button>
                 )}
-              </Button>
+
+                {(sessionOrders.length > 0 || accumulatedTotal > 0) && (
+                  <Button
+                    variant="secondary"
+                    disabled={isBusy}
+                    onClick={() => selectedTable && void handleMarkReadyToPay(selectedTable)}
+                  >
+                    {isPending(`ready:${selectedTable.id}`) ? (
+                      <>
+                        <Spinner className="mr-2" />
+                        Procesando...
+                      </>
+                    ) : (
+                      'Listo para cobrar'
+                    )}
+                  </Button>
+                )}
+              </>
             )}
 
             {selectedTable?.status === 'finished' && (
               <Button
                 variant="destructive"
                 disabled={isBusy}
-                onClick={() => selectedTable && void handleCloseTable(selectedTable)}
+                onClick={() => {
+                  setClosePaymentMethod('cash')
+                  setPaymentDialogOpen(true)
+                }}
               >
-                {isPending(`close:${selectedTable.id}`) ? (
-                  <>
-                    <Spinner className="mr-2" />
-                    Cerrando...
-                  </>
-                ) : (
-                  'Cerrar mesa'
-                )}
+                Cobrar y cerrar mesa
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-            {orderItems.length > 0 && selectedTable?.status !== 'finished' && (
-              <Button
-                className={PANEL_PRIMARY_BTN}
-                disabled={isBusy}
-                onClick={() => void handleSendOrder()}
+      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+        <DialogContent className="border-gray-100 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[#2D5A57]">
+              Cobrar mesa {selectedTable?.number}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className={cn(PANEL_CARD, 'bg-[#F0FAF8] p-4 text-center')}>
+              <p className="text-sm text-muted-foreground">Total a cobrar</p>
+              <p className="font-serif text-3xl font-bold text-[#2D5A57]">
+                {formatPrice(accumulatedTotal)}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Método de pago</Label>
+              <RadioGroup
+                value={closePaymentMethod}
+                onValueChange={(value) => setClosePaymentMethod(value as PaymentMethod)}
+                className="grid gap-2"
               >
-                {isPending(`send:${selectedTable.id}`) ? (
-                  <>
-                    <Spinner className="mr-2" />
-                    Enviando...
-                  </>
-                ) : (
-                  'Enviar pedido'
-                )}
-              </Button>
-            )}
+                {CLOSE_PAYMENT_METHODS.map((method) => (
+                  <div key={method} className="flex items-center gap-2 rounded-lg border border-gray-100 p-3">
+                    <RadioGroupItem value={method} id={`close-pay-${method}`} />
+                    <Label htmlFor={`close-pay-${method}`} className="flex-1 cursor-pointer font-normal">
+                      {PAYMENT_METHOD_LABELS[method]}
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className={PANEL_PRIMARY_BTN}
+              disabled={isBusy || !selectedTable}
+              onClick={() => void handleConfirmClose()}
+            >
+              {selectedTable && isPending(`close:${selectedTable.id}`) ? (
+                <>
+                  <Spinner className="mr-2" />
+                  Cobrando...
+                </>
+              ) : (
+                'Confirmar cobro'
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -543,7 +679,7 @@ export function WaitressPanel({ embedded = false }: { embedded?: boolean }) {
                         <button
                           key={product.id}
                           type="button"
-                          onClick={() => handleAddProduct(product)}
+                          onClick={() => handleProductClick(product)}
                           className="flex w-full items-center gap-3 rounded-xl border border-gray-100 bg-white p-2 text-left transition-colors hover:bg-[#F8FBFA]"
                         >
                           <img
@@ -566,6 +702,19 @@ export function WaitressPanel({ embedded = false }: { embedded?: boolean }) {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      {productPicker && (
+        <ProductDetailModal
+          product={productPicker}
+          promotions={promotions}
+          onClose={() => setProductPicker(null)}
+          onAddToCart={(product, quantity, options, notes) => {
+            handleAddProductItem(product, quantity, options, notes)
+            setProductPicker(null)
+            setAddProductOpen(false)
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -13,8 +13,8 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 export const TABLE_STATUS_LABELS: Record<TableStatus, string> = {
   free: 'Libre',
   occupied: 'Ocupada',
-  waiting: 'Esperando',
-  finished: 'Por cobrar',
+  waiting: 'Esperando pedido',
+  finished: 'Finalizada',
 }
 
 export const ORDER_TYPE_LABELS: Record<OrderType, string> = {
