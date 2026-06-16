@@ -177,15 +177,23 @@ export function WaitressPanel({ embedded = false }: { embedded?: boolean }) {
 
     await run(`send:${selectedTable.id}`, async () => {
       try {
-        await createTableOrder(selectedTable.id, {
-          items: orderItems.map((item) => ({
-            productId: item.product.id,
-            quantity: item.quantity,
-            selectedOptions: item.selectedOptions,
-            notes: item.notes,
-          })),
-        })
-        toast.success('Pedido enviado a cocina')
+        await createTableOrder(
+          selectedTable.id,
+          {
+            items: orderItems.map((item) => ({
+              productId: item.product.id,
+              quantity: item.quantity,
+              selectedOptions: item.selectedOptions,
+              notes: item.notes,
+            })),
+          },
+          selectedTable.number
+        )
+        toast.success(
+          navigator.onLine
+            ? 'Pedido enviado a cocina'
+            : 'Pedido guardado sin conexión. Se enviará al recuperar señal.'
+        )
         setOrderItems([])
         setSelectedTable(null)
       } catch (error) {

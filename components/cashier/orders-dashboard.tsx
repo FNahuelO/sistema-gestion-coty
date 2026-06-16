@@ -281,7 +281,7 @@ export function CashierDashboard({ embedded = false }: { embedded?: boolean }) {
                 <AnimatePresence>
                   {filteredOrders.map((order, index) => {
                     const TypeIcon = orderTypeIcons[order.type]
-                    const action = statusActions[order.status]
+                    const action = order.offlinePending ? null : statusActions[order.status]
 
                     return (
                       <motion.div
@@ -318,7 +318,14 @@ export function CashierDashboard({ embedded = false }: { embedded?: boolean }) {
                                 </p>
                               </div>
                             </div>
-                            <StatusBadge status={order.status} />
+                            <div className="flex flex-col items-end gap-1">
+                              {order.offlinePending && (
+                                <Badge className="border-0 bg-amber-100 text-[10px] text-amber-900 hover:bg-amber-100">
+                                  Sin enviar
+                                </Badge>
+                              )}
+                              <StatusBadge status={order.status} />
+                            </div>
                           </div>
 
                           <div className="mt-3 space-y-1 pl-12 text-sm">
@@ -381,7 +388,13 @@ export function CashierDashboard({ embedded = false }: { embedded?: boolean }) {
         order={selectedOrder}
         open={!!selectedOrder}
         onOpenChange={(open) => !open && setSelectedOrder(null)}
-        statusAction={selectedOrder ? statusActions[selectedOrder.status] : null}
+        statusAction={
+          selectedOrder?.offlinePending
+            ? null
+            : selectedOrder
+              ? statusActions[selectedOrder.status]
+              : null
+        }
         onAdvanceStatus={handleStatusChange}
         onCancel={handleCancelOrder}
         onArchive={handleCloseOrder}

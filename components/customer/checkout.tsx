@@ -32,6 +32,7 @@ import { CartProductCard } from '@/components/customer/cart-product-card'
 import { CheckoutFormSkeleton, CheckoutLoadingSkeleton, LoadingSkeleton } from '@/components/shared/loading'
 import { COTY_HEADER, COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
 import { buildWhatsAppUrl } from '@/lib/whatsapp-message'
+import { useOnlineStatus } from '@/hooks/use-online-status'
 import { cn } from '@/lib/utils'
 import type { OrderType, PaymentMethod, Order } from '@/lib/types'
 import { toast } from 'sonner'
@@ -105,6 +106,7 @@ export function CheckoutPage() {
   const { subtotal, discount, total } = useCartPricing(items, promotions)
   const { addOrder } = useOrders()
   const { tableSession, isTableMode, hydrated: tableSessionHydrated } = useTableSession()
+  const { isOffline } = useOnlineStatus()
 
   const [orderType, setOrderType] = useState<OrderType>('pickup')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
@@ -152,6 +154,11 @@ export function CheckoutPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (isOffline && paymentMethod === 'mercado_pago') {
+      toast.error('Mercado Pago requiere conexión a internet.')
+      return
+    }
 
     if (isClosed) {
       toast.error('El local está cerrado en este momento')
@@ -225,6 +232,10 @@ export function CheckoutPage() {
       setOrderComplete(true)
       setConfirmOpen(false)
       clearCart()
+
+      if (createdOrder.offlinePending || isOffline) {
+        toast.success('Pedido guardado. Se enviará automáticamente al recuperar conexión.')
+      }
 
       const whatsappUrl = generateWhatsAppMessage(createdOrder)
       if (whatsappUrl) {

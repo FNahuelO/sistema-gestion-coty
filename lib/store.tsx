@@ -4,6 +4,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import useSWR from 'swr'
 import { SessionProvider, signIn, signOut, useSession } from 'next-auth/react'
 import type { AnalyticsOverview, BusinessSettings, CartItem, Category, Order, OrderStatus, PaymentMethod, Product, Promotion, SelectedOption, Table, User } from '@/lib/types'
+import { getOfflineCache, isBrowserOffline, OFFLINE_CACHE_KEYS, setOfflineCache } from '@/lib/offline-cache'
+import {
+  enqueueOfflineOrder,
+  getPendingOfflineOrders,
+  OFFLINE_QUEUE_CHANGED_EVENT,
+  queuedEntryToOrder,
+  type CreateOrderPayload,
+} from '@/lib/offline-order-queue'
 
 const CART_STORAGE_KEY = 'coty-cafe-cart'
 const TRACKING_CODES_KEY = 'coty-cafe-tracking-codes'
@@ -14,23 +22,7 @@ type TableSession = {
   tableNumber: number
 }
 
-type CreateOrderItemInput = {
-  productId: string
-  quantity: number
-  selectedOptions: SelectedOption[]
-  notes?: string
-}
-
-type CreateOrderPayload = {
-  type: Order['type']
-  paymentMethod: PaymentMethod
-  customerName: string
-  customerPhone: string
-  customerAddress?: string
-  notes?: string
-  tableId?: string
-  items: CreateOrderItemInput[]
-}
+type CreateOrderItemInput = CreateOrderPayload['items'][number]
 
 type AdminUserInput = {
   name: string
@@ -86,6 +78,18 @@ const fetchJson = async <T,>(url: string): Promise<T> => {
   return response.json()
 }
 
+const fetchJsonWithOfflineCache = async <T,>(url: string, cacheKey: string): Promise<T> => {
+  try {
+    const data = await fetchJson<T>(url)
+    setOfflineCache(cacheKey, data)
+    return data
+  } catch (error) {
+    const cached = getOfflineCache<T>(cacheKey)
+    if (cached) return cached
+    throw error
+  }
+}
+
 const parsePromotion = (promotion: Promotion & { validFrom: string | Date; validTo: string | Date }): Promotion => ({
   ...promotion,
   validFrom: new Date(promotion.validFrom),
@@ -115,6 +119,10 @@ const getStoredTrackingCodes = () => {
 }
 
 async function sendJson<T>(url: string, method: string, body?: unknown): Promise<T> {
+  if (isBrowserOffline()) {
+    throw new Error('Sin conexión a internet. Volvé a intentar cuando tengas señal.')
+  }
+
   const response = await fetch(url, {
     method,
     credentials: 'include',
@@ -403,9 +411,14 @@ export function useAuth() {
 }
 
 export function useBusiness() {
-  const { data, error, isLoading, mutate } = useSWR<BusinessSettings>('/api/settings', fetchJson, {
-    revalidateOnFocus: false,
-  })
+  const { data, error, isLoading, mutate } = useSWR<BusinessSettings>(
+    '/api/settings',
+    () => fetchJsonWithOfflineCache<BusinessSettings>('/api/settings', OFFLINE_CACHE_KEYS.settings),
+    {
+      revalidateOnFocus: false,
+      fallbackData: typeof window !== 'undefined' ? getOfflineCache<BusinessSettings>(OFFLINE_CACHE_KEYS.settings) ?? undefined : undefined,
+    }
+  )
 
   return {
     settings:
@@ -424,19 +437,27 @@ export function useBusiness() {
       },
     error,
     isLoading,
+    isOfflineCache: isBrowserOffline() && Boolean(getOfflineCache(OFFLINE_CACHE_KEYS.settings)),
     refresh: mutate,
   }
 }
 
 export function useCatalog() {
-  const { data, error, isLoading, mutate } = useSWR<{
+  type CatalogData = {
     settings: BusinessSettings | null
     categories: Category[]
     products: Product[]
     promotions: Array<Promotion & { validFrom: string | Date; validTo: string | Date }>
-  }>('/api/catalog', fetchJson, {
-    revalidateOnFocus: false,
-  })
+  }
+
+  const { data, error, isLoading, mutate } = useSWR<CatalogData>(
+    '/api/catalog',
+    () => fetchJsonWithOfflineCache<CatalogData>('/api/catalog', OFFLINE_CACHE_KEYS.catalog),
+    {
+      revalidateOnFocus: false,
+      fallbackData: typeof window !== 'undefined' ? getOfflineCache<CatalogData>(OFFLINE_CACHE_KEYS.catalog) ?? undefined : undefined,
+    }
+  )
 
   return {
     settings: data?.settings ?? null,
@@ -445,6 +466,7 @@ export function useCatalog() {
     promotions: (data?.promotions ?? []).map(parsePromotion),
     error,
     isLoading,
+    isOfflineCache: isBrowserOffline() && Boolean(getOfflineCache(OFFLINE_CACHE_KEYS.catalog)),
     refresh: mutate,
   }
 }
@@ -452,6 +474,7 @@ export function useCatalog() {
 export function useOrders() {
   const { user } = useAuth()
   const shouldFetch = Boolean(user?.role)
+  const [offlineOrders, setOfflineOrders] = useState<Order[]>([])
   const { data, error, isLoading, mutate } = useSWR<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
     shouldFetch ? '/api/orders' : null,
     fetchJson,
@@ -461,8 +484,44 @@ export function useOrders() {
     }
   )
 
+  const refreshOfflineOrders = useCallback(() => {
+    setOfflineOrders(getPendingOfflineOrders().map(queuedEntryToOrder))
+  }, [])
+
+  useEffect(() => {
+    refreshOfflineOrders()
+    const refresh = () => {
+      refreshOfflineOrders()
+      void mutate()
+    }
+    window.addEventListener('coty-refresh-orders', refresh)
+    window.addEventListener(OFFLINE_QUEUE_CHANGED_EVENT, refresh)
+    return () => {
+      window.removeEventListener('coty-refresh-orders', refresh)
+      window.removeEventListener(OFFLINE_QUEUE_CHANGED_EVENT, refresh)
+    }
+  }, [mutate, refreshOfflineOrders])
+
+  const serverOrders = useMemo(() => (data ?? []).map(parseOrder), [data])
+
+  const orders = useMemo(() => {
+    const pendingIds = new Set(offlineOrders.map((order) => order.id))
+    return [...offlineOrders, ...serverOrders.filter((order) => !pendingIds.has(order.id))]
+  }, [offlineOrders, serverOrders])
+
   const addOrder = useCallback(
     async (payload: CreateOrderPayload) => {
+      if (payload.paymentMethod === 'mercado_pago' && isBrowserOffline()) {
+        throw new Error('Mercado Pago requiere conexión a internet.')
+      }
+
+      if (isBrowserOffline()) {
+        const entry = enqueueOfflineOrder({ kind: 'customer', payload })
+        const order = queuedEntryToOrder(entry)
+        storeTrackingCode(order.publicTrackingCode ?? order.id)
+        return order
+      }
+
       const order = parseOrder(await sendJson<Order & { createdAt: string; updatedAt: string }>('/api/orders', 'POST', payload))
       storeTrackingCode(order.publicTrackingCode ?? order.id)
       await mutate()
@@ -497,7 +556,7 @@ export function useOrders() {
   )
 
   return {
-    orders: (data ?? []).map(parseOrder),
+    orders,
     addOrder,
     updateOrderStatus,
     closeOrder,
@@ -509,9 +568,23 @@ export function useOrders() {
 
 export function useTrackedOrders(searchId: string) {
   const [codes, setCodes] = useState<string[]>([])
+  const [offlineOrders, setOfflineOrders] = useState<Order[]>([])
 
   useEffect(() => {
     setCodes(getStoredTrackingCodes())
+  }, [])
+
+  useEffect(() => {
+    const refresh = () => {
+      setOfflineOrders(
+        getPendingOfflineOrders()
+          .filter((entry) => entry.kind === 'customer')
+          .map(queuedEntryToOrder)
+      )
+    }
+    refresh()
+    window.addEventListener(OFFLINE_QUEUE_CHANGED_EVENT, refresh)
+    return () => window.removeEventListener(OFFLINE_QUEUE_CHANGED_EVENT, refresh)
   }, [])
 
   const queryString = useMemo(() => {
@@ -533,8 +606,31 @@ export function useTrackedOrders(searchId: string) {
     }
   )
 
+  const serverOrders = useMemo(() => (data ?? []).map(parseOrder), [data])
+
+  const orders = useMemo(() => {
+    const query = searchId.trim().toLowerCase()
+    const offlineMatches = offlineOrders.filter((order) => {
+      if (!query) {
+        return codes.some(
+          (code) =>
+            code === order.id ||
+            code === order.publicTrackingCode ||
+            code === order.displayCode
+        )
+      }
+      return (
+        order.id.toLowerCase().includes(query) ||
+        order.displayCode?.toLowerCase().includes(query) ||
+        order.publicTrackingCode?.toLowerCase().includes(query)
+      )
+    })
+    const offlineIds = new Set(offlineMatches.map((order) => order.id))
+    return [...offlineMatches, ...serverOrders.filter((order) => !offlineIds.has(order.id))]
+  }, [serverOrders, offlineOrders, codes, searchId])
+
   return {
-    orders: (data ?? []).map(parseOrder),
+    orders,
     error,
     isLoading,
     refresh: mutate,
@@ -572,7 +668,27 @@ export function useTables() {
   )
 
   const createTableOrder = useCallback(
-    async (tableId: string, payload: { items: CreateOrderItemInput[]; notes?: string }) => {
+    async (tableId: string, payload: { items: CreateOrderItemInput[]; notes?: string }, tableNumber?: number) => {
+      const orderPayload: CreateOrderPayload = {
+        type: 'table',
+        paymentMethod: 'cash',
+        customerName: tableNumber ? `Mesa ${tableNumber}` : 'Mesa',
+        customerPhone: 'staff',
+        tableId,
+        notes: payload.notes,
+        items: payload.items,
+      }
+
+      if (isBrowserOffline()) {
+        const entry = enqueueOfflineOrder({
+          kind: 'table',
+          tableId,
+          tableNumber,
+          payload: orderPayload,
+        })
+        return queuedEntryToOrder(entry)
+      }
+
       const order = parseOrder(
         await sendJson<Order & { createdAt: string; updatedAt: string }>(`/api/tables/${tableId}/orders`, 'POST', payload)
       )

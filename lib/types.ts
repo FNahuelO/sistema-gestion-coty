@@ -80,6 +80,7 @@ export interface Order {
   notes?: string
   createdAt: Date
   updatedAt: Date
+  offlinePending?: boolean
 }
 
 // Table types

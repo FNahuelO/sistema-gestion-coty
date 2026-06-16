@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useTrackedOrders } from '@/lib/store'
+import { Badge } from '@/components/ui/badge'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
 import type { OrderStatus } from '@/lib/types'
@@ -97,7 +98,14 @@ export function OrderStatusPage() {
                         <CardTitle className="text-base">
                           Pedido {getOrderLabel(order)}
                         </CardTitle>
-                        <StatusBadge status={order.status} />
+                        <div className="flex flex-col items-end gap-1">
+                          {order.offlinePending && (
+                            <Badge className="bg-amber-100 text-[10px] text-amber-900 hover:bg-amber-100">
+                              Pendiente de envío
+                            </Badge>
+                          )}
+                          <StatusBadge status={order.status} />
+                        </div>
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {formatDistanceToNow(order.createdAt, { addSuffix: true, locale: es })}

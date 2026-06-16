@@ -17,10 +17,10 @@
   ],
   "shortcuts": [
     {
-      "name": "Panel staff",
-      "short_name": "Staff",
-      "description": "Acceso rápido al panel de mesas y pedidos",
-      "url": "/staff",
+      "name": "Menú",
+      "short_name": "Menú",
+      "description": "Ver el menú (disponible offline si ya lo visitaste)",
+      "url": "/menu",
       "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
     },
     {

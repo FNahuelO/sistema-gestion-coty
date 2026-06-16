@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ElementType, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ElementType, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -223,9 +223,17 @@ export function AdminDashboard() {
     setFormPanelsOpen((previous) => ({ ...previous, [section]: open }))
   }
 
-  const openFormPanel = (section: FormSection) => {
-    setFormPanelOpen(section, true)
-  }
+  const openFormPanel = useCallback((section: FormSection) => {
+    setFormPanelsOpen((previous) => ({ ...previous, [section]: true }))
+    window.requestAnimationFrame(() => {
+      window.setTimeout(() => {
+        document.getElementById(`admin-form-panel-${section}`)?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
+      }, 120)
+    })
+  }, [])
 
   useEffect(() => {
     setSettingsDraft(admin.settings)
@@ -727,6 +735,7 @@ export function AdminDashboard() {
             />
             <div className="space-y-6">
             <AdminFormPanel
+              panelId="products"
               title={productForm.id ? 'Editar producto' : 'Nuevo producto'}
               open={formPanelsOpen.products}
               onOpenChange={(open) => setFormPanelOpen('products', open)}
@@ -810,6 +819,7 @@ export function AdminDashboard() {
             />
             <div className="space-y-6">
             <AdminFormPanel
+              panelId="categories"
               title={categoryForm.id ? 'Editar categoría' : 'Nueva categoría'}
               open={formPanelsOpen.categories}
               onOpenChange={(open) => setFormPanelOpen('categories', open)}
@@ -875,6 +885,7 @@ export function AdminDashboard() {
             />
             <div className="space-y-6">
             <AdminFormPanel
+              panelId="promotions"
               title={promotionForm.id ? 'Editar promoción' : 'Nueva promoción'}
               open={formPanelsOpen.promotions}
               onOpenChange={(open) => setFormPanelOpen('promotions', open)}
@@ -954,6 +965,7 @@ export function AdminDashboard() {
             />
             <div className="space-y-6">
             <AdminFormPanel
+              panelId="tables"
               title={tableForm.id ? 'Editar mesa' : 'Nueva mesa'}
               open={formPanelsOpen.tables}
               onOpenChange={(open) => setFormPanelOpen('tables', open)}
@@ -1017,6 +1029,7 @@ export function AdminDashboard() {
             />
             <div className="space-y-6">
             <AdminFormPanel
+              panelId="users"
               title={userForm.id ? 'Editar usuario' : 'Nuevo usuario'}
               open={formPanelsOpen.users}
               onOpenChange={(open) => setFormPanelOpen('users', open)}
@@ -1129,6 +1142,7 @@ export function AdminDashboard() {
             />
             <div className="space-y-6">
             <AdminFormPanel
+              panelId="settings"
               title="Datos del negocio"
               open={formPanelsOpen.settings}
               onOpenChange={(open) => setFormPanelOpen('settings', open)}
@@ -1246,11 +1260,13 @@ function AdminPageHeader({
 }
 
 function AdminFormPanel({
+  panelId,
   title,
   open,
   onOpenChange,
   children,
 }: {
+  panelId: FormSection
   title: string
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -1258,7 +1274,7 @@ function AdminFormPanel({
 }) {
   return (
     <Collapsible open={open} onOpenChange={onOpenChange}>
-      <Card className={ADMIN_CARD}>
+      <Card id={`admin-form-panel-${panelId}`} className={cn(ADMIN_CARD, 'scroll-mt-24')}>
         <CollapsibleTrigger asChild>
           <button
             type="button"
