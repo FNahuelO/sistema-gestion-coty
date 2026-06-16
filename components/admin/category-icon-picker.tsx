@@ -4,13 +4,7 @@ import { useMemo, useState, type ComponentProps } from 'react'
 import { ChevronDown, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from '@/components/ui/drawer'
+import { NativeDialog, NATIVE_SCROLL_CLASS } from '@/components/ui/native-dialog'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { COTY_TEAL } from '@/lib/coty-theme'
 import { CATEGORY_ICON_OPTIONS } from '@/lib/category-icon-options'
@@ -87,14 +81,7 @@ function IconPickerBody({
           className="pl-9"
         />
       </div>
-      <div
-        data-vaul-no-drag
-        className={cn(
-          'min-h-0 overflow-y-auto overscroll-contain pr-1 touch-pan-y',
-          scrollClassName
-        )}
-        style={{ WebkitOverflowScrolling: 'touch' }}
-      >
+      <div className={cn(NATIVE_SCROLL_CLASS, scrollClassName)}>
         <IconPickerGrid value={value} filteredIcons={filteredIcons} onSelect={onSelect} />
       </div>
     </>
@@ -150,28 +137,32 @@ export function CategoryIconPicker({ value, onChange }: CategoryIconPickerProps)
     setQuery('')
   }
 
+  const body = (
+    <IconPickerBody
+      value={value}
+      query={query}
+      onQueryChange={setQuery}
+      filteredIcons={filteredIcons}
+      onSelect={selectIcon}
+      scrollClassName={isMobile ? 'max-h-[55vh]' : 'max-h-72'}
+    />
+  )
+
   if (isMobile) {
     return (
-      <Drawer open={open} onOpenChange={setOpen}>
-        <DrawerTrigger asChild>
-          <PickerTrigger value={value} />
-        </DrawerTrigger>
-        <DrawerContent className="flex max-h-[85vh] flex-col px-4 pb-6">
-          <DrawerHeader className="shrink-0 px-0 text-left">
-            <DrawerTitle className="text-[#2D5A57]">Elegir icono</DrawerTitle>
-          </DrawerHeader>
-          <div className="flex min-h-0 flex-1 flex-col">
-            <IconPickerBody
-              value={value}
-              query={query}
-              onQueryChange={setQuery}
-              filteredIcons={filteredIcons}
-              onSelect={selectIcon}
-              scrollClassName="max-h-[55vh]"
-            />
-          </div>
-        </DrawerContent>
-      </Drawer>
+      <>
+        <PickerTrigger value={value} onClick={() => setOpen(true)} />
+        <NativeDialog
+          open={open}
+          onOpenChange={setOpen}
+          title="Elegir icono"
+          position="bottom"
+          maxWidthClassName="max-w-none"
+          bodyClassName="pb-6"
+        >
+          {body}
+        </NativeDialog>
+      </>
     )
   }
 
@@ -181,14 +172,7 @@ export function CategoryIconPicker({ value, onChange }: CategoryIconPickerProps)
         <PickerTrigger value={value} />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[min(100vw-2rem,22rem)] p-3">
-        <IconPickerBody
-          value={value}
-          query={query}
-          onQueryChange={setQuery}
-          filteredIcons={filteredIcons}
-          onSelect={selectIcon}
-          scrollClassName="max-h-72"
-        />
+        {body}
       </PopoverContent>
     </Popover>
   )

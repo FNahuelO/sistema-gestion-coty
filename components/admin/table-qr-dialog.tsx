@@ -2,13 +2,7 @@
 
 import { useMemo } from 'react'
 import { QrCode } from 'lucide-react'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { NativeDialog } from '@/components/ui/native-dialog'
 import { Button } from '@/components/ui/button'
 import { QrCodeCard } from '@/components/admin/qr-code-card'
 import { buildMenuUrl, getAppBaseUrl } from '@/lib/menu-url'
@@ -26,28 +20,23 @@ export function TableQrDialog({ table, businessName, onClose }: TableQrDialogPro
   const printLabel = table ? `Mesa ${table.number} · ${businessName}` : businessName
 
   return (
-    <Dialog open={Boolean(table)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-lg rounded-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-[#2D5A57]">
-            {table ? `QR Mesa ${table.number}` : 'Código QR'}
-          </DialogTitle>
-          <DialogDescription>
-            Escaneá este código para abrir el menú con la mesa identificada.
-          </DialogDescription>
-        </DialogHeader>
-
-        {table ? (
-          <QrCodeCard
-            url={menuUrl}
-            title={`Menú · Mesa ${table.number}`}
-            description="Ideal para imprimir y colocar en la mesa."
-            downloadFilename={`mesa-${table.number}-qr.png`}
-            printLabel={printLabel}
-          />
-        ) : null}
-      </DialogContent>
-    </Dialog>
+    <NativeDialog
+      open={Boolean(table)}
+      onOpenChange={(open) => !open && onClose()}
+      title={table ? `QR Mesa ${table.number}` : 'Código QR'}
+      description="Escaneá este código para abrir el menú con la mesa identificada."
+      maxWidthClassName="max-w-lg"
+    >
+      {table ? (
+        <QrCodeCard
+          url={menuUrl}
+          title={`Menú · Mesa ${table.number}`}
+          description="Ideal para imprimir y colocar en la mesa."
+          downloadFilename={`mesa-${table.number}-qr.png`}
+          printLabel={printLabel}
+        />
+      ) : null}
+    </NativeDialog>
   )
 }
 

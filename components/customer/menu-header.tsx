@@ -4,9 +4,12 @@ import Link from 'next/link'
 import { Search, X, ShoppingBag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MenuCategoryNav } from '@/components/customer/menu-category-nav'
+import { TableSessionBanner } from '@/components/customer/table-session-banner'
 import { COTY_HEADER, COTY_TEAL, LOGO_SRC_SVG, formatPrice } from '@/lib/coty-theme'
+import { useTableSession } from '@/lib/store'
 import type { Category } from '@/lib/types'
 import type { MenuCategoryId } from '@/lib/menu-categories'
+import { cn } from '@/lib/utils'
 
 interface MenuHeaderProps {
   searchQuery: string
@@ -27,6 +30,9 @@ export function MenuHeader({
   onSearchChange,
   onCategorySelect,
 }: MenuHeaderProps) {
+  const { tableSession, isLoading, error } = useTableSession()
+  const hasTableIndicator = isLoading || Boolean(tableSession) || Boolean(error)
+
   return (
     <div
       className="w-full rounded-b-4xl md:rounded-b-[2.5rem]"
@@ -63,7 +69,9 @@ export function MenuHeader({
             )}
           </div>
 
-          <div className="mt-4 pb-10 md:pb-0 md:text-center">
+          <TableSessionBanner variant="inline" />
+
+          <div className={cn('pb-10 md:pb-0 md:text-center', hasTableIndicator ? 'mt-2' : 'mt-4')}>
             {isSearchMode ? (
               <>
                 <h1 className="text-base font-bold text-white md:text-lg">
@@ -74,7 +82,7 @@ export function MenuHeader({
                   {searchResultCount === 1 ? 'producto encontrado' : 'productos encontrados'}
                 </p>
               </>
-            ) : (
+            ) : hasTableIndicator ? null : (
               <h1 className="my-4 text-xl font-bold text-white md:text-2xl">Menú</h1>
             )}
           </div>

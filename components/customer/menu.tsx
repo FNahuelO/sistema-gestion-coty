@@ -7,7 +7,6 @@ import { useCartPricing } from '@/hooks/use-cart-pricing'
 import { MenuHeader, MenuCartBar } from '@/components/customer/menu-header'
 import { MenuContent } from '@/components/customer/menu-content'
 import { ProductDetailModal } from '@/components/customer/product-detail-modal'
-import { TableSessionBanner } from '@/components/customer/table-session-banner'
 
 export function MenuPage() {
   const { products, categories, promotions, isLoading } = useCatalog()
@@ -44,10 +43,6 @@ export function MenuPage() {
         onSearchChange={handleSearchChange}
         onCategorySelect={handleCategorySelect}
       />
-
-      <div className="mx-auto max-w-lg px-4 md:max-w-4xl md:px-6 lg:max-w-6xl lg:px-8">
-        <TableSessionBanner className="-mt-2 mb-4 md:-mt-4" />
-      </div>
 
       <MenuContent
         isLoading={isLoading}
