@@ -5,6 +5,7 @@ import { Search, X, ShoppingBag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MenuCategoryNav } from '@/components/customer/menu-category-nav'
 import { COTY_HEADER, COTY_TEAL, LOGO_SRC_SVG, formatPrice } from '@/lib/coty-theme'
+import type { Category } from '@/lib/types'
 import type { MenuCategoryId } from '@/lib/menu-categories'
 
 interface MenuHeaderProps {
@@ -12,6 +13,7 @@ interface MenuHeaderProps {
   isSearchMode: boolean
   searchResultCount: number
   selectedCategory: MenuCategoryId
+  categories: Category[]
   onSearchChange: (value: string) => void
   onCategorySelect: (categoryId: MenuCategoryId) => void
 }
@@ -21,6 +23,7 @@ export function MenuHeader({
   isSearchMode,
   searchResultCount,
   selectedCategory,
+  categories,
   onSearchChange,
   onCategorySelect,
 }: MenuHeaderProps) {
@@ -80,7 +83,7 @@ export function MenuHeader({
         {!isSearchMode && (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 translate-y-1/2 px-4 md:px-6 lg:px-8">
             <div className="pointer-events-auto md:mx-auto md:max-w-4xl lg:max-w-5xl">
-              <MenuCategoryNav selected={selectedCategory} onSelect={onCategorySelect} />
+              <MenuCategoryNav categories={categories} selected={selectedCategory} onSelect={onCategorySelect} />
             </div>
           </div>
         )}

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   LayoutGrid,
   UtensilsCrossed,
@@ -20,9 +20,19 @@ import Image from 'next/image'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Inicio', icon: '/icons/inicio.svg', match: (path: string) => path === '/' },
-  { href: '/menu', label: 'Menú', icon: '/icons/menu.svg', match: (path: string) => path.startsWith('/menu') },
+  {
+    href: '/menu',
+    label: 'Menú',
+    icon: '/icons/menu.svg',
+    match: (path: string, search: URLSearchParams) => path.startsWith('/menu') && !search.has('promo'),
+  },
   { href: '/checkout', label: 'Pedidos', icon: '/icons/pedidos.svg', match: (path: string) => path.startsWith('/checkout') },
-  { href: '/menu', label: 'Promos', icon: '/icons/promo.svg', match: () => false },
+  {
+    href: '/menu?promo=1',
+    label: 'Promos',
+    icon: '/icons/promo.svg',
+    match: (path: string, search: URLSearchParams) => path.startsWith('/menu') && search.has('promo'),
+  },
   { href: '/order-status', label: 'Perfil', icon: '/icons/perfil.svg', match: (path: string) => path.startsWith('/order-status') },
 ] as const
 
@@ -57,6 +67,7 @@ function HomeSearchBar() {
 
 export function CustomerTopNav() {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { itemCount } = useCart()
   const isHome = pathname === '/'
 
@@ -83,7 +94,10 @@ export function CustomerTopNav() {
             className="flex flex-1 items-center justify-center gap-1 lg:gap-2"
           >
             {NAV_ITEMS.map(({ href, label, icon: Icon, match }) => {
-              const isActive = match(pathname)
+              const isActive =
+                match.length > 1
+                  ? (match as (path: string, search: URLSearchParams) => boolean)(pathname, searchParams)
+                  : (match as (path: string) => boolean)(pathname)
 
               return (
                 <Link

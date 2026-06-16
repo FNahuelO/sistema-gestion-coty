@@ -5,13 +5,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Search,
-  Coffee,
-  Wine,
-  Sandwich,
-  Soup,
-  Beef,
-  UtensilsCrossed,
-  Utensils,
   Star,
   Clock,
   MapPin,
@@ -21,6 +14,7 @@ import {
   ArrowRight,
   ShoppingBag,
 } from 'lucide-react'
+import { getCategoryIcon } from '@/lib/category-icons'
 import {
   Carousel,
   CarouselContent,
@@ -50,16 +44,6 @@ const HERO_IMAGE = 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd
 const CTA_IMAGE = 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=1600&h=500&fit=crop'
 const PROMO_IMAGE = 'https://images.unsplash.com/photo-1436076865539-06670f77990b?w=1600&h=400&fit=crop'
 
-const LANDING_CATEGORIES = [
-  { name: 'Cafetería', slug: 'coffee', icon: Coffee },
-  { name: 'Tragos y Milkshakes', slug: 'cold', icon: Wine },
-  { name: 'Sándwiches', slug: 'sandwiches', icon: Sandwich },
-  { name: 'Entradas', slug: 'starters', icon: Soup },
-  { name: 'Hamburguesas', slug: 'burgers', icon: Beef },
-  { name: 'Milanesas', slug: 'milanesas', icon: UtensilsCrossed },
-  { name: 'Pastas', slug: 'burgers', icon: Utensils },
-  { name: 'Promociones', slug: 'promo', icon: Star },
-] as const
 
 function getDefaultCartItem(items: CartItem[], productId: string) {
   return items.find(
@@ -247,7 +231,18 @@ export function CustomerLanding() {
   const router = useRouter()
   const { settings, isLoading: isSettingsLoading } = useBusiness()
   const { items, itemCount, addItem, updateQuantity } = useCart()
-  const { products, promotions, isLoading: isCatalogLoading } = useCatalog()
+  const { products, categories, promotions, isLoading: isCatalogLoading } = useCatalog()
+  const landingCategories = [
+    ...categories
+      .filter((category) => category.active !== false)
+      .sort((left, right) => left.order - right.order)
+      .map((category) => ({
+        name: category.name,
+        href: `/menu?category=${category.id}`,
+        icon: getCategoryIcon(category.icon),
+      })),
+    { name: 'Promociones', href: '/menu?promo=1', icon: Star },
+  ]
   const [searchQuery, setSearchQuery] = useState('')
 
   const featuredProducts = products.filter((product) => product.featured && product.available)
@@ -268,6 +263,12 @@ export function CustomerLanding() {
     ? `https://wa.me/${settings.whatsapp.replace(/\D/g, '')}`
     : '#'
   const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(settings.address)}`
+  const instagramUrl = settings.instagram
+    ? (settings.instagram.startsWith('http') ? settings.instagram : `https://instagram.com/${settings.instagram.replace(/^@/, '')}`)
+    : null
+  const facebookUrl = settings.facebook
+    ? (settings.facebook.startsWith('http') ? settings.facebook : `https://facebook.com/${settings.facebook.replace(/^@/, '')}`)
+    : null
 
   const heroImage = (
     <div className="relative overflow-hidden rounded-2xl shadow-md md:rounded-3xl">
@@ -339,17 +340,13 @@ export function CustomerLanding() {
         <section className="py-6 md:py-10">
           <h2 className="mb-4 text-lg font-bold md:mb-6 md:text-2xl">Categories</h2>
           <div className="grid grid-cols-4 gap-3 md:grid-cols-8 md:gap-4 lg:gap-6">
-            {LANDING_CATEGORIES.map((category) => {
+            {landingCategories.map((category) => {
               const Icon = category.icon
-              const href =
-                category.slug === 'promo'
-                  ? '/menu'
-                  : `/menu?category=${category.slug}`
 
               return (
                 <Link
                   key={category.name}
-                  href={href}
+                  href={category.href}
                   className="group flex flex-col items-center gap-2 transition-transform hover:-translate-y-0.5"
                 >
                   <div
@@ -494,16 +491,37 @@ export function CustomerLanding() {
                 <p className="text-[11px] font-semibold md:text-sm">Contacto</p>
                 <p className="mt-1 text-[10px] leading-snug text-muted-foreground md:mt-2 md:text-sm">
                   {settings.phone}
-                  {settings.instagram ? ` ${settings.instagram}` : ''}
                 </p>
-                <a
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 rounded-full border border-[#2D5A57]/20 bg-white px-2 py-0.5 text-[9px] font-medium text-[#2D5A57] transition-colors hover:bg-[#2D5A57]/5 md:mt-3 md:px-4 md:py-1.5 md:text-xs"
-                >
-                  WhatsApp
-                </a>
+                <div className="mt-2 flex flex-wrap items-center justify-center gap-2 md:mt-3">
+                  <a
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full border border-[#2D5A57]/20 bg-white px-2 py-0.5 text-[9px] font-medium text-[#2D5A57] transition-colors hover:bg-[#2D5A57]/5 md:px-4 md:py-1.5 md:text-xs"
+                  >
+                    WhatsApp
+                  </a>
+                  {instagramUrl && (
+                    <a
+                      href={instagramUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-full border border-[#2D5A57]/20 bg-white px-2 py-0.5 text-[9px] font-medium text-[#2D5A57] transition-colors hover:bg-[#2D5A57]/5 md:px-4 md:py-1.5 md:text-xs"
+                    >
+                      Instagram
+                    </a>
+                  )}
+                  {facebookUrl && (
+                    <a
+                      href={facebookUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-full border border-[#2D5A57]/20 bg-white px-2 py-0.5 text-[9px] font-medium text-[#2D5A57] transition-colors hover:bg-[#2D5A57]/5 md:px-4 md:py-1.5 md:text-xs"
+                    >
+                      Facebook
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           )}

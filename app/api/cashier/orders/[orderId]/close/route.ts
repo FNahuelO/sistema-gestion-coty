@@ -4,7 +4,7 @@ import { closeTableAndOrders, requireSessionRole, serializeOrder } from '@/lib/s
 
 export async function POST(_request: NextRequest, context: { params: Promise<{ orderId: string }> }) {
   try {
-    const user = await requireSessionRole(['admin', 'cashier'])
+    const user = await requireSessionRole(['admin', 'staff'])
     const { orderId } = await context.params
 
     const order = await prisma.order.findUnique({

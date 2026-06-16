@@ -14,6 +14,7 @@ import {
 import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getProductDiscountPercent } from '@/lib/promotions'
 import type { AnalyticsOverview, BusinessSettings, CartItem, Category, Order, PaymentMethod, Product, Promotion, SelectedOption, Table, User } from '@/lib/types'
 
 export const selectedOptionSchema = z.object({
@@ -110,7 +111,7 @@ export const tableInputSchema = z.object({
 export const userInputSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(160),
-  role: z.enum(['admin', 'cashier', 'waitress']),
+  role: z.enum(['admin', 'staff']),
   avatar: z.string().trim().url().optional().or(z.literal('')),
   active: z.boolean().default(true),
   password: z.string().min(6).max(120).optional(),
@@ -169,7 +170,7 @@ const tableInclude = {
 } satisfies Prisma.DiningTableInclude
 
 export type SessionUser = User & {
-  role: 'admin' | 'cashier' | 'waitress'
+  role: 'admin' | 'staff'
 }
 
 function decimalToNumber(value: Prisma.Decimal | number | string | null | undefined) {
@@ -193,11 +194,15 @@ export function mapUserRole(role: string): User['role'] {
     case 'ADMIN':
     case 'admin':
       return 'admin'
+    case 'STAFF':
+    case 'staff':
     case 'CASHIER':
     case 'cashier':
-      return 'cashier'
+    case 'WAITRESS':
+    case 'waitress':
+      return 'staff'
     default:
-      return 'waitress'
+      return 'staff'
   }
 }
 
@@ -205,10 +210,8 @@ function toPrismaUserRole(role: User['role']): PrismaUserRole {
   switch (role) {
     case 'admin':
       return PrismaUserRole.ADMIN
-    case 'cashier':
-      return PrismaUserRole.CASHIER
     default:
-      return PrismaUserRole.WAITRESS
+      return PrismaUserRole.STAFF
   }
 }
 
@@ -629,18 +632,30 @@ export async function createOrderFromPayload(payload: z.infer<typeof createOrder
   }
 
   const productIds = [...new Set(input.items.map((item) => item.productId))]
-  const products = await prisma.product.findMany({
-    where: {
-      id: { in: productIds },
-      deletedAt: null,
-      available: true,
-    },
-    include: productInclude,
-  })
+  const [products, activePromotions] = await Promise.all([
+    prisma.product.findMany({
+      where: {
+        id: { in: productIds },
+        deletedAt: null,
+        available: true,
+      },
+      include: productInclude,
+    }),
+    prisma.promotion.findMany({
+      where: {
+        active: true,
+        validFrom: { lte: new Date() },
+        validTo: { gte: new Date() },
+      },
+      include: promotionInclude,
+    }),
+  ])
 
   if (products.length !== productIds.length) {
     throw new Error('INVALID_PRODUCTS')
   }
+
+  const serializedPromotions = activePromotions.map(serializePromotion)
 
   let diningTable:
     | {
@@ -710,12 +725,16 @@ export async function createOrderFromPayload(payload: z.infer<typeof createOrder
       })
     })
 
+    const serializedProduct = serializeProduct(product)
+    const discountPercent = getProductDiscountPercent(serializedProduct, serializedPromotions)
+    const discountedUnitPrice = discountPercent > 0 ? unitPrice * (1 - discountPercent / 100) : unitPrice
+
     return {
       productId: product.id,
       productName: product.name,
       productDescription: product.description,
       basePrice: decimalToNumber(product.basePrice),
-      unitPrice,
+      unitPrice: discountedUnitPrice,
       imageUrl: product.images[0]?.url ?? product.imageUrl,
       quantity: item.quantity,
       notes: item.notes,
@@ -725,6 +744,14 @@ export async function createOrderFromPayload(payload: z.infer<typeof createOrder
 
   const subtotal = itemsToCreate.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
   const deliveryFee = input.type === 'delivery' ? decimalToNumber(settings.deliveryFee) : 0
+
+  if (input.type !== 'table') {
+    const minAmount = decimalToNumber(settings.minOrderAmount)
+    if (minAmount > 0 && subtotal < minAmount) {
+      throw new Error('MIN_ORDER_AMOUNT')
+    }
+  }
+
   const tax = subtotal * decimalToNumber(settings.taxRate)
   const total = subtotal + tax + deliveryFee
 
@@ -799,11 +826,19 @@ export async function createOrderFromPayload(payload: z.infer<typeof createOrder
     include: orderInclude,
   })
 
-  if (diningTable?.id) {
-    await prisma.diningTable.update({
-      where: { id: diningTable.id },
-      data: { status: 'OCCUPIED' },
-    })
+  if (diningTable?.id && tableSessionId) {
+    await Promise.all([
+      prisma.diningTable.update({
+        where: { id: diningTable.id },
+        data: { status: 'WAITING' },
+      }),
+      prisma.tableSession.update({
+        where: { id: tableSessionId },
+        data: {
+          accumulatedTotal: { increment: total },
+        },
+      }),
+    ])
   }
 
   const serialized = serializeOrder(createdOrder)
@@ -1111,7 +1146,10 @@ export async function getAnalytics(): Promise<AnalyticsOverview> {
     averageTicket: orders.length ? totalRevenue / orders.length : 0,
     totalRevenue,
     activeOrders: orders.filter((order) => ![PrismaOrderStatus.COMPLETED, PrismaOrderStatus.CANCELLED].includes(order.status)).length,
-    tablesServed: tables.length,
+    tablesServed: tables.filter((session) => session.closedAt !== null).length,
+    tablesServedToday: tables.filter(
+      (session) => session.closedAt && session.closedAt.toDateString() === now.toDateString()
+    ).length,
     salesByType,
     topProducts: [...productMap.entries()]
       .map(([productId, value]) => ({

@@ -3,7 +3,7 @@ import { createOrderFromPayload, getOperationalOrders, getSessionUser, requireSe
 
 export async function GET() {
   try {
-    await requireSessionRole(['admin', 'cashier', 'waitress'])
+    await requireSessionRole(['admin', 'staff'])
     const orders = await getOperationalOrders()
     return NextResponse.json(orders)
   } catch (error) {
@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
         ['TABLE_REQUIRED', ['Debe indicar la mesa para este pedido', 400]],
         ['TABLE_NOT_FOUND', ['La mesa seleccionada no existe', 404]],
         ['SETTINGS_NOT_FOUND', ['La configuración del negocio no está lista', 500]],
+        ['MIN_ORDER_AMOUNT', ['El pedido no alcanza el monto mínimo requerido', 400]],
       ])
 
       if (knownMessages.has(error.message)) {

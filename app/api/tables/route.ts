@@ -3,7 +3,7 @@ import { getTablesSnapshot, requireSessionRole, tableInputSchema, upsertTable } 
 
 export async function GET() {
   try {
-    await requireSessionRole(['admin', 'cashier', 'waitress'])
+    await requireSessionRole(['admin', 'staff'])
     const tables = await getTablesSnapshot()
     return NextResponse.json(tables)
   } catch (error) {

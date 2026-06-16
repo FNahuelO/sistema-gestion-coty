@@ -9,7 +9,7 @@ const schema = z.object({
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ orderId: string }> }) {
   try {
-    const user = await requireSessionRole(['admin', 'cashier'])
+    const user = await requireSessionRole(['admin', 'staff'])
     const { orderId } = await context.params
     const body = schema.parse(await request.json())
 

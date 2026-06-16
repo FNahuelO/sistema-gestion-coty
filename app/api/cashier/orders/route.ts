@@ -3,7 +3,7 @@ import { getOperationalOrders, requireSessionRole } from '@/lib/server-data'
 
 export async function GET() {
   try {
-    await requireSessionRole(['admin', 'cashier'])
+    await requireSessionRole(['admin', 'staff'])
     const orders = await getOperationalOrders()
     return NextResponse.json(orders)
   } catch (error) {

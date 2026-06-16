@@ -1,0 +1,8 @@
+export const PANEL_CARD = 'rounded-2xl border border-gray-100 bg-white shadow-sm'
+export const PANEL_LIST_ROW = 'rounded-xl border border-gray-100 bg-white p-3 shadow-sm'
+export const PANEL_TOGGLE_ROW = 'flex items-center justify-between rounded-xl border border-gray-100 bg-[#F8FBFA] p-3'
+export const PANEL_TITLE = 'text-sm font-semibold text-[#2D5A57]'
+export const PANEL_PRIMARY_BTN = 'bg-[#2D5A57] text-white hover:bg-[#053E38]'
+export const PANEL_OUTLINE_BTN = 'border-[#C5DDD9] bg-white text-[#2D5A57] hover:bg-[#C5DDD9]/40'
+export const PANEL_NAV_ACTIVE = 'bg-[#C5DDD9]/50 font-medium text-[#2D5A57]'
+export const PANEL_NAV_IDLE = 'text-gray-700 hover:bg-gray-50'

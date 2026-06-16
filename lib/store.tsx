@@ -537,7 +537,10 @@ export function useAdminData(): AdminData {
     '/api/orders',
     fetchJson
   )
-  const { data: analyticsData, mutate: mutateAnalytics } = useSWR<AnalyticsOverview>('/api/admin/analytics', fetchJson)
+  const { data: analyticsData, mutate: mutateAnalytics } = useSWR<AnalyticsOverview>('/api/admin/analytics', fetchJson, {
+    refreshInterval: 15000,
+    revalidateOnFocus: true,
+  })
   const { data: historyData, mutate: mutateHistory } = useSWR<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
     '/api/admin/orders/history',
     fetchJson

@@ -12,7 +12,7 @@ const patchSchema = z.object({
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ tableId: string }> }) {
   try {
-    await requireSessionRole(['admin', 'cashier', 'waitress'])
+    await requireSessionRole(['admin', 'staff'])
     const { tableId } = await context.params
     const body = patchSchema.parse(await request.json())
 

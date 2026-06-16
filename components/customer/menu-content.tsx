@@ -7,15 +7,9 @@ import { CartItemSkeleton, LoadingSkeleton, ProductCardSkeleton } from '@/compon
 import { MenuSectionHeader } from '@/components/customer/menu-section-header'
 import { MenuGridProductCard } from '@/components/customer/menu-grid-product-card'
 import { MenuListProductCard } from '@/components/customer/menu-list-product-card'
-import { MENU_SECTION_ICONS } from '@/lib/menu-section-icons'
-import type { MenuCategoryId } from '@/lib/menu-categories'
+import { getCategoryIcon } from '@/lib/category-icons'
+import type { MenuCategoryId, MenuSection } from '@/lib/menu-categories'
 import { cn } from '@/lib/utils'
-
-interface MenuSection {
-  id: Exclude<MenuCategoryId, 'all'>
-  name: string
-  products: Product[]
-}
 
 interface MenuContentProps {
   isLoading: boolean
@@ -25,6 +19,7 @@ interface MenuContentProps {
   menuSections: MenuSection[]
   categoryProducts: Product[]
   activeCategoryName?: string
+  activeCategoryIcon?: string
   items: CartItem[]
   addItem: ReturnType<typeof useCart>['addItem']
   removeItem: ReturnType<typeof useCart>['removeItem']
@@ -42,6 +37,7 @@ export function MenuContent({
   menuSections,
   categoryProducts,
   activeCategoryName,
+  activeCategoryIcon,
   items,
   addItem,
   removeItem,
@@ -83,6 +79,7 @@ export function MenuContent({
         <SingleCategoryView
           categoryId={selectedCategory}
           categoryName={activeCategoryName}
+          categoryIcon={activeCategoryIcon}
           products={categoryProducts}
           items={items}
           addItem={addItem}
@@ -200,7 +197,7 @@ function AllCategoriesView({
   return (
     <div className="space-y-8">
       {menuSections.map((section) => {
-        const Icon = MENU_SECTION_ICONS[section.id]
+        const Icon = getCategoryIcon(section.icon)
         return (
           <section key={section.id} className="space-y-4">
             <MenuSectionHeader
@@ -230,6 +227,7 @@ function AllCategoriesView({
 function SingleCategoryView({
   categoryId,
   categoryName,
+  categoryIcon,
   products,
   items,
   addItem,
@@ -238,8 +236,9 @@ function SingleCategoryView({
   onCategoryReset,
   onOpenProduct,
 }: {
-  categoryId: Exclude<MenuCategoryId, 'all'>
+  categoryId: MenuCategoryId
   categoryName?: string
+  categoryIcon?: string
   products: Product[]
   items: CartItem[]
   addItem: ReturnType<typeof useCart>['addItem']
@@ -259,7 +258,7 @@ function SingleCategoryView({
     )
   }
 
-  const Icon = MENU_SECTION_ICONS[categoryId]
+  const Icon = getCategoryIcon(categoryId === 'promo' ? 'Star' : categoryIcon ?? 'UtensilsCrossed')
 
   return (
     <>

@@ -3,14 +3,12 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 
-function mapRole(role: string): 'admin' | 'cashier' | 'waitress' {
+function mapRole(role: string): 'admin' | 'staff' {
   switch (role) {
     case 'ADMIN':
       return 'admin'
-    case 'CASHIER':
-      return 'cashier'
     default:
-      return 'waitress'
+      return 'staff'
   }
 }
 

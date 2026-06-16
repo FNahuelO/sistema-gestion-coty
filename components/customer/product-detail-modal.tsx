@@ -8,15 +8,18 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import type { Product, SelectedOption } from '@/lib/types'
+import type { Product, Promotion, SelectedOption } from '@/lib/types'
+import { getDiscountedUnitPrice, getProductDiscountPercent } from '@/lib/promotions'
+import { formatPrice } from '@/lib/coty-theme'
 
 interface ProductDetailModalProps {
   product: Product
+  promotions?: Promotion[]
   onClose: () => void
   onAddToCart: (product: Product, quantity: number, options: SelectedOption[], notes?: string) => void
 }
 
-export function ProductDetailModal({ product, onClose, onAddToCart }: ProductDetailModalProps) {
+export function ProductDetailModal({ product, promotions = [], onClose, onAddToCart }: ProductDetailModalProps) {
   const [quantity, setQuantity] = useState(1)
   const [selectedOptions, setSelectedOptions] = useState<SelectedOption[]>([])
   const [notes, setNotes] = useState('')
@@ -59,21 +62,9 @@ export function ProductDetailModal({ product, onClose, onAddToCart }: ProductDet
     })
   }
 
-  const calculatePrice = () => {
-    let price = product.price
-    selectedOptions.forEach((option) => {
-      const productOption = product.options?.find((o) => o.id === option.optionId)
-      if (productOption) {
-        option.choiceIds.forEach((choiceId) => {
-          const choice = productOption.choices.find((c) => c.id === choiceId)
-          if (choice) {
-            price += choice.priceModifier
-          }
-        })
-      }
-    })
-    return price * quantity
-  }
+  const discountPercent = getProductDiscountPercent(product, promotions)
+  const unitPrice = getDiscountedUnitPrice(product, selectedOptions, promotions)
+  const calculatePrice = () => unitPrice * quantity
 
   const canAddToCart = () => {
     const requiredOptions = product.options?.filter((o) => o.required) || []

@@ -23,7 +23,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { SimpleModal } from '@/components/ui/simple-modal'
-import { useCart, useBusiness, useOrders } from '@/lib/store'
+import { useCart, useBusiness, useCatalog, useOrders } from '@/lib/store'
+import { useCartPricing } from '@/hooks/use-cart-pricing'
 import { CartProductCard } from '@/components/customer/cart-product-card'
 import { CheckoutFormSkeleton, CheckoutLoadingSkeleton, LoadingSkeleton } from '@/components/shared/loading'
 import { COTY_HEADER, COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
@@ -94,8 +95,10 @@ function CheckoutSection({
 
 export function CheckoutPage() {
   const pathname = usePathname()
-  const { items, total, hydrated, updateQuantity, removeItem, clearCart } = useCart()
+  const { items, hydrated, updateQuantity, removeItem, clearCart } = useCart()
   const { settings, isLoading: isSettingsLoading } = useBusiness()
+  const { promotions } = useCatalog()
+  const { subtotal, discount, total } = useCartPricing(items, promotions)
   const { addOrder } = useOrders()
 
   const [orderType, setOrderType] = useState<OrderType>('pickup')
@@ -112,6 +115,8 @@ export function CheckoutPage() {
   const isEmpty = items.length === 0 && !orderComplete
   const deliveryFee = orderType === 'delivery' ? settings.deliveryFee : 0
   const finalTotal = total + deliveryFee
+  const isClosed = !settings.isOpen
+  const belowMinOrder = settings.minOrderAmount > 0 && subtotal < settings.minOrderAmount
 
   useEffect(() => {
     if (items.length === 0) {
@@ -165,6 +170,11 @@ ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (isClosed) {
+      toast.error('El local está cerrado en este momento')
+      return
+    }
+
     if (!customerName || !customerPhone) {
       toast.error('Por favor completá todos los campos requeridos')
       return
@@ -172,6 +182,11 @@ ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`
 
     if (orderType === 'delivery' && !customerAddress) {
       toast.error('Por favor ingresá tu dirección de entrega')
+      return
+    }
+
+    if (belowMinOrder) {
+      toast.error(`El pedido mínimo es de ${formatPrice(settings.minOrderAmount)}`)
       return
     }
 
@@ -303,6 +318,16 @@ ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`
           <CheckoutHeader />
 
           <CheckoutMain className="pb-4 pt-6 md:pt-8">
+            {isClosed && (
+              <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                El local está cerrado. Horario: {settings.openTime} – {settings.closeTime}
+              </div>
+            )}
+            {belowMinOrder && !isClosed && (
+              <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Pedido mínimo: {formatPrice(settings.minOrderAmount)}. Te faltan {formatPrice(settings.minOrderAmount - subtotal)}.
+              </div>
+            )}
             <div className="lg:grid lg:grid-cols-5 lg:items-start lg:gap-8">
               <div className="space-y-3 lg:col-span-3">
                 {items.map((item, index) => (
@@ -391,8 +416,14 @@ ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`
                       <div className="mt-2 space-y-2 text-sm">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Productos</span>
-                          <span className="font-medium">{formatPrice(total)}</span>
+                          <span className="font-medium">{formatPrice(subtotal + discount)}</span>
                         </div>
+                        {discount > 0 && (
+                          <div className="flex justify-between text-emerald-700">
+                            <span>Descuento promos</span>
+                            <span className="font-medium">-{formatPrice(discount)}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Envío</span>
                           <span className="font-medium">{formatPrice(deliveryFee)}</span>
@@ -420,7 +451,8 @@ ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`
                 <button
                   type="button"
                   onClick={() => setConfirmOpen(true)}
-                  className="flex w-full items-center justify-between rounded-full px-6 py-4 text-base font-bold text-white shadow-lg transition-opacity hover:opacity-95"
+                  disabled={isClosed || belowMinOrder}
+                  className="flex w-full items-center justify-between rounded-full px-6 py-4 text-base font-bold text-white shadow-lg transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
                   style={{ backgroundColor: '#053E38' }}
                 >
                   <span className="flex-1 text-center">Confirmar pedido</span>

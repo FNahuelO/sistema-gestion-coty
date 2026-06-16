@@ -23,7 +23,7 @@ const schema = z.object({
 
 export async function POST(request: NextRequest, context: { params: Promise<{ tableId: string }> }) {
   try {
-    const user = await requireSessionRole(['admin', 'cashier', 'waitress'])
+    const user = await requireSessionRole(['admin', 'staff'])
     const { tableId } = await context.params
     const body = schema.parse(await request.json())
 

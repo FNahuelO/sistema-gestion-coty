@@ -3,7 +3,7 @@ import { closeTableAndOrders, requireSessionRole, serializeTable } from '@/lib/s
 
 export async function POST(_request: NextRequest, context: { params: Promise<{ tableId: string }> }) {
   try {
-    const user = await requireSessionRole(['admin', 'cashier', 'waitress'])
+    const user = await requireSessionRole(['admin', 'staff'])
     const { tableId } = await context.params
     const table = await closeTableAndOrders(tableId, user.id)
 

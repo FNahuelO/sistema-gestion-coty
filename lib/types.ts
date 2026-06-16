@@ -98,7 +98,11 @@ export interface Table {
 }
 
 // User types
-export type UserRole = 'admin' | 'cashier' | 'waitress' | 'customer'
+export type UserRole = 'admin' | 'staff' | 'customer'
+
+export function isStaffRole(role?: string | null): role is 'staff' {
+  return role === 'staff' || role === 'cashier' || role === 'waitress'
+}
 
 export interface User {
   id: string
@@ -150,6 +154,7 @@ export interface AnalyticsOverview {
   totalRevenue: number
   activeOrders: number
   tablesServed: number
+  tablesServedToday: number
   salesByType: SalesByType
   topProducts: ProductSales[]
   dailySales: DailySales[]

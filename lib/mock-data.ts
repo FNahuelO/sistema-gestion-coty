@@ -374,9 +374,9 @@ export const tables: Table[] = [
 
 export const users: User[] = [
   { id: 'admin1', name: 'María García', email: 'maria@cotycafe.com', role: 'admin', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop' },
-  { id: 'cashier1', name: 'Carlos López', email: 'carlos@cotycafe.com', role: 'cashier', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop' },
-  { id: 'w1', name: 'Ana Martínez', email: 'ana@cotycafe.com', role: 'waitress', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop' },
-  { id: 'w2', name: 'Luis Hernández', email: 'luis@cotycafe.com', role: 'waitress', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop' },
+  { id: 'staff1', name: 'Carlos López', email: 'carlos@cotycafe.com', role: 'staff', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop' },
+  { id: 'w1', name: 'Ana Martínez', email: 'ana@cotycafe.com', role: 'staff', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop' },
+  { id: 'w2', name: 'Luis Hernández', email: 'luis@cotycafe.com', role: 'staff', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop' },
 ]
 
 export const orders: Order[] = [

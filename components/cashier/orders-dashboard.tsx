@@ -1,18 +1,14 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef, type ElementType } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Coffee,
-  LogOut,
-  Menu,
   Bell,
   Truck,
   Store,
   Users,
   Clock,
   CheckCircle,
-  XCircle,
   Search,
   Filter,
   ChefHat,
@@ -20,31 +16,34 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { useAuth, useOrders } from '@/lib/store'
+import { useOrders } from '@/lib/store'
+import { usePendingAction } from '@/hooks/use-pending-action'
+import { OrderDetailSheet } from '@/components/staff/order-detail-sheet'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
+import { formatOrderStatus } from '@/lib/order-labels'
 import type { Order, OrderStatus, OrderType } from '@/lib/types'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { toast } from 'sonner'
+import { COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
+import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
+import { Spinner } from '@/components/ui/spinner'
+import { cn } from '@/lib/utils'
 
-const orderTypeIcons: Record<OrderType, React.ElementType> = {
+const orderTypeIcons: Record<OrderType, ElementType> = {
   delivery: Truck,
   pickup: Store,
   table: Users,
 }
 
-const orderTypeLabels: Record<OrderType, string> = {
-  delivery: 'Delivery',
-  pickup: 'Recoger',
-  table: 'Mesa',
+const ORDER_TYPE_ACCENT: Record<OrderType, string> = {
+  delivery: 'border-l-[#E8A598]',
+  pickup: 'border-l-[#7EB8B3]',
+  table: 'border-l-[#2D5A57]',
 }
 
 const statusActions: Record<OrderStatus, { next: OrderStatus; label: string } | null> = {
@@ -57,28 +56,52 @@ const statusActions: Record<OrderStatus, { next: OrderStatus; label: string } | 
   cancelled: null,
 }
 
-export function CashierDashboard() {
-  const { user, logout } = useAuth()
-  const { orders, updateOrderStatus } = useOrders()
-  const [menuOpen, setMenuOpen] = useState(false)
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  iconColor,
+}: {
+  label: string
+  value: number
+  icon: ElementType
+  iconColor: string
+}) {
+  return (
+    <div className={cn(PANEL_CARD, 'flex items-center gap-3 p-4')}>
+      <div
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+        style={{ backgroundColor: `${COTY_QTY_BG}99` }}
+      >
+        <Icon className="h-5 w-5" style={{ color: iconColor }} />
+      </div>
+      <div>
+        <p className="text-2xl font-bold tracking-tight">{value}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
+      </div>
+    </div>
+  )
+}
+
+export function CashierDashboard({ embedded = false }: { embedded?: boolean }) {
+  const { orders, updateOrderStatus, closeOrder } = useOrders()
+  const { isPending, isBusy, run } = usePendingAction()
+  const previousPendingCount = useRef<number | null>(null)
   const [selectedTab, setSelectedTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('active')
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
 
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
-      // Tab filter
+    return orders.filter((order) => {
       if (selectedTab !== 'all' && order.type !== selectedTab) return false
 
-      // Status filter
       if (statusFilter === 'active') {
         if (['completed', 'cancelled'].includes(order.status)) return false
       } else if (statusFilter !== 'all' && order.status !== statusFilter) {
         return false
       }
 
-      // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase()
         return (
@@ -93,78 +116,110 @@ export function CashierDashboard() {
   }, [orders, selectedTab, statusFilter, searchQuery])
 
   const orderStats = useMemo(() => {
-    const active = orders.filter(o => !['completed', 'cancelled'].includes(o.status))
+    const active = orders.filter((o) => !['completed', 'cancelled'].includes(o.status))
     return {
-      pending: active.filter(o => o.status === 'pending').length,
-      preparing: active.filter(o => o.status === 'preparing').length,
-      ready: active.filter(o => o.status === 'ready').length,
+      pending: active.filter((o) => o.status === 'pending').length,
+      preparing: active.filter((o) => o.status === 'preparing').length,
+      ready: active.filter((o) => o.status === 'ready').length,
       total: active.length,
     }
   }, [orders])
 
-  const handleStatusChange = (orderId: string, newStatus: OrderStatus) => {
-    updateOrderStatus(orderId, newStatus)
-    toast.success(`Pedido actualizado a: ${newStatus}`)
+  useEffect(() => {
+    const pending = orderStats.pending
+    if (previousPendingCount.current !== null && pending > previousPendingCount.current) {
+      try {
+        const context = new AudioContext()
+        const oscillator = context.createOscillator()
+        const gain = context.createGain()
+        oscillator.connect(gain)
+        gain.connect(context.destination)
+        oscillator.frequency.value = 880
+        gain.gain.value = 0.08
+        oscillator.start()
+        oscillator.stop(context.currentTime + 0.25)
+      } catch {
+        // ignore audio errors
+      }
+    }
+    previousPendingCount.current = pending
+  }, [orderStats.pending])
+
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+    await run(`status:${orderId}`, async () => {
+      try {
+        await updateOrderStatus(orderId, newStatus)
+        toast.success(`Pedido actualizado a: ${formatOrderStatus(newStatus)}`)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'No se pudo actualizar el pedido')
+        throw error
+      }
+    })
   }
 
-  const handleCancelOrder = (orderId: string) => {
-    updateOrderStatus(orderId, 'cancelled')
-    toast.success('Pedido cancelado')
-    setSelectedOrder(null)
+  const handleCancelOrder = async (orderId: string) => {
+    await run(`cancel:${orderId}`, async () => {
+      try {
+        await updateOrderStatus(orderId, 'cancelled')
+        toast.success('Pedido cancelado')
+        setSelectedOrder(null)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'No se pudo cancelar el pedido')
+        throw error
+      }
+    })
+  }
+
+  const handleCloseOrder = async (orderId: string) => {
+    await run(`archive:${orderId}`, async () => {
+      try {
+        await closeOrder(orderId)
+        toast.success('Pedido archivado (permanece en historial)')
+        setSelectedOrder(null)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'No se pudo archivar el pedido')
+        throw error
+      }
+    })
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-72">
-                <SheetHeader>
-                  <SheetTitle className="flex items-center gap-2">
-                    <Coffee className="h-5 w-5 text-primary" />
-                    Coty Café
-                  </SheetTitle>
-                </SheetHeader>
-                <div className="mt-6 space-y-2">
-                  <div className="flex items-center gap-3 rounded-lg bg-muted p-3">
-                    <Avatar>
-                      <AvatarImage src={user?.avatar} />
-                      <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">{user?.name}</p>
-                      <p className="text-sm text-muted-foreground">Cajero/a</p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start gap-2"
-                    onClick={async () => {
-                      await logout()
-                      window.location.href = '/login'
-                    }}
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Cerrar Sesión
-                  </Button>
-                </div>
-              </SheetContent>
-            </Sheet>
-            <div className="flex items-center gap-2">
-              <ChefHat className="h-6 w-6 text-primary" />
-              <span className="font-serif text-lg font-bold">Pedidos</span>
-            </div>
-          </div>
+    <div className={cn('flex flex-col', !embedded && 'min-h-screen bg-[#FAFAFA]')}>
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <StatCard label="Pendientes" value={orderStats.pending} icon={Clock} iconColor="#CA8A04" />
+          <StatCard label="Preparando" value={orderStats.preparing} icon={ChefHat} iconColor="#EA580C" />
+          <StatCard label="Listos" value={orderStats.ready} icon={CheckCircle} iconColor="#16A34A" />
+          <StatCard label="Activos" value={orderStats.total} icon={Package} iconColor={COTY_TEAL} />
+        </div>
 
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" className="relative">
+        <div className={cn(PANEL_CARD, 'p-4')}>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por ID, cliente o teléfono..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="border-gray-200 bg-[#F8FBFA] pl-9"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full border-gray-200 bg-[#F8FBFA] md:w-44">
+                <Filter className="mr-2 h-4 w-4 text-[#2D5A57]" />
+                <SelectValue placeholder="Estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Activos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="pending">Pendientes</SelectItem>
+                <SelectItem value="confirmed">Confirmados</SelectItem>
+                <SelectItem value="preparing">Preparando</SelectItem>
+                <SelectItem value="ready">Listos</SelectItem>
+                <SelectItem value="completed">Completados</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="icon" className={cn('relative shrink-0', PANEL_OUTLINE_BTN)}>
               <Bell className="h-4 w-4" />
               {orderStats.pending > 0 && (
                 <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-white">
@@ -174,108 +229,39 @@ export function CashierDashboard() {
             </Button>
           </div>
         </div>
-      </header>
 
-      {/* Stats Cards */}
-      <div className="container px-4 py-4 mx-auto">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-100 text-yellow-600">
-                <Clock className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{orderStats.pending}</p>
-                <p className="text-xs text-muted-foreground">Pendientes</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">
-                <ChefHat className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{orderStats.preparing}</p>
-                <p className="text-xs text-muted-foreground">Preparando</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-600">
-                <CheckCircle className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{orderStats.ready}</p>
-                <p className="text-xs text-muted-foreground">Listos</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Package className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{orderStats.total}</p>
-                <p className="text-xs text-muted-foreground">Activos</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="container px-4 pb-4 mx-auto">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por ID, cliente o teléfono..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full md:w-40">
-              <Filter className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">Activos</SelectItem>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="pending">Pendientes</SelectItem>
-              <SelectItem value="confirmed">Confirmados</SelectItem>
-              <SelectItem value="preparing">Preparando</SelectItem>
-              <SelectItem value="ready">Listos</SelectItem>
-              <SelectItem value="completed">Completados</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Orders Tabs */}
-      <div className="container flex-1 px-4 pb-6 mx-auto">
         <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-          <TabsList className="w-full justify-start">
-            <TabsTrigger value="all" className="gap-1.5">
+          <TabsList className="h-auto w-full justify-start gap-1 bg-[#F8FBFA] p-1">
+            <TabsTrigger
+              value="all"
+              className="gap-1.5 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
+            >
               <Package className="h-4 w-4" />
               Todos
-              <Badge variant="secondary" className="ml-1">
-                {orders.filter(o => statusFilter === 'active' ? !['completed', 'cancelled'].includes(o.status) : true).length}
+              <Badge variant="secondary" className="ml-1 bg-[#C5DDD9]/60 text-[#2D5A57]">
+                {orders.filter((o) =>
+                  statusFilter === 'active' ? !['completed', 'cancelled'].includes(o.status) : true
+                ).length}
               </Badge>
             </TabsTrigger>
-            <TabsTrigger value="delivery" className="gap-1.5">
+            <TabsTrigger
+              value="delivery"
+              className="gap-1.5 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
+            >
               <Truck className="h-4 w-4" />
               Delivery
             </TabsTrigger>
-            <TabsTrigger value="pickup" className="gap-1.5">
+            <TabsTrigger
+              value="pickup"
+              className="gap-1.5 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
+            >
               <Store className="h-4 w-4" />
               Recoger
             </TabsTrigger>
-            <TabsTrigger value="table" className="gap-1.5">
+            <TabsTrigger
+              value="table"
+              className="gap-1.5 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
+            >
               <Users className="h-4 w-4" />
               Mesas
             </TabsTrigger>
@@ -283,13 +269,15 @@ export function CashierDashboard() {
 
           <TabsContent value={selectedTab} className="mt-4">
             {filteredOrders.length === 0 ? (
-              <EmptyState
-                icon="package"
-                title="Sin pedidos"
-                description="No hay pedidos que coincidan con los filtros"
-              />
+              <div className={PANEL_CARD}>
+                <EmptyState
+                  icon="package"
+                  title="Sin pedidos"
+                  description="No hay pedidos que coincidan con los filtros"
+                />
+              </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 <AnimatePresence>
                   {filteredOrders.map((order, index) => {
                     const TypeIcon = orderTypeIcons[order.type]
@@ -298,67 +286,87 @@ export function CashierDashboard() {
                     return (
                       <motion.div
                         key={order.id}
-                        initial={{ opacity: 0, y: 20 }}
+                        initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        transition={{ delay: index * 0.05 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                        transition={{ delay: index * 0.03 }}
                       >
-                        <Card
-                          className={`cursor-pointer transition-all hover:shadow-md ${order.status === 'pending' ? 'border-yellow-300 bg-yellow-50/50 dark:bg-yellow-950/20' : ''
-                            }`}
+                        <button
+                          type="button"
                           onClick={() => setSelectedOrder(order)}
+                          className={cn(
+                            PANEL_LIST_ROW,
+                            'w-full border-l-4 text-left transition-colors hover:bg-[#F8FBFA]',
+                            ORDER_TYPE_ACCENT[order.type],
+                            order.status === 'pending' && 'bg-[#FFFBEB]/80'
+                          )}
                         >
-                          <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                                  <TypeIcon className="h-4 w-4" />
-                                </div>
-                                <div>
-                                  <CardTitle className="text-sm">#{order.id}</CardTitle>
-                                  <p className="text-xs text-muted-foreground">
-                                    {formatDistanceToNow(order.createdAt, { addSuffix: true, locale: es })}
-                                  </p>
-                                </div>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex min-w-0 items-start gap-3">
+                              <div
+                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                                style={{ backgroundColor: `${COTY_QTY_BG}99` }}
+                              >
+                                <TypeIcon className="h-4 w-4" style={{ color: COTY_TEAL }} />
                               </div>
-                              <StatusBadge status={order.status} />
+                              <div className="min-w-0">
+                                <p className="font-semibold text-foreground">
+                                  {order.displayCode ?? `#${order.id}`}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatDistanceToNow(order.createdAt, { addSuffix: true, locale: es })}
+                                </p>
+                              </div>
                             </div>
-                          </CardHeader>
-                          <CardContent className="space-y-3">
-                            <div>
-                              <p className="font-medium">{order.customerName}</p>
-                              {order.customerPhone && (
-                                <p className="text-sm text-muted-foreground">{order.customerPhone}</p>
-                              )}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {order.items.slice(0, 2).map(item => (
+                            <StatusBadge status={order.status} />
+                          </div>
+
+                          <div className="mt-3 space-y-1 pl-12 text-sm">
+                            <p className="font-medium">{order.customerName}</p>
+                            {order.customerPhone && (
+                              <p className="text-muted-foreground">{order.customerPhone}</p>
+                            )}
+                            <div className="text-xs text-muted-foreground">
+                              {order.items.slice(0, 2).map((item) => (
                                 <p key={item.id}>
                                   {item.quantity}x {item.product.name}
                                 </p>
                               ))}
                               {order.items.length > 2 && (
-                                <p className="text-xs">+{order.items.length - 2} más...</p>
+                                <p>+{order.items.length - 2} más...</p>
                               )}
                             </div>
-                            <div className="flex items-center justify-between border-t pt-2">
-                              <span className="font-serif text-lg font-bold">
-                                ${order.total.toFixed(2)}
-                              </span>
-                              {action && (
-                                <Button
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleStatusChange(order.id, action.next)
-                                  }}
-                                >
-                                  {action.label}
-                                </Button>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
+                          </div>
+
+                          <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 pl-12">
+                            <span
+                              className="rounded-full px-3 py-1 text-xs font-semibold"
+                              style={{ backgroundColor: COTY_QTY_BG, color: COTY_TEAL }}
+                            >
+                              {formatPrice(order.total)}
+                            </span>
+                            {action && (
+                              <Button
+                                size="sm"
+                                className={PANEL_PRIMARY_BTN}
+                                disabled={isBusy}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  void handleStatusChange(order.id, action.next)
+                                }}
+                              >
+                                {isPending(`status:${order.id}`) ? (
+                                  <>
+                                    <Spinner className="mr-1.5" />
+                                    ...
+                                  </>
+                                ) : (
+                                  action.label
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </button>
                       </motion.div>
                     )
                   })}
@@ -369,129 +377,17 @@ export function CashierDashboard() {
         </Tabs>
       </div>
 
-      {/* Order Detail Sheet */}
-      <Sheet open={!!selectedOrder} onOpenChange={(open) => !open && setSelectedOrder(null)}>
-        <SheetContent className="w-full sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle>Pedido #{selectedOrder?.id}</SheetTitle>
-          </SheetHeader>
-
-          {selectedOrder && (
-            <ScrollArea className="h-[calc(100vh-8rem)] pr-4">
-              <div className="space-y-6 py-4">
-                {/* Status */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Estado</span>
-                  <StatusBadge status={selectedOrder.status} />
-                </div>
-
-                {/* Type */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Tipo</span>
-                  <div className="flex items-center gap-2">
-                    {(() => {
-                      const TypeIcon = orderTypeIcons[selectedOrder.type]
-                      return <TypeIcon className="h-4 w-4" />
-                    })()}
-                    <span>{orderTypeLabels[selectedOrder.type]}</span>
-                  </div>
-                </div>
-
-                {/* Customer Info */}
-                <div className="rounded-lg bg-muted p-4">
-                  <h3 className="mb-2 font-medium">Cliente</h3>
-                  <p>{selectedOrder.customerName}</p>
-                  {selectedOrder.customerPhone && (
-                    <p className="text-sm text-muted-foreground">{selectedOrder.customerPhone}</p>
-                  )}
-                  {selectedOrder.customerAddress && (
-                    <p className="mt-2 text-sm">{selectedOrder.customerAddress}</p>
-                  )}
-                </div>
-
-                {/* Items */}
-                <div>
-                  <h3 className="mb-3 font-medium">Productos</h3>
-                  <div className="space-y-3">
-                    {selectedOrder.items.map(item => (
-                      <div key={item.id} className="flex items-center gap-3">
-                        <img
-                          src={item.product.image}
-                          alt={item.product.name}
-                          className="h-12 w-12 rounded-md object-cover"
-                        />
-                        <div className="flex-1">
-                          <p className="font-medium">{item.product.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {item.quantity}x ${item.product.price}
-                          </p>
-                        </div>
-                        <span className="font-medium">
-                          ${(item.product.price * item.quantity).toFixed(2)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Notes */}
-                {selectedOrder.notes && (
-                  <div className="rounded-lg bg-muted p-4">
-                    <h3 className="mb-2 font-medium">Notas</h3>
-                    <p className="text-sm">{selectedOrder.notes}</p>
-                  </div>
-                )}
-
-                {/* Total */}
-                <div className="rounded-lg border p-4">
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Subtotal</span>
-                      <span>${selectedOrder.subtotal.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">IVA</span>
-                      <span>${selectedOrder.tax.toFixed(2)}</span>
-                    </div>
-                  </div>
-                  <div className="mt-2 flex justify-between border-t pt-2 text-lg font-bold">
-                    <span>Total</span>
-                    <span className="font-serif">${selectedOrder.total.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="space-y-2">
-                  {statusActions[selectedOrder.status] && (
-                    <Button
-                      className="w-full"
-                      onClick={() => {
-                        handleStatusChange(
-                          selectedOrder.id,
-                          statusActions[selectedOrder.status]!.next
-                        )
-                        setSelectedOrder(null)
-                      }}
-                    >
-                      {statusActions[selectedOrder.status]!.label}
-                    </Button>
-                  )}
-                  {!['completed', 'cancelled'].includes(selectedOrder.status) && (
-                    <Button
-                      variant="destructive"
-                      className="w-full"
-                      onClick={() => handleCancelOrder(selectedOrder.id)}
-                    >
-                      <XCircle className="mr-2 h-4 w-4" />
-                      Cancelar Pedido
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </ScrollArea>
-          )}
-        </SheetContent>
-      </Sheet>
+      <OrderDetailSheet
+        order={selectedOrder}
+        open={!!selectedOrder}
+        onOpenChange={(open) => !open && setSelectedOrder(null)}
+        statusAction={selectedOrder ? statusActions[selectedOrder.status] : null}
+        onAdvanceStatus={handleStatusChange}
+        onCancel={handleCancelOrder}
+        onArchive={handleCloseOrder}
+        isPending={isPending}
+        isBusy={isBusy}
+      />
     </div>
   )
 }

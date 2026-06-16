@@ -14,7 +14,7 @@ function AdminContent() {
     if (!isLoading && !user) {
       router.push('/login')
     } else if (!isLoading && user?.role !== 'admin') {
-      router.push('/cashier')
+      router.push('/staff')
     }
   }, [isLoading, router, user])
 

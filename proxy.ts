@@ -1,7 +1,15 @@
 import { withAuth } from 'next-auth/middleware'
+import { NextResponse } from 'next/server'
+import { isStaffRole } from '@/lib/types'
 
 export default withAuth(
-  function proxy() {},
+  function proxy(req) {
+    const pathname = req.nextUrl.pathname
+
+    if (pathname.startsWith('/cashier') || pathname.startsWith('/waitress')) {
+      return NextResponse.redirect(new URL('/staff', req.url))
+    }
+  },
   {
     callbacks: {
       authorized: ({ token, req }) => {
@@ -11,12 +19,12 @@ export default withAuth(
           return token?.role === 'admin'
         }
 
-        if (pathname.startsWith('/cashier')) {
-          return token?.role === 'cashier' || token?.role === 'admin'
+        if (pathname.startsWith('/staff')) {
+          return isStaffRole(token?.role) || token?.role === 'admin'
         }
 
-        if (pathname.startsWith('/waitress')) {
-          return token?.role === 'waitress' || token?.role === 'admin'
+        if (pathname.startsWith('/cashier') || pathname.startsWith('/waitress')) {
+          return isStaffRole(token?.role) || token?.role === 'admin'
         }
 
         return !!token
@@ -26,5 +34,5 @@ export default withAuth(
 )
 
 export const config = {
-  matcher: ['/admin/:path*', '/cashier/:path*', '/waitress/:path*'],
+  matcher: ['/admin/:path*', '/staff/:path*', '/cashier/:path*', '/waitress/:path*'],
 }

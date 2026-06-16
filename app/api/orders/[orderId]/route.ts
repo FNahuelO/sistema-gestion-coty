@@ -4,7 +4,7 @@ import { requireSessionRole, serializeOrder } from '@/lib/server-data'
 
 export async function GET(_request: NextRequest, context: { params: Promise<{ orderId: string }> }) {
   try {
-    await requireSessionRole(['admin', 'cashier', 'waitress'])
+    await requireSessionRole(['admin', 'staff'])
     const { orderId } = await context.params
 
     const order = await prisma.order.findUnique({

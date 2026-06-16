@@ -6,16 +6,18 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
   BarChart3,
+  ChevronDown,
   Coffee,
   DollarSign,
   LayoutGrid,
   LogOut,
+  Menu,
   Package,
   Percent,
+  Plus,
   Settings,
   ShoppingCart,
   Store,
-  Tag,
   Truck,
   Users,
 } from 'lucide-react'
@@ -27,11 +29,20 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
+import { formatCategoryIconLabel, getCategoryIcon } from '@/lib/category-icons'
+import { COTY_HEADER, COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
+import { cn } from '@/lib/utils'
 import { useAdminData, useAuth } from '@/lib/store'
-import type { Category, Product, Promotion, Table, TableStatus, User } from '@/lib/types'
+import type { Category, Order, OrderType, Product, ProductOption, Promotion, Table, TableStatus, User } from '@/lib/types'
 import { StatusBadge } from '@/components/shared/status-badge'
+import { SalesChart } from '@/components/admin/sales-chart'
+import { ImageUploadField } from '@/components/admin/image-upload-field'
+import { CategoryIconPicker } from '@/components/admin/category-icon-picker'
+import { MultiSelectField } from '@/components/admin/multi-select-field'
+import { ProductOptionsEditor, normalizeProductOptions } from '@/components/admin/product-options-editor'
 
 type ProductFormState = {
   id?: string
@@ -43,7 +54,7 @@ type ProductFormState = {
   featured: boolean
   available: boolean
   preparationTime: number
-  optionsText: string
+  options: ProductOption[]
 }
 
 type CategoryFormState = {
@@ -62,8 +73,8 @@ type PromotionFormState = {
   discount: number
   validFrom: string
   validTo: string
-  productIdsText: string
-  categoryIdsText: string
+  productIds: string[]
+  categoryIds: string[]
   active: boolean
 }
 
@@ -94,12 +105,12 @@ const emptyProductForm = (): ProductFormState => ({
   featured: false,
   available: true,
   preparationTime: 0,
-  optionsText: '[]',
+  options: [],
 })
 
 const emptyCategoryForm = (): CategoryFormState => ({
   name: '',
-  icon: 'Coffee',
+  icon: 'coffee',
   order: 0,
   active: true,
 })
@@ -111,8 +122,8 @@ const emptyPromotionForm = (): PromotionFormState => ({
   discount: 0,
   validFrom: new Date().toISOString().slice(0, 10),
   validTo: new Date().toISOString().slice(0, 10),
-  productIdsText: '',
-  categoryIdsText: '',
+  productIds: [],
+  categoryIds: [],
   active: true,
 })
 
@@ -126,22 +137,69 @@ const emptyTableForm = (): TableFormState => ({
 const emptyUserForm = (): UserFormState => ({
   name: '',
   email: '',
-  role: 'waitress',
+  role: 'staff',
   avatar: '',
   active: true,
   password: '',
 })
 
-function parseIds(text: string) {
-  return text
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
+type AdminSection =
+  | 'dashboard'
+  | 'products'
+  | 'categories'
+  | 'promotions'
+  | 'tables'
+  | 'users'
+  | 'settings'
+
+const NAV_ITEMS: { id: AdminSection; label: string; icon: ElementType }[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+  { id: 'products', label: 'Productos', icon: Package },
+  { id: 'categories', label: 'Categorías', icon: LayoutGrid },
+  { id: 'promotions', label: 'Promociones', icon: Percent },
+  { id: 'tables', label: 'Mesas', icon: Store },
+  { id: 'users', label: 'Usuarios', icon: Users },
+  { id: 'settings', label: 'Configuración', icon: Settings },
+]
+
+const ADMIN_CARD = 'rounded-2xl border border-gray-100 bg-white shadow-sm'
+const ADMIN_LIST_ROW = 'rounded-xl border border-gray-100 bg-white p-3 shadow-sm'
+const ADMIN_TOGGLE_ROW = 'flex items-center justify-between rounded-xl border border-gray-100 bg-[#F8FBFA] p-3'
+const ADMIN_TITLE = 'text-sm font-semibold text-[#2D5A57]'
+const ADMIN_PRIMARY_BTN = 'bg-[#2D5A57] text-white hover:bg-[#053E38]'
+const ADMIN_OUTLINE_BTN = 'border-[#C5DDD9] bg-white text-[#2D5A57] hover:bg-[#C5DDD9]/40'
+
+type FormSection = Exclude<AdminSection, 'dashboard'>
+
+const DEFAULT_FORM_PANELS: Record<FormSection, boolean> = {
+  products: false,
+  categories: false,
+  promotions: false,
+  tables: false,
+  users: false,
+  settings: false,
 }
 
-function parseOptions(text: string) {
-  if (!text.trim()) return []
-  return JSON.parse(text)
+const ORDER_TYPE_META: Record<OrderType, { label: string; accent: string; icon: ElementType }> = {
+  delivery: { label: 'Delivery', accent: 'border-l-[#E8A598]', icon: Truck },
+  pickup: { label: 'Retiro', accent: 'border-l-[#7EB8B3]', icon: Store },
+  table: { label: 'Mesa', accent: 'border-l-[#7EB8B3]', icon: Users },
+}
+
+function percentVsYesterday(today: number, yesterday: number) {
+  if (yesterday === 0) return null
+  return ((today - yesterday) / yesterday) * 100
+}
+
+function yesterdayMetrics(dailySales: { date: string; revenue: number; orders: number }[]) {
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  const key = yesterday.toISOString().slice(0, 10)
+  const entry = dailySales.find((day) => day.date === key)
+  return {
+    revenue: entry?.revenue ?? 0,
+    orders: entry?.orders ?? 0,
+  }
 }
 
 export function AdminDashboard() {
@@ -154,12 +212,58 @@ export function AdminDashboard() {
   const [tableForm, setTableForm] = useState<TableFormState>(emptyTableForm)
   const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm)
   const [settingsDraft, setSettingsDraft] = useState(admin.settings)
+  const [activeSection, setActiveSection] = useState<AdminSection>('dashboard')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [formPanelsOpen, setFormPanelsOpen] = useState(DEFAULT_FORM_PANELS)
+
+  const setFormPanelOpen = (section: FormSection, open: boolean) => {
+    setFormPanelsOpen((previous) => ({ ...previous, [section]: open }))
+  }
+
+  const openFormPanel = (section: FormSection) => {
+    setFormPanelOpen(section, true)
+  }
 
   useEffect(() => {
     setSettingsDraft(admin.settings)
   }, [admin.settings])
 
+  const yesterday = useMemo(
+    () => yesterdayMetrics(admin.analytics?.dailySales ?? []),
+    [admin.analytics?.dailySales]
+  )
+
+  const revenueComparison = useMemo(
+    () => percentVsYesterday(admin.analytics?.todayRevenue ?? 0, yesterday.revenue),
+    [admin.analytics?.todayRevenue, yesterday.revenue]
+  )
+
+  const ordersComparison = useMemo(
+    () => percentVsYesterday(admin.analytics?.todayOrders ?? 0, yesterday.orders),
+    [admin.analytics?.todayOrders, yesterday.orders]
+  )
+
+  const navigateTo = (section: AdminSection) => {
+    setActiveSection(section)
+    setMenuOpen(false)
+  }
+
   const productCategoryOptions = useMemo(
+    () => admin.categories.map((category) => ({ value: category.id, label: category.name })),
+    [admin.categories]
+  )
+
+  const promotionProductOptions = useMemo(
+    () =>
+      admin.products.map((product) => ({
+        value: product.id,
+        label: product.name,
+        description: admin.categories.find((category) => category.id === product.categoryId)?.name,
+      })),
+    [admin.products, admin.categories]
+  )
+
+  const promotionCategoryOptions = useMemo(
     () => admin.categories.map((category) => ({ value: category.id, label: category.name })),
     [admin.categories]
   )
@@ -180,8 +284,12 @@ export function AdminDashboard() {
       featured: product.featured,
       available: product.available,
       preparationTime: product.preparationTime,
-      optionsText: JSON.stringify(product.options ?? [], null, 2),
+      options: (product.options ?? []).map((option) => ({
+        ...option,
+        choices: option.choices.map((choice) => ({ ...choice })),
+      })),
     })
+    openFormPanel('products')
   }
 
   const loadCategory = (category: Category) => {
@@ -192,6 +300,7 @@ export function AdminDashboard() {
       order: category.order,
       active: category.active ?? true,
     })
+    openFormPanel('categories')
   }
 
   const loadPromotion = (promotion: Promotion) => {
@@ -203,10 +312,11 @@ export function AdminDashboard() {
       discount: promotion.discount,
       validFrom: promotion.validFrom.toISOString().slice(0, 10),
       validTo: promotion.validTo.toISOString().slice(0, 10),
-      productIdsText: (promotion.productIds ?? []).join(', '),
-      categoryIdsText: (promotion.categoryIds ?? []).join(', '),
+      productIds: promotion.productIds ?? [],
+      categoryIds: promotion.categoryIds ?? [],
       active: promotion.active,
     })
+    openFormPanel('promotions')
   }
 
   const loadTable = (table: Table) => {
@@ -217,6 +327,7 @@ export function AdminDashboard() {
       status: table.status,
       active: table.active ?? true,
     })
+    openFormPanel('tables')
   }
 
   const loadUser = (user: User) => {
@@ -229,6 +340,7 @@ export function AdminDashboard() {
       active: user.active ?? true,
       password: '',
     })
+    openFormPanel('users')
   }
 
   const submitProduct = async () => {
@@ -242,7 +354,7 @@ export function AdminDashboard() {
         featured: productForm.featured,
         available: productForm.available,
         preparationTime: productForm.preparationTime,
-        options: parseOptions(productForm.optionsText),
+        options: normalizeProductOptions(productForm.options),
       }
 
       if (productForm.id) {
@@ -291,8 +403,8 @@ export function AdminDashboard() {
         discount: promotionForm.discount,
         validFrom: promotionForm.validFrom,
         validTo: promotionForm.validTo,
-        productIds: parseIds(promotionForm.productIdsText),
-        categoryIds: parseIds(promotionForm.categoryIdsText),
+        productIds: promotionForm.productIds,
+        categoryIds: promotionForm.categoryIds,
         active: promotionForm.active,
       }
 
@@ -369,159 +481,202 @@ export function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
-        <div className="flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-              <Coffee className="h-5 w-5 text-primary" />
+    <div className="flex min-h-screen bg-[#FAFAFA]">
+      <aside className="hidden w-72 shrink-0 border-r border-gray-100 bg-white lg:flex lg:flex-col">
+        <AdminSideNav
+          activeSection={activeSection}
+          onSelect={navigateTo}
+          onLogout={() => void handleLogout()}
+        />
+      </aside>
+
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+        <SheetContent side="left" className="w-[85%] max-w-xs gap-0 border-r p-0 [&>button]:hidden">
+          <AdminSideNav
+            activeSection={activeSection}
+            onSelect={navigateTo}
+            onLogout={() => void handleLogout()}
+          />
+        </SheetContent>
+      </Sheet>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-40 border-b border-gray-100 bg-white">
+          <div className="flex h-14 items-center justify-between px-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-[#2D5A57] hover:bg-[#C5DDD9]/40 lg:hidden"
+              onClick={() => setMenuOpen(true)}
+              aria-label="Abrir menú"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            <div className="hidden w-10 lg:block" />
+
+            <div className="flex flex-col items-center">
+              <div
+                className="mb-0.5 flex h-7 w-7 items-center justify-center rounded-full"
+                style={{ backgroundColor: COTY_HEADER }}
+              >
+                <Coffee className="h-3.5 w-3.5 text-white" />
+              </div>
+              <p className="font-serif text-base font-bold leading-tight text-foreground">Coty Cafe</p>
             </div>
-            <div>
-              <p className="font-serif text-lg font-bold">Coty Café</p>
-              <p className="text-sm text-muted-foreground">Panel administrador</p>
-            </div>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => void handleLogout()}
+              aria-label="Cerrar sesión"
+              className="text-[#2D5A57] hover:bg-[#C5DDD9]/40"
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
           </div>
-          <Button variant="outline" onClick={handleLogout} className="gap-2">
-            <LogOut className="h-4 w-4" />
-            Cerrar sesión
-          </Button>
-        </div>
-      </header>
+        </header>
 
-      <main className="container px-4 py-6 mx-auto">
-        <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="dashboard" className="gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="products" className="gap-2">
-              <Package className="h-4 w-4" />
-              Productos
-            </TabsTrigger>
-            <TabsTrigger value="categories" className="gap-2">
-              <Tag className="h-4 w-4" />
-              Categorías
-            </TabsTrigger>
-            <TabsTrigger value="promotions" className="gap-2">
-              <Percent className="h-4 w-4" />
-              Promociones
-            </TabsTrigger>
-            <TabsTrigger value="tables" className="gap-2">
-              <LayoutGrid className="h-4 w-4" />
-              Mesas
-            </TabsTrigger>
-            <TabsTrigger value="users" className="gap-2">
-              <Users className="h-4 w-4" />
-              Usuarios
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Configuración
-            </TabsTrigger>
-          </TabsList>
+        <main className="flex-1 px-4 py-5">
+          {activeSection === 'dashboard' && (
+            <div className="mx-auto max-w-3xl space-y-6">
+              <section>
+                <h2 className="mb-3 text-sm font-semibold text-foreground">Resumen de hoy</h2>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <MetricCard
+                    title="Ventas de hoy"
+                    value={formatPrice(admin.analytics?.todayRevenue ?? 0)}
+                    icon={DollarSign}
+                    comparison={revenueComparison}
+                  />
+                  <MetricCard
+                    title="Pedidos de hoy"
+                    value={String(admin.analytics?.todayOrders ?? 0)}
+                    icon={ShoppingCart}
+                    comparison={ordersComparison}
+                  />
+                  <MetricCard
+                    title="Ticket promedio"
+                    value={formatPrice(admin.analytics?.averageTicket ?? 0)}
+                    icon={BarChart3}
+                  />
+                  <MetricCard
+                    title="Pedidos activos"
+                    value={String(admin.analytics?.activeOrders ?? 0)}
+                    icon={Package}
+                  />
+                </div>
+              </section>
 
-          <TabsContent value="dashboard" className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <MetricCard title="Ventas de hoy" value={`$${admin.analytics?.todayRevenue.toFixed(2) ?? '0.00'}`} icon={DollarSign} />
-              <MetricCard title="Pedidos de hoy" value={String(admin.analytics?.todayOrders ?? 0)} icon={ShoppingCart} />
-              <MetricCard title="Ticket promedio" value={`$${admin.analytics?.averageTicket.toFixed(2) ?? '0.00'}`} icon={BarChart3} />
-              <MetricCard title="Pedidos activos" value={String(admin.analytics?.activeOrders ?? 0)} icon={Package} />
-            </div>
+              <section>
+                <h2 className="mb-3 text-sm font-semibold text-foreground">Ventas por tipo</h2>
+                <div className="space-y-2">
+                  <SalesTypeRow
+                    label="Delivery"
+                    value={admin.analytics?.salesByType.delivery ?? 0}
+                    accentClass="border-b-[#E8A598]"
+                  />
+                  <SalesTypeRow
+                    label="Retiro"
+                    value={admin.analytics?.salesByType.pickup ?? 0}
+                    accentClass="border-b-[#7EB8B3]"
+                  />
+                  <SalesTypeRow
+                    label="Mesas"
+                    value={admin.analytics?.salesByType.table ?? 0}
+                    accentClass="border-b-[#7EB8B3]"
+                  />
+                </div>
+              </section>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-              <Card>
+              <Card className={ADMIN_CARD}>
                 <CardHeader>
-                  <CardTitle>Ventas por tipo</CardTitle>
+                  <CardTitle className={ADMIN_TITLE}>Ventas diarias (últimos 14 días)</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <BreakdownRow label="Delivery" value={admin.analytics?.salesByType.delivery ?? 0} icon={<Truck className="h-4 w-4" />} />
-                  <BreakdownRow label="Retiro" value={admin.analytics?.salesByType.pickup ?? 0} icon={<Store className="h-4 w-4" />} />
-                  <BreakdownRow label="Mesas" value={admin.analytics?.salesByType.table ?? 0} icon={<Users className="h-4 w-4" />} />
+                <CardContent>
+                  <SalesChart data={admin.analytics?.dailySales ?? []} />
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className={ADMIN_CARD}>
                 <CardHeader>
-                  <CardTitle>Productos más vendidos</CardTitle>
+                  <CardTitle className={ADMIN_TITLE}>Productos más vendidos</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-2">
                   {(admin.analytics?.topProducts ?? []).map((product) => (
-                    <div key={product.productId} className="flex items-center justify-between rounded-lg border p-3 text-sm">
+                    <div key={product.productId} className={cn(ADMIN_LIST_ROW, 'flex items-center justify-between text-sm')}>
                       <div>
                         <p className="font-medium">{product.productName}</p>
-                        <p className="text-muted-foreground">{product.quantity} unidades</p>
+                        <p className="text-xs text-muted-foreground">{product.quantity} unidades</p>
                       </div>
-                      <Badge variant="secondary">${product.revenue.toFixed(2)}</Badge>
+                      <CotyPriceBadge>{formatPrice(product.revenue)}</CotyPriceBadge>
                     </div>
                   ))}
+                  {(admin.analytics?.topProducts ?? []).length === 0 && (
+                    <p className="py-6 text-center text-xs text-muted-foreground">Sin datos de productos</p>
+                  )}
                 </CardContent>
               </Card>
-            </div>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Historial reciente</CardTitle>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => window.open(admin.exportSalesUrl('csv'), '_blank')}>
-                    Exportar CSV
-                  </Button>
-                  <Button size="sm" onClick={() => window.open(admin.exportSalesUrl('xlsx'), '_blank')}>
-                    Exportar Excel
-                  </Button>
+              <section>
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-foreground">Historial reciente</h2>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={ADMIN_OUTLINE_BTN}
+                      onClick={() => window.open(admin.exportSalesUrl('csv'), '_blank')}
+                    >
+                      CSV
+                    </Button>
+                    <Button
+                      size="sm"
+                      className={ADMIN_PRIMARY_BTN}
+                      onClick={() => window.open(admin.exportSalesUrl('xlsx'), '_blank')}
+                    >
+                      Excel
+                    </Button>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {admin.history.slice(0, 10).map((order) => (
-                  <div key={order.id} className="flex flex-col gap-2 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="font-medium">{order.displayCode ?? order.id}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {order.customerName} • {order.type} • {format(order.createdAt, 'dd/MM/yyyy HH:mm', { locale: es })}
-                      </p>
+                <div className="space-y-2">
+                  {admin.history.slice(0, 10).map((order) => (
+                    <HistoryOrderRow key={order.id} order={order} />
+                  ))}
+                  {admin.history.length === 0 && (
+                    <div className={cn(ADMIN_LIST_ROW, 'py-8 text-center text-xs text-muted-foreground')}>
+                      No hay pedidos en el historial
                     </div>
-                    <div className="flex items-center gap-3">
-                      <StatusBadge status={order.status} />
-                      <Badge variant="outline">${order.total.toFixed(2)}</Badge>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                  )}
+                </div>
+              </section>
+            </div>
+          )}
 
-          <TabsContent value="products" className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-            <Card>
-              <CardHeader>
-                <CardTitle>Productos</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {admin.products.map((product) => (
-                  <div key={product.id} className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
-                    <div className="flex items-center gap-3">
-                      <img src={product.image} alt={product.name} className="h-14 w-14 rounded-lg object-cover" />
-                      <div>
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-sm text-muted-foreground">${product.price.toFixed(2)} • {product.preparationTime} min</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => loadProduct(product)}>Editar</Button>
-                      <Button variant="destructive" size="sm" onClick={() => void admin.deleteProduct(product.id).then(() => toast.success('Producto eliminado'))}>Eliminar</Button>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>{productForm.id ? 'Editar producto' : 'Nuevo producto'}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+          {activeSection === 'products' && (
+            <div className="mx-auto max-w-6xl space-y-4">
+            <AdminPageHeader
+              title="Productos"
+              description="Gestioná el menú y sus opciones"
+              onNew={() => {
+                setProductForm(emptyProductForm())
+                openFormPanel('products')
+              }}
+            />
+            <div className="space-y-6">
+            <AdminFormPanel
+              title={productForm.id ? 'Editar producto' : 'Nuevo producto'}
+              open={formPanelsOpen.products}
+              onOpenChange={(open) => setFormPanelOpen('products', open)}
+            >
                 <Field label="Nombre"><Input value={productForm.name} onChange={(event) => setProductForm((previous) => ({ ...previous, name: event.target.value }))} /></Field>
                 <Field label="Descripción"><Textarea value={productForm.description} onChange={(event) => setProductForm((previous) => ({ ...previous, description: event.target.value }))} /></Field>
-                <Field label="Imagen (URL)"><Input value={productForm.image} onChange={(event) => setProductForm((previous) => ({ ...previous, image: event.target.value }))} /></Field>
+                <Field label="Imagen">
+                  <ImageUploadField
+                    folder="products"
+                    value={productForm.image}
+                    onChange={(url) => setProductForm((previous) => ({ ...previous, image: url }))}
+                  />
+                </Field>
                 <Field label="Precio"><Input type="number" value={productForm.price} onChange={(event) => setProductForm((previous) => ({ ...previous, price: Number(event.target.value) }))} /></Field>
                 <Field label="Tiempo de preparación (min)"><Input type="number" value={productForm.preparationTime} onChange={(event) => setProductForm((previous) => ({ ...previous, preparationTime: Number(event.target.value) }))} /></Field>
                 <Field label="Categoría">
@@ -534,128 +689,212 @@ export function AdminDashboard() {
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Opciones del producto (JSON)">
-                  <Textarea rows={8} value={productForm.optionsText} onChange={(event) => setProductForm((previous) => ({ ...previous, optionsText: event.target.value }))} />
+                <Field label="Opciones del producto">
+                  <ProductOptionsEditor
+                    value={productForm.options}
+                    onChange={(options) => setProductForm((previous) => ({ ...previous, options }))}
+                  />
                 </Field>
-                <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className={ADMIN_TOGGLE_ROW}>
                   <Label>Destacado</Label>
                   <Switch checked={productForm.featured} onCheckedChange={(checked) => setProductForm((previous) => ({ ...previous, featured: checked }))} />
                 </div>
-                <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className={ADMIN_TOGGLE_ROW}>
                   <Label>Disponible</Label>
                   <Switch checked={productForm.available} onCheckedChange={(checked) => setProductForm((previous) => ({ ...previous, available: checked }))} />
                 </div>
                 <div className="flex gap-2">
-                  <Button className="flex-1" onClick={() => void submitProduct()}>Guardar</Button>
-                  <Button variant="outline" onClick={() => setProductForm(emptyProductForm())}>Limpiar</Button>
+                  <Button className={cn('flex-1', ADMIN_PRIMARY_BTN)} onClick={() => void submitProduct()}>Guardar</Button>
+                  <Button variant="outline" className={ADMIN_OUTLINE_BTN} onClick={() => setProductForm(emptyProductForm())}>Limpiar</Button>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+            </AdminFormPanel>
 
-          <TabsContent value="categories" className="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
-            <Card>
-              <CardHeader><CardTitle>Categorías</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                {admin.categories.map((category) => (
-                  <div key={category.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{category.name}</p>
-                      <p className="text-sm text-muted-foreground">{category.icon} • orden {category.order}</p>
+            <Card className={ADMIN_CARD}>
+              <CardHeader>
+                <CardTitle className={ADMIN_TITLE}>Listado</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {admin.products.map((product) => (
+                  <div key={product.id} className={cn(ADMIN_LIST_ROW, 'flex flex-col gap-3 md:flex-row md:items-center md:justify-between')}>
+                    <div className="flex items-center gap-3">
+                      <img src={product.image} alt={product.name} className="h-14 w-14 rounded-xl object-cover ring-1 ring-gray-100" />
+                      <div>
+                        <p className="font-medium">{product.name}</p>
+                        <p className="text-xs text-muted-foreground">{formatPrice(product.price)} · {product.preparationTime} min</p>
+                      </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => loadCategory(category)}>Editar</Button>
-                      <Button variant="destructive" size="sm" onClick={() => void admin.deleteCategory(category.id).then(() => toast.success('Categoría eliminada'))}>Eliminar</Button>
+                      <Button variant="outline" size="sm" className={ADMIN_OUTLINE_BTN} onClick={() => loadProduct(product)}>Editar</Button>
+                      <Button variant="destructive" size="sm" onClick={() => void admin.deleteProduct(product.id).then(() => toast.success('Producto eliminado'))}>Eliminar</Button>
                     </div>
                   </div>
                 ))}
               </CardContent>
             </Card>
+            </div>
+            </div>
+          )}
 
-            <Card>
-              <CardHeader><CardTitle>{categoryForm.id ? 'Editar categoría' : 'Nueva categoría'}</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
+          {activeSection === 'categories' && (
+            <div className="mx-auto max-w-6xl space-y-4">
+            <AdminPageHeader
+              title="Categorías"
+              description="Organizá las secciones del menú"
+              onNew={() => {
+                setCategoryForm(emptyCategoryForm())
+                openFormPanel('categories')
+              }}
+            />
+            <div className="space-y-6">
+            <AdminFormPanel
+              title={categoryForm.id ? 'Editar categoría' : 'Nueva categoría'}
+              open={formPanelsOpen.categories}
+              onOpenChange={(open) => setFormPanelOpen('categories', open)}
+            >
                 <Field label="Nombre"><Input value={categoryForm.name} onChange={(event) => setCategoryForm((previous) => ({ ...previous, name: event.target.value }))} /></Field>
-                <Field label="Icono"><Input value={categoryForm.icon} onChange={(event) => setCategoryForm((previous) => ({ ...previous, icon: event.target.value }))} /></Field>
+                <Field label="Icono">
+                  <CategoryIconPicker
+                    value={categoryForm.icon}
+                    onChange={(icon) => setCategoryForm((previous) => ({ ...previous, icon }))}
+                  />
+                </Field>
                 <Field label="Orden"><Input type="number" value={categoryForm.order} onChange={(event) => setCategoryForm((previous) => ({ ...previous, order: Number(event.target.value) }))} /></Field>
-                <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className={ADMIN_TOGGLE_ROW}>
                   <Label>Activa</Label>
                   <Switch checked={categoryForm.active} onCheckedChange={(checked) => setCategoryForm((previous) => ({ ...previous, active: checked }))} />
                 </div>
                 <div className="flex gap-2">
-                  <Button className="flex-1" onClick={() => void submitCategory()}>Guardar</Button>
-                  <Button variant="outline" onClick={() => setCategoryForm(emptyCategoryForm())}>Limpiar</Button>
+                  <Button className={cn('flex-1', ADMIN_PRIMARY_BTN)} onClick={() => void submitCategory()}>Guardar</Button>
+                  <Button variant="outline" className={ADMIN_OUTLINE_BTN} onClick={() => setCategoryForm(emptyCategoryForm())}>Limpiar</Button>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+            </AdminFormPanel>
 
-          <TabsContent value="promotions" className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
-            <Card>
-              <CardHeader><CardTitle>Promociones</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                {admin.promotions.map((promotion) => (
-                  <div key={promotion.id} className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="font-medium">{promotion.title}</p>
-                      <p className="text-sm text-muted-foreground">{promotion.discount}% • hasta {format(promotion.validTo, 'dd/MM/yyyy', { locale: es })}</p>
+            <Card className={ADMIN_CARD}>
+              <CardHeader><CardTitle className={ADMIN_TITLE}>Listado</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {admin.categories.map((category) => {
+                  const CategoryIcon = getCategoryIcon(category.icon)
+                  return (
+                  <div key={category.id} className={cn(ADMIN_LIST_ROW, 'flex items-center justify-between')}>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F8FBFA]">
+                        <CategoryIcon className="h-5 w-5" style={{ color: COTY_TEAL }} />
+                      </div>
+                      <div>
+                        <p className="font-medium">{category.name}</p>
+                        <p className="text-xs capitalize text-muted-foreground">
+                          {formatCategoryIconLabel(category.icon)} · orden {category.order}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => loadPromotion(promotion)}>Editar</Button>
+                      <Button variant="outline" size="sm" className={ADMIN_OUTLINE_BTN} onClick={() => loadCategory(category)}>Editar</Button>
+                      <Button variant="destructive" size="sm" onClick={() => void admin.deleteCategory(category.id).then(() => toast.success('Categoría eliminada'))}>Eliminar</Button>
+                    </div>
+                  </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+            </div>
+            </div>
+          )}
+
+          {activeSection === 'promotions' && (
+            <div className="mx-auto max-w-6xl space-y-4">
+            <AdminPageHeader
+              title="Promociones"
+              description="Descuentos y ofertas activas"
+              onNew={() => {
+                setPromotionForm(emptyPromotionForm())
+                openFormPanel('promotions')
+              }}
+            />
+            <div className="space-y-6">
+            <AdminFormPanel
+              title={promotionForm.id ? 'Editar promoción' : 'Nueva promoción'}
+              open={formPanelsOpen.promotions}
+              onOpenChange={(open) => setFormPanelOpen('promotions', open)}
+            >
+                <Field label="Título"><Input value={promotionForm.title} onChange={(event) => setPromotionForm((previous) => ({ ...previous, title: event.target.value }))} /></Field>
+                <Field label="Descripción"><Textarea value={promotionForm.description} onChange={(event) => setPromotionForm((previous) => ({ ...previous, description: event.target.value }))} /></Field>
+                <Field label="Imagen">
+                  <ImageUploadField
+                    folder="promotions"
+                    value={promotionForm.image}
+                    onChange={(url) => setPromotionForm((previous) => ({ ...previous, image: url }))}
+                  />
+                </Field>
+                <Field label="Descuento (%)"><Input type="number" value={promotionForm.discount} onChange={(event) => setPromotionForm((previous) => ({ ...previous, discount: Number(event.target.value) }))} /></Field>
+                <Field label="Válida desde"><Input type="date" value={promotionForm.validFrom} onChange={(event) => setPromotionForm((previous) => ({ ...previous, validFrom: event.target.value }))} /></Field>
+                <Field label="Válida hasta"><Input type="date" value={promotionForm.validTo} onChange={(event) => setPromotionForm((previous) => ({ ...previous, validTo: event.target.value }))} /></Field>
+                <Field label="Productos">
+                  <MultiSelectField
+                    options={promotionProductOptions}
+                    value={promotionForm.productIds}
+                    onChange={(productIds) => setPromotionForm((previous) => ({ ...previous, productIds }))}
+                    placeholder="Elegir productos"
+                    searchPlaceholder="Buscar producto..."
+                    emptyMessage="No hay productos"
+                  />
+                </Field>
+                <Field label="Categorías">
+                  <MultiSelectField
+                    options={promotionCategoryOptions}
+                    value={promotionForm.categoryIds}
+                    onChange={(categoryIds) => setPromotionForm((previous) => ({ ...previous, categoryIds }))}
+                    placeholder="Elegir categorías"
+                    searchPlaceholder="Buscar categoría..."
+                    emptyMessage="No hay categorías"
+                  />
+                </Field>
+                <div className={ADMIN_TOGGLE_ROW}>
+                  <Label>Activa</Label>
+                  <Switch checked={promotionForm.active} onCheckedChange={(checked) => setPromotionForm((previous) => ({ ...previous, active: checked }))} />
+                </div>
+                <div className="flex gap-2">
+                  <Button className={cn('flex-1', ADMIN_PRIMARY_BTN)} onClick={() => void submitPromotion()}>Guardar</Button>
+                  <Button variant="outline" className={ADMIN_OUTLINE_BTN} onClick={() => setPromotionForm(emptyPromotionForm())}>Limpiar</Button>
+                </div>
+            </AdminFormPanel>
+
+            <Card className={ADMIN_CARD}>
+              <CardHeader><CardTitle className={ADMIN_TITLE}>Listado</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {admin.promotions.map((promotion) => (
+                  <div key={promotion.id} className={cn(ADMIN_LIST_ROW, 'flex flex-col gap-3 md:flex-row md:items-center md:justify-between')}>
+                    <div>
+                      <p className="font-medium">{promotion.title}</p>
+                      <p className="text-xs text-muted-foreground">{promotion.discount}% · hasta {format(promotion.validTo, 'dd/MM/yyyy', { locale: es })}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" className={ADMIN_OUTLINE_BTN} onClick={() => loadPromotion(promotion)}>Editar</Button>
                       <Button variant="destructive" size="sm" onClick={() => void admin.deletePromotion(promotion.id).then(() => toast.success('Promoción eliminada'))}>Eliminar</Button>
                     </div>
                   </div>
                 ))}
               </CardContent>
             </Card>
+            </div>
+            </div>
+          )}
 
-            <Card>
-              <CardHeader><CardTitle>{promotionForm.id ? 'Editar promoción' : 'Nueva promoción'}</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <Field label="Título"><Input value={promotionForm.title} onChange={(event) => setPromotionForm((previous) => ({ ...previous, title: event.target.value }))} /></Field>
-                <Field label="Descripción"><Textarea value={promotionForm.description} onChange={(event) => setPromotionForm((previous) => ({ ...previous, description: event.target.value }))} /></Field>
-                <Field label="Imagen (URL)"><Input value={promotionForm.image} onChange={(event) => setPromotionForm((previous) => ({ ...previous, image: event.target.value }))} /></Field>
-                <Field label="Descuento (%)"><Input type="number" value={promotionForm.discount} onChange={(event) => setPromotionForm((previous) => ({ ...previous, discount: Number(event.target.value) }))} /></Field>
-                <Field label="Válida desde"><Input type="date" value={promotionForm.validFrom} onChange={(event) => setPromotionForm((previous) => ({ ...previous, validFrom: event.target.value }))} /></Field>
-                <Field label="Válida hasta"><Input type="date" value={promotionForm.validTo} onChange={(event) => setPromotionForm((previous) => ({ ...previous, validTo: event.target.value }))} /></Field>
-                <Field label="IDs de productos (coma separada)"><Input value={promotionForm.productIdsText} onChange={(event) => setPromotionForm((previous) => ({ ...previous, productIdsText: event.target.value }))} /></Field>
-                <Field label="IDs de categorías (coma separada)"><Input value={promotionForm.categoryIdsText} onChange={(event) => setPromotionForm((previous) => ({ ...previous, categoryIdsText: event.target.value }))} /></Field>
-                <div className="flex items-center justify-between rounded-lg border p-3">
-                  <Label>Activa</Label>
-                  <Switch checked={promotionForm.active} onCheckedChange={(checked) => setPromotionForm((previous) => ({ ...previous, active: checked }))} />
-                </div>
-                <div className="flex gap-2">
-                  <Button className="flex-1" onClick={() => void submitPromotion()}>Guardar</Button>
-                  <Button variant="outline" onClick={() => setPromotionForm(emptyPromotionForm())}>Limpiar</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="tables" className="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
-            <Card>
-              <CardHeader><CardTitle>Mesas</CardTitle></CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-2">
-                {admin.tables.map((table) => (
-                  <div key={table.id} className="rounded-xl border p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="font-serif text-2xl font-bold">Mesa {table.number}</p>
-                      <StatusBadge status={table.status} />
-                    </div>
-                    <p className="mt-2 text-sm text-muted-foreground">{table.capacity} personas</p>
-                    <p className="text-sm text-muted-foreground">Total actual: ${table.currentTotal?.toFixed(2) ?? '0.00'}</p>
-                    <div className="mt-4 flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => loadTable(table)}>Editar</Button>
-                      <Button variant="destructive" size="sm" onClick={() => void admin.deleteTable(table.id).then(() => toast.success('Mesa desactivada'))}>Eliminar</Button>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle>{tableForm.id ? 'Editar mesa' : 'Nueva mesa'}</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
+          {activeSection === 'tables' && (
+            <div className="mx-auto max-w-6xl space-y-4">
+            <AdminPageHeader
+              title="Mesas"
+              description="Estado y configuración del salón"
+              onNew={() => {
+                setTableForm(emptyTableForm())
+                openFormPanel('tables')
+              }}
+            />
+            <div className="space-y-6">
+            <AdminFormPanel
+              title={tableForm.id ? 'Editar mesa' : 'Nueva mesa'}
+              open={formPanelsOpen.tables}
+              onOpenChange={(open) => setFormPanelOpen('tables', open)}
+            >
                 <Field label="Número"><Input type="number" value={tableForm.number} onChange={(event) => setTableForm((previous) => ({ ...previous, number: Number(event.target.value) }))} /></Field>
                 <Field label="Capacidad"><Input type="number" value={tableForm.capacity} onChange={(event) => setTableForm((previous) => ({ ...previous, capacity: Number(event.target.value) }))} /></Field>
                 <Field label="Estado">
@@ -669,36 +908,119 @@ export function AdminDashboard() {
                     </SelectContent>
                   </Select>
                 </Field>
-                <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className={ADMIN_TOGGLE_ROW}>
                   <Label>Activa</Label>
                   <Switch checked={tableForm.active} onCheckedChange={(checked) => setTableForm((previous) => ({ ...previous, active: checked }))} />
                 </div>
                 <div className="flex gap-2">
-                  <Button className="flex-1" onClick={() => void submitTable()}>Guardar</Button>
-                  <Button variant="outline" onClick={() => setTableForm(emptyTableForm())}>Limpiar</Button>
+                  <Button className={cn('flex-1', ADMIN_PRIMARY_BTN)} onClick={() => void submitTable()}>Guardar</Button>
+                  <Button variant="outline" className={ADMIN_OUTLINE_BTN} onClick={() => setTableForm(emptyTableForm())}>Limpiar</Button>
                 </div>
+            </AdminFormPanel>
+
+            <Card className={ADMIN_CARD}>
+              <CardHeader><CardTitle className={ADMIN_TITLE}>Salón</CardTitle></CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-2">
+                {admin.tables.map((table) => (
+                  <div key={table.id} className={cn(ADMIN_LIST_ROW, 'p-4')}>
+                    <div className="flex items-center justify-between">
+                      <p className="font-serif text-2xl font-bold text-[#2D5A57]">Mesa {table.number}</p>
+                      <StatusBadge status={table.status} />
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">{table.capacity} personas</p>
+                    <p className="text-xs text-muted-foreground">Total actual: {formatPrice(table.currentTotal ?? 0)}</p>
+                    <div className="mt-4 flex gap-2">
+                      <Button variant="outline" size="sm" className={ADMIN_OUTLINE_BTN} onClick={() => loadTable(table)}>Editar</Button>
+                      <Button variant="destructive" size="sm" onClick={() => void admin.deleteTable(table.id).then(() => toast.success('Mesa desactivada'))}>Eliminar</Button>
+                    </div>
+                  </div>
+                ))}
               </CardContent>
             </Card>
-          </TabsContent>
+            </div>
+            </div>
+          )}
 
-          <TabsContent value="users" className="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
-            <Card>
-              <CardHeader><CardTitle>Usuarios del sistema</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
+          {activeSection === 'users' && (
+            <div className="mx-auto max-w-6xl space-y-4">
+            <AdminPageHeader
+              title="Usuarios"
+              description="Accesos al sistema"
+              onNew={() => {
+                setUserForm(emptyUserForm())
+                openFormPanel('users')
+              }}
+            />
+            <div className="space-y-6">
+            <AdminFormPanel
+              title={userForm.id ? 'Editar usuario' : 'Nuevo usuario'}
+              open={formPanelsOpen.users}
+              onOpenChange={(open) => setFormPanelOpen('users', open)}
+            >
+                <Field label="Nombre">
+                  <Input value={userForm.name} onChange={(event) => setUserForm((previous) => ({ ...previous, name: event.target.value }))} />
+                </Field>
+                <Field label="Email">
+                  <Input type="email" value={userForm.email} onChange={(event) => setUserForm((previous) => ({ ...previous, email: event.target.value }))} />
+                </Field>
+                <Field label="Rol">
+                  <Select value={userForm.role} onValueChange={(value) => setUserForm((previous) => ({ ...previous, role: value as User['role'] }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="staff">Personal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Avatar">
+                  <ImageUploadField
+                    folder="users"
+                    value={userForm.avatar}
+                    onChange={(url) => setUserForm((previous) => ({ ...previous, avatar: url }))}
+                  />
+                </Field>
+                <Field label={userForm.id ? 'Nueva contraseña (opcional)' : 'Contraseña'}>
+                  <Input
+                    type="password"
+                    value={userForm.password}
+                    onChange={(event) => setUserForm((previous) => ({ ...previous, password: event.target.value }))}
+                    placeholder={userForm.id ? 'Dejar vacío para mantener la actual' : 'Mínimo 6 caracteres'}
+                  />
+                </Field>
+                <div className={ADMIN_TOGGLE_ROW}>
+                  <Label>Activo</Label>
+                  <Switch checked={userForm.active} onCheckedChange={(checked) => setUserForm((previous) => ({ ...previous, active: checked }))} />
+                </div>
+                <div className="flex gap-2">
+                  <Button className={cn('flex-1', ADMIN_PRIMARY_BTN)} onClick={() => void submitUser()}>Guardar</Button>
+                  <Button variant="outline" className={ADMIN_OUTLINE_BTN} onClick={() => setUserForm(emptyUserForm())}>Limpiar</Button>
+                </div>
+            </AdminFormPanel>
+
+            <Card className={ADMIN_CARD}>
+              <CardHeader><CardTitle className={ADMIN_TITLE}>Equipo</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
                 {admin.users.map((user) => (
-                  <div key={user.id} className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
+                  <div key={user.id} className={cn(ADMIN_LIST_ROW, 'flex flex-col gap-3 md:flex-row md:items-center md:justify-between')}>
                     <div>
                       <p className="font-medium">{user.name}</p>
-                      <p className="text-sm text-muted-foreground">{user.email}</p>
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
                       <div className="mt-2 flex items-center gap-2">
-                        <Badge variant="outline">{user.role}</Badge>
-                        <Badge variant={user.active ? 'secondary' : 'destructive'}>
+                        <Badge variant="outline" className="border-[#C5DDD9] text-[#2D5A57]">
+                          {user.role === 'staff' ? 'Personal' : user.role}
+                        </Badge>
+                        <Badge
+                          className={cn(
+                            'border-0',
+                            user.active ? 'bg-[#C5DDD9]/60 text-[#2D5A57]' : 'bg-destructive/15 text-destructive'
+                          )}
+                        >
                           {user.active ? 'Activo' : 'Inactivo'}
                         </Badge>
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => loadUser(user)}>Editar</Button>
+                      <Button variant="outline" size="sm" className={ADMIN_OUTLINE_BTN} onClick={() => loadUser(user)}>Editar</Button>
                       {user.active ? (
                         <Button
                           variant="destructive"
@@ -710,6 +1032,7 @@ export function AdminDashboard() {
                       ) : (
                         <Button
                           size="sm"
+                          className={ADMIN_PRIMARY_BTN}
                           onClick={() =>
                             void admin.updateUser(user.id, {
                               name: user.name,
@@ -728,55 +1051,32 @@ export function AdminDashboard() {
                 ))}
               </CardContent>
             </Card>
+            </div>
+            </div>
+          )}
 
-            <Card>
-              <CardHeader><CardTitle>{userForm.id ? 'Editar usuario' : 'Nuevo usuario'}</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <Field label="Nombre">
-                  <Input value={userForm.name} onChange={(event) => setUserForm((previous) => ({ ...previous, name: event.target.value }))} />
-                </Field>
-                <Field label="Email">
-                  <Input type="email" value={userForm.email} onChange={(event) => setUserForm((previous) => ({ ...previous, email: event.target.value }))} />
-                </Field>
-                <Field label="Rol">
-                  <Select value={userForm.role} onValueChange={(value) => setUserForm((previous) => ({ ...previous, role: value as User['role'] }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="cashier">Caja</SelectItem>
-                      <SelectItem value="waitress">Mesero/a</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Avatar (URL opcional)">
-                  <Input value={userForm.avatar} onChange={(event) => setUserForm((previous) => ({ ...previous, avatar: event.target.value }))} />
-                </Field>
-                <Field label={userForm.id ? 'Nueva contraseña (opcional)' : 'Contraseña'}>
-                  <Input
-                    type="password"
-                    value={userForm.password}
-                    onChange={(event) => setUserForm((previous) => ({ ...previous, password: event.target.value }))}
-                    placeholder={userForm.id ? 'Dejar vacío para mantener la actual' : 'Mínimo 6 caracteres'}
+          {activeSection === 'settings' && (
+            <div className="mx-auto max-w-6xl space-y-4">
+            <AdminPageHeader
+              title="Configuración"
+              description="Datos del negocio y operación"
+              newLabel="Editar"
+              onNew={() => openFormPanel('settings')}
+            />
+            <div className="space-y-6">
+            <AdminFormPanel
+              title="Datos del negocio"
+              open={formPanelsOpen.settings}
+              onOpenChange={(open) => setFormPanelOpen('settings', open)}
+            >
+                <Field label="Nombre"><Input value={settingsDraft?.name ?? ''} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, name: event.target.value } : previous)} /></Field>
+                <Field label="Logo">
+                  <ImageUploadField
+                    folder="settings"
+                    value={settingsDraft?.logo ?? ''}
+                    onChange={(url) => setSettingsDraft((previous) => previous ? { ...previous, logo: url } : previous)}
                   />
                 </Field>
-                <div className="flex items-center justify-between rounded-lg border p-3">
-                  <Label>Activo</Label>
-                  <Switch checked={userForm.active} onCheckedChange={(checked) => setUserForm((previous) => ({ ...previous, active: checked }))} />
-                </div>
-                <div className="flex gap-2">
-                  <Button className="flex-1" onClick={() => void submitUser()}>Guardar</Button>
-                  <Button variant="outline" onClick={() => setUserForm(emptyUserForm())}>Limpiar</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="settings" className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-            <Card>
-              <CardHeader><CardTitle>Configuración del negocio</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <Field label="Nombre"><Input value={settingsDraft?.name ?? ''} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, name: event.target.value } : previous)} /></Field>
-                <Field label="Logo"><Input value={settingsDraft?.logo ?? ''} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, logo: event.target.value } : previous)} /></Field>
                 <Field label="Teléfono"><Input value={settingsDraft?.phone ?? ''} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, phone: event.target.value } : previous)} /></Field>
                 <Field label="Dirección"><Textarea value={settingsDraft?.address ?? ''} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, address: event.target.value } : previous)} /></Field>
                 <div className="grid gap-3 md:grid-cols-2">
@@ -791,45 +1091,221 @@ export function AdminDashboard() {
                 <Field label="WhatsApp"><Input value={settingsDraft?.whatsapp ?? ''} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, whatsapp: event.target.value } : previous)} /></Field>
                 <Field label="Instagram"><Input value={settingsDraft?.instagram ?? ''} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, instagram: event.target.value } : previous)} /></Field>
                 <Field label="Facebook"><Input value={settingsDraft?.facebook ?? ''} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, facebook: event.target.value } : previous)} /></Field>
-                <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className={ADMIN_TOGGLE_ROW}>
                   <Label>Negocio abierto</Label>
                   <Switch checked={settingsDraft?.isOpen ?? false} onCheckedChange={(checked) => setSettingsDraft((previous) => previous ? { ...previous, isOpen: checked } : previous)} />
                 </div>
-                <Button className="w-full" onClick={() => void saveSettings()}>Guardar configuración</Button>
-              </CardContent>
-            </Card>
+                <Button className={cn('w-full', ADMIN_PRIMARY_BTN)} onClick={() => void saveSettings()}>Guardar configuración</Button>
+            </AdminFormPanel>
 
-            <Card>
-              <CardHeader><CardTitle>Control operativo</CardTitle></CardHeader>
+            <Card className={ADMIN_CARD}>
+              <CardHeader><CardTitle className={ADMIN_TITLE}>Control operativo</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <MetricCard title="Mesas atendidas" value={String(admin.analytics?.tablesServed ?? 0)} icon={LayoutGrid} />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <MetricCard title="Mesas atendidas hoy" value={String(admin.analytics?.tablesServedToday ?? 0)} icon={LayoutGrid} />
+                  <MetricCard title="Mesas atendidas (total)" value={String(admin.analytics?.tablesServed ?? 0)} icon={LayoutGrid} />
                   <MetricCard title="Productos activos" value={String(admin.products.filter((product) => product.available).length)} icon={Package} />
                 </div>
-                <div className="rounded-lg border p-4">
-                  <p className="font-medium">Pedidos recientes</p>
+                <div className={ADMIN_LIST_ROW}>
+                  <p className="text-sm font-semibold text-[#2D5A57]">Pedidos recientes</p>
                   <div className="mt-3 space-y-2">
                     {admin.orders.slice(0, 6).map((order) => (
-                      <div key={order.id} className="flex items-center justify-between text-sm">
-                        <span>{order.displayCode ?? order.id} • {order.customerName}</span>
-                        <span className="font-medium">${order.total.toFixed(2)}</span>
-                      </div>
+                      <HistoryOrderRow key={order.id} order={order} compact />
                     ))}
+                    {admin.orders.length === 0 && (
+                      <p className="py-4 text-center text-xs text-muted-foreground">Sin pedidos recientes</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" className="flex-1" onClick={() => window.open(admin.exportSalesUrl('csv'), '_blank')}>
+                  <Button variant="outline" className={cn('flex-1', ADMIN_OUTLINE_BTN)} onClick={() => window.open(admin.exportSalesUrl('csv'), '_blank')}>
                     Exportar CSV
                   </Button>
-                  <Button className="flex-1" onClick={() => window.open(admin.exportSalesUrl('xlsx'), '_blank')}>
+                  <Button className={cn('flex-1', ADMIN_PRIMARY_BTN)} onClick={() => window.open(admin.exportSalesUrl('xlsx'), '_blank')}>
                     Exportar XLSX
                   </Button>
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
-      </main>
+            </div>
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  )
+}
+
+function AdminPageHeader({
+  title,
+  description,
+  onNew,
+  newLabel = 'Nuevo',
+}: {
+  title: string
+  description?: string
+  onNew?: () => void
+  newLabel?: string
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+        {description ? <p className="mt-0.5 text-xs text-muted-foreground">{description}</p> : null}
+      </div>
+      {onNew ? (
+        <Button size="sm" className={cn('shrink-0 gap-1.5', ADMIN_PRIMARY_BTN)} onClick={onNew}>
+          <Plus className="h-4 w-4" />
+          {newLabel}
+        </Button>
+      ) : null}
+    </div>
+  )
+}
+
+function AdminFormPanel({
+  title,
+  open,
+  onOpenChange,
+  children,
+}: {
+  title: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  children: ReactNode
+}) {
+  return (
+    <Collapsible open={open} onOpenChange={onOpenChange}>
+      <Card className={ADMIN_CARD}>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors hover:bg-[#F8FBFA]"
+          >
+            <span className={ADMIN_TITLE}>{title}</span>
+            <ChevronDown
+              className={cn('h-5 w-5 shrink-0 text-[#2D5A57] transition-transform duration-200', open && 'rotate-180')}
+            />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="space-y-3 border-t border-gray-100 pt-4">{children}</CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  )
+}
+
+function CotyPriceBadge({ children }: { children: ReactNode }) {
+  return (
+    <span
+      className="inline-flex shrink-0 rounded-full px-3 py-1 text-xs font-semibold"
+      style={{ backgroundColor: COTY_QTY_BG, color: COTY_TEAL }}
+    >
+      {children}
+    </span>
+  )
+}
+
+function HistoryOrderRow({ order, compact = false }: { order: Order; compact?: boolean }) {
+  const meta = ORDER_TYPE_META[order.type]
+  const Icon = meta.icon
+
+  if (compact) {
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-lg bg-[#F8FBFA] px-2.5 py-2 text-sm">
+        <div className="flex min-w-0 items-center gap-2">
+          <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: COTY_TEAL }} />
+          <span className="truncate text-xs">
+            {order.displayCode ?? order.id} · {order.customerName}
+          </span>
+        </div>
+        <CotyPriceBadge>{formatPrice(order.total)}</CotyPriceBadge>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className={cn(
+        ADMIN_LIST_ROW,
+        'flex flex-col gap-3 border-l-4 md:flex-row md:items-center md:justify-between',
+        meta.accent
+      )}
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+          style={{ backgroundColor: `${COTY_QTY_BG}99` }}
+        >
+          <Icon className="h-4 w-4" style={{ color: COTY_TEAL }} />
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold text-foreground">{order.displayCode ?? order.id}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {order.customerName} · {meta.label} · {format(order.createdAt, 'dd/MM/yyyy HH:mm', { locale: es })}
+          </p>
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-2 pl-12 md:pl-0">
+        <StatusBadge status={order.status} />
+        <CotyPriceBadge>{formatPrice(order.total)}</CotyPriceBadge>
+      </div>
+    </div>
+  )
+}
+
+function AdminSideNav({
+  activeSection,
+  onSelect,
+  onLogout,
+}: {
+  activeSection: AdminSection
+  onSelect: (section: AdminSection) => void
+  onLogout: () => void
+}) {
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-start justify-between border-b border-gray-100 p-5">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
+            style={{ backgroundColor: COTY_HEADER }}
+          >
+            <Coffee className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <p className="font-serif text-xl font-bold leading-tight">Coty Cafe</p>
+            <p className="text-xs text-muted-foreground">Panel de Administrador</p>
+          </div>
+        </div>
+        <Button variant="ghost" size="icon" onClick={onLogout} aria-label="Cerrar sesión" className="shrink-0">
+          <LogOut className="h-5 w-5" />
+        </Button>
+      </div>
+
+      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon
+          const isActive = activeSection === item.id
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onSelect(item.id)}
+              className={cn(
+                'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors',
+                isActive
+                  ? 'bg-[#C5DDD9]/50 font-medium text-[#2D5A57]'
+                  : 'text-gray-700 hover:bg-gray-50'
+              )}
+            >
+              <Icon className={cn('h-5 w-5 shrink-0', isActive ? 'text-[#2D5A57]' : 'text-[#7EB8B3]')} />
+              {item.label}
+            </button>
+          )
+        })}
+      </nav>
     </div>
   )
 }
@@ -838,42 +1314,59 @@ function MetricCard({
   title,
   value,
   icon: Icon,
+  comparison,
 }: {
   title: string
   value: string
   icon: ElementType
+  comparison?: number | null
 }) {
   return (
-    <Card>
-      <CardContent className="flex items-center justify-between p-5">
-        <div>
-          <p className="text-sm text-muted-foreground">{title}</p>
-          <p className="mt-1 text-2xl font-bold">{value}</p>
-        </div>
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-          <Icon className="h-6 w-6 text-primary" />
-        </div>
-      </CardContent>
-    </Card>
+    <div className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+      <div className="min-w-0">
+        <p className="text-xs text-muted-foreground">{title}</p>
+        <p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
+        {comparison !== undefined && (
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            {comparison === null
+              ? '--% vs ayer'
+              : `${comparison >= 0 ? '+' : ''}${comparison.toFixed(0)}% vs ayer`}
+          </p>
+        )}
+      </div>
+      <div
+        className="ml-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+        style={{ backgroundColor: `${COTY_QTY_BG}99` }}
+      >
+        <Icon className="h-5 w-5" style={{ color: COTY_TEAL }} />
+      </div>
+    </div>
   )
 }
 
-function BreakdownRow({
+function SalesTypeRow({
   label,
   value,
-  icon,
+  accentClass,
 }: {
   label: string
   value: number
-  icon: ReactNode
+  accentClass: string
 }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border p-3">
-      <div className="flex items-center gap-2">
-        {icon}
-        <span>{label}</span>
-      </div>
-      <Badge variant="outline">${value.toFixed(2)}</Badge>
+    <div
+      className={cn(
+        'flex items-center justify-between rounded-xl border border-gray-100 border-b-2 bg-white px-4 py-3 shadow-sm',
+        accentClass
+      )}
+    >
+      <span className="text-sm font-medium text-foreground">{label}</span>
+      <span
+        className="rounded-full px-3 py-1 text-xs font-semibold"
+        style={{ backgroundColor: COTY_QTY_BG, color: COTY_TEAL }}
+      >
+        {formatPrice(value)}
+      </span>
     </div>
   )
 }
@@ -887,7 +1380,7 @@ function Field({
 }) {
   return (
     <div className="space-y-2">
-      <Label>{label}</Label>
+      <Label className="text-xs font-medium text-[#2D5A57]/80">{label}</Label>
       {children}
     </div>
   )

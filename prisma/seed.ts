@@ -26,10 +26,8 @@ function toUserRole(role: string): UserRole {
   switch (role) {
     case 'admin':
       return UserRole.ADMIN
-    case 'cashier':
-      return UserRole.CASHIER
     default:
-      return UserRole.WAITRESS
+      return UserRole.STAFF
   }
 }
 
@@ -202,18 +200,11 @@ async function main() {
       avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop',
     },
     {
-      id: 'cashier-login',
-      name: 'Carlos Caja',
-      email: 'cajero@cotycafe.com',
-      role: UserRole.CASHIER,
+      id: 'staff-login',
+      name: 'Personal Coty',
+      email: 'personal@cotycafe.com',
+      role: UserRole.STAFF,
       avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop',
-    },
-    {
-      id: 'waitress-login',
-      name: 'Ana Mesas',
-      email: 'mesero@cotycafe.com',
-      role: UserRole.WAITRESS,
-      avatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop',
     },
   ]
 
@@ -377,7 +368,7 @@ async function main() {
     })
   }
 
-  console.log('Seed completado. Usuarios de prueba: admin@cotycafe.com, cajero@cotycafe.com, mesero@cotycafe.com')
+  console.log('Seed completado. Usuarios de prueba: admin@cotycafe.com, personal@cotycafe.com')
   console.log('Contraseña de prueba: cotycafe123')
 }
 

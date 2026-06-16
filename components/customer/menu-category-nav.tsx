@@ -1,37 +1,36 @@
 'use client'
 
-import {
-  Coffee,
-  Wine,
-  Sandwich,
-  Soup,
-  Beef,
-  UtensilsCrossed,
-} from 'lucide-react'
+import { Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { COTY_QTY_BG, COTY_TEAL } from '@/lib/coty-theme'
-import { MENU_CATEGORIES, type MenuCategoryId } from '@/lib/menu-categories'
-
-const CATEGORY_ICONS = {
-  coffee: Coffee,
-  cold: Wine,
-  sandwiches: Sandwich,
-  starters: Soup,
-  burgers: Beef,
-  milanesas: UtensilsCrossed,
-} as const
+import { getCategoryIcon } from '@/lib/category-icons'
+import type { Category } from '@/lib/types'
+import type { MenuCategoryId } from '@/lib/menu-categories'
 
 interface MenuCategoryNavProps {
+  categories: Category[]
   selected: MenuCategoryId
   onSelect: (categoryId: MenuCategoryId) => void
 }
 
-export function MenuCategoryNav({ selected, onSelect }: MenuCategoryNavProps) {
+export function MenuCategoryNav({ categories, selected, onSelect }: MenuCategoryNavProps) {
+  const activeCategories = [...categories]
+    .filter((category) => category.active !== false)
+    .sort((left, right) => left.order - right.order)
+
+  const items: Array<{ id: MenuCategoryId; name: string; icon: string }> = [
+    ...activeCategories.map((category) => ({
+      id: category.id as MenuCategoryId,
+      name: category.name,
+      icon: category.icon,
+    })),
+    { id: 'promo', name: 'Promos', icon: 'Star' },
+  ]
+
   return (
     <div className="-mx-1 overflow-x-auto scrollbar-hide md:mx-0 md:overflow-visible">
       <div className="flex min-w-max px-1 md:min-w-0 md:justify-center md:gap-2 lg:gap-3">
-        {MENU_CATEGORIES.map((category) => {
-          const Icon = CATEGORY_ICONS[category.id]
+        {items.map((category) => {
+          const Icon = category.id === 'promo' ? Star : getCategoryIcon(category.icon)
           const isActive = selected === category.id
 
           return (
@@ -50,10 +49,7 @@ export function MenuCategoryNav({ selected, onSelect }: MenuCategoryNavProps) {
                 }}
               >
                 <Icon
-                  className={cn(
-                    'h-6 w-6',
-                    isActive ? '#2E514E' : 'text-[#6BACA5]',
-                  )}
+                  className={cn('h-6 w-6', isActive ? 'text-[#2E514E]' : 'text-[#6BACA5]')}
                   strokeWidth={1.75}
                 />
               </div>

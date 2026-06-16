@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/lib/store'
+import { isStaffRole } from '@/lib/types'
 import { toast } from 'sonner'
 
 export function LoginPage() {
@@ -28,10 +29,8 @@ export function LoginPage() {
       toast.success('Inicio de sesión exitoso')
       if (authenticatedUser.role === 'admin') {
         router.push('/admin')
-      } else if (authenticatedUser.role === 'cashier') {
-        router.push('/cashier')
-      } else if (authenticatedUser.role === 'waitress') {
-        router.push('/waitress')
+      } else if (isStaffRole(authenticatedUser.role)) {
+        router.push('/staff')
       }
     } else {
       toast.error('Credenciales inválidas')
@@ -116,8 +115,7 @@ export function LoginPage() {
               <p className="mb-2 text-sm font-medium">Cuentas de prueba:</p>
               <div className="space-y-1 text-xs text-muted-foreground">
                 <p><strong>Admin:</strong> admin@cotycafe.com</p>
-                <p><strong>Cajero:</strong> cajero@cotycafe.com</p>
-                <p><strong>Mesero:</strong> mesero@cotycafe.com</p>
+                <p><strong>Personal:</strong> personal@cotycafe.com</p>
                 <p className="mt-2 italic">Contraseña de prueba: cotycafe123</p>
               </div>
             </div>

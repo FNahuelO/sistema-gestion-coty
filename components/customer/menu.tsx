@@ -1,14 +1,17 @@
 'use client'
 
+import { useMemo } from 'react'
 import { useCart, useCatalog } from '@/lib/store'
 import { useMenuFilters } from '@/hooks/use-menu-filters'
+import { useCartPricing } from '@/hooks/use-cart-pricing'
 import { MenuHeader, MenuCartBar } from '@/components/customer/menu-header'
 import { MenuContent } from '@/components/customer/menu-content'
 import { ProductDetailModal } from '@/components/customer/product-detail-modal'
 
 export function MenuPage() {
-  const { products, isLoading } = useCatalog()
-  const { items, itemCount, total, addItem, removeItem, updateQuantity } = useCart()
+  const { products, categories, promotions, isLoading } = useCatalog()
+  const { items, itemCount, addItem, removeItem, updateQuantity } = useCart()
+  const { total } = useCartPricing(items, promotions)
 
   const {
     selectedCategory,
@@ -19,10 +22,15 @@ export function MenuPage() {
     searchResults,
     menuSections,
     categoryProducts,
-    activeCategoryConfig,
+    activeCategoryName,
     handleSearchChange,
     handleCategorySelect,
-  } = useMenuFilters(products)
+  } = useMenuFilters(products, categories, promotions)
+
+  const activeCategoryIcon = useMemo(() => {
+    if (selectedCategory === 'promo') return 'Star'
+    return categories.find((category) => category.id === selectedCategory)?.icon
+  }, [categories, selectedCategory])
 
   return (
     <div className="coly-landing min-h-screen bg-white pb-24 md:pb-10">
@@ -31,6 +39,7 @@ export function MenuPage() {
         isSearchMode={isSearchMode}
         searchResultCount={searchResults.length}
         selectedCategory={selectedCategory}
+        categories={categories}
         onSearchChange={handleSearchChange}
         onCategorySelect={handleCategorySelect}
       />
@@ -42,7 +51,8 @@ export function MenuPage() {
         selectedCategory={selectedCategory}
         menuSections={menuSections}
         categoryProducts={categoryProducts}
-        activeCategoryName={activeCategoryConfig?.name}
+        activeCategoryName={activeCategoryName}
+        activeCategoryIcon={activeCategoryIcon}
         items={items}
         addItem={addItem}
         removeItem={removeItem}
@@ -55,6 +65,7 @@ export function MenuPage() {
       {selectedProduct && (
         <ProductDetailModal
           product={selectedProduct}
+          promotions={promotions}
           onClose={() => setSelectedProduct(null)}
           onAddToCart={(product, quantity, options, notes) => {
             addItem(product, quantity, options, notes)

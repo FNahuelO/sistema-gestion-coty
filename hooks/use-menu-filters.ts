@@ -2,20 +2,21 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { useSearchParams, usePathname } from 'next/navigation'
-import type { Product } from '@/lib/types'
+import type { Category, Product, Promotion } from '@/lib/types'
 import {
-  MENU_CATEGORIES,
+  buildMenuSections,
   filterProductsByMenuCategory,
-  getMenuCategoryConfig,
+  getMenuCategoryName,
   resolveMenuCategoryId,
   type MenuCategoryId,
 } from '@/lib/menu-categories'
 
-export function useMenuFilters(products: Product[]) {
+export function useMenuFilters(products: Product[], categories: Category[], promotions: Promotion[] = []) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const initialSearch = searchParams.get('search') || ''
-  const initialCategory = resolveMenuCategoryId(searchParams.get('category'))
+  const promoParam = searchParams.has('promo') || searchParams.get('category') === 'promo'
+  const initialCategory = promoParam ? 'promo' : resolveMenuCategoryId(searchParams.get('category'))
 
   const [selectedCategory, setSelectedCategory] = useState<MenuCategoryId>(initialCategory)
   const [searchQuery, setSearchQuery] = useState(initialSearch)
@@ -33,9 +34,9 @@ export function useMenuFilters(products: Product[]) {
 
   useEffect(() => {
     if (!initialSearch) {
-      setSelectedCategory(resolveMenuCategoryId(searchParams.get('category')))
+      setSelectedCategory(promoParam ? 'promo' : resolveMenuCategoryId(searchParams.get('category')))
     }
-  }, [searchParams, initialSearch])
+  }, [searchParams, initialSearch, promoParam])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -44,12 +45,18 @@ export function useMenuFilters(products: Product[]) {
       if (searchQuery.trim()) {
         params.set('search', searchQuery.trim())
         params.delete('category')
+        params.delete('promo')
       } else {
         params.delete('search')
-        if (selectedCategory !== 'all') {
+        if (selectedCategory === 'promo') {
+          params.set('promo', '1')
+          params.delete('category')
+        } else if (selectedCategory !== 'all') {
           params.set('category', selectedCategory)
+          params.delete('promo')
         } else {
           params.delete('category')
+          params.delete('promo')
         }
       }
 
@@ -74,20 +81,17 @@ export function useMenuFilters(products: Product[]) {
     )
   }, [products, searchQuery])
 
-  const menuSections = useMemo(() => {
-    return MENU_CATEGORIES.map((category) => ({
-      ...category,
-      products: filterProductsByMenuCategory(products, category.id),
-    })).filter((section) => section.products.length > 0)
-  }, [products])
-
-  const categoryProducts = useMemo(
-    () => filterProductsByMenuCategory(products, selectedCategory),
-    [products, selectedCategory]
+  const menuSections = useMemo(
+    () => buildMenuSections(products, categories, promotions),
+    [products, categories, promotions]
   )
 
-  const activeCategoryConfig =
-    selectedCategory !== 'all' ? getMenuCategoryConfig(selectedCategory) : null
+  const categoryProducts = useMemo(
+    () => filterProductsByMenuCategory(products, selectedCategory, promotions),
+    [products, selectedCategory, promotions]
+  )
+
+  const activeCategoryName = getMenuCategoryName(selectedCategory, categories)
 
   const handleSearchChange = (value: string) => {
     setSelectedProduct(null)
@@ -109,7 +113,7 @@ export function useMenuFilters(products: Product[]) {
     searchResults,
     menuSections,
     categoryProducts,
-    activeCategoryConfig,
+    activeCategoryName,
     handleSearchChange,
     handleCategorySelect,
   }
