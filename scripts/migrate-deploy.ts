@@ -5,10 +5,10 @@ import { join } from 'node:path'
 import { Client } from 'pg'
 
 const migrationsDir = join(process.cwd(), 'prisma/migrations')
-const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL
+const connectionString = process.env.DATABASE_URL
 
 if (!connectionString) {
-  console.error('Falta DIRECT_URL o DATABASE_URL en .env')
+  console.error('Falta DATABASE_URL en .env')
   process.exit(1)
 }
 
