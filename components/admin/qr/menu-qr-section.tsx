@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { QrCodeCard } from '@/components/admin/qr-code-card'
+import { QrCodeCard } from '@/components/admin/qr/qr-code-card'
 import { buildHomeUrl, buildMenuUrl, getAppBaseUrl } from '@/lib/menu-url'
 
 type MenuQrSectionProps = {

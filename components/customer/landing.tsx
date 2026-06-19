@@ -22,6 +22,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from '@/components/ui/carousel'
+import { getActivePromotions } from '@/lib/promotions'
 import { cn } from '@/lib/utils'
 import { useBusiness, useCart, useCatalog } from '@/lib/store'
 import type { CartItem, Product } from '@/lib/types'
@@ -35,14 +36,10 @@ import {
   LOGO_SRC_SVG_2,
   LOGO_SRC_SVG_NEGRO,
 } from '@/lib/coty-theme'
-import {
-  LandingCarouselSkeleton,
-  LandingFooterSkeleton,
-  LoadingSkeleton,
-} from '@/components/shared/loading'
+import { LandingCarouselSkeleton, LandingFooterSkeleton, LoadingSkeleton } from '@/components/shared/loading'
+import { PromotionBanner } from '@/components/customer/promotion-banner'
 const HERO_IMAGE = 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=999&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
 const CTA_IMAGE = 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=1600&h=500&fit=crop'
-const PROMO_IMAGE = 'https://images.unsplash.com/photo-1436076865539-06670f77990b?w=1600&h=400&fit=crop'
 
 
 function getDefaultCartItem(items: CartItem[], productId: string) {
@@ -68,13 +65,13 @@ function QuantityControl({
         type="button"
         onClick={onDecrease}
         disabled={quantity === 0}
-        className="flex h-8 w-8 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40 md:h-9 md:w-9"
+        className="flex h-9 w-9 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40 md:h-9 md:w-9"
         style={{ backgroundColor: COTY_TEAL }}
         aria-label="Quitar"
       >
         <Minus className="h-4 w-4" />
       </button>
-      <div className="relative mx-1 flex min-w-[72px] items-center justify-center md:min-w-[80px]">
+      <div className="relative mx-1 flex min-w-[52px] items-center justify-center md:min-w-[60px]">
         <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-[#2D5A57]/30" />
         <span
           className={`relative px-2 text-sm font-medium text-foreground md:text-base ${quantityBg === 'white/95' ? 'bg-white/95' : 'bg-white'
@@ -86,7 +83,7 @@ function QuantityControl({
       <button
         type="button"
         onClick={onIncrease}
-        className="flex h-8 w-8 items-center justify-center rounded-full text-white md:h-9 md:w-9"
+        className="flex h-9 w-9 items-center justify-center rounded-full text-white md:h-9 md:w-9"
         style={{ backgroundColor: COTY_TEAL }}
         aria-label="Agregar"
       >
@@ -231,7 +228,7 @@ export function CustomerLanding() {
   const router = useRouter()
   const { settings, isLoading: isSettingsLoading } = useBusiness()
   const { items, itemCount, addItem, updateQuantity } = useCart()
-  const { products, categories, promotions, isLoading: isCatalogLoading } = useCatalog()
+  const { products, categories, promotions, channelAvailability, isLoading: isCatalogLoading } = useCatalog()
   const landingCategories = [
     ...categories
       .filter((category) => category.active !== false)
@@ -248,7 +245,7 @@ export function CustomerLanding() {
   const featuredProducts = products.filter((product) => product.featured && product.available)
   const availableProducts = products.filter((product) => product.available)
   const carouselProducts = (featuredProducts.length > 0 ? featuredProducts : availableProducts).slice(0, 12)
-  const activePromo = promotions.find((promo) => promo.active)
+  const activePromo = getActivePromotions(promotions)[0]
 
   const handleSearch = (event: React.FormEvent) => {
     event.preventDefault()
@@ -271,7 +268,7 @@ export function CustomerLanding() {
     : null
 
   const heroImage = (
-    <div className="relative overflow-hidden rounded-2xl shadow-md md:rounded-3xl">
+    <div className="relative translate-y-3 overflow-hidden rounded-2xl shadow-md md:rounded-3xl">
       <img
         src={HERO_IMAGE}
         alt="Especialidad del local"
@@ -281,7 +278,7 @@ export function CustomerLanding() {
         <img
           src={LOGO_SRC_SVG_2}
           alt="Coty Café"
-          className="h-32 w-auto object-contain md:h-44 lg:h-48"
+          className="h-24 w-auto object-contain md:h-44 lg:h-48"
         />
       </div>
     </div>
@@ -291,7 +288,7 @@ export function CustomerLanding() {
     <div className="coly-landing min-h-screen bg-[#FDFBF9] pb-24 md:pb-10">
       {/* Mobile: header verde + hero solapado */}
       <div
-        className="w-full rounded-b-4xl md:hidden"
+        className="w-full rounded-b-4xl md:hidden mb-14"
         style={{ backgroundColor: COTY_HEADER }}
       >
         <div className="relative mx-auto w-full max-w-6xl">
@@ -301,7 +298,7 @@ export function CustomerLanding() {
                 <img
                   src={LOGO_SRC_SVG}
                   alt="Coty Café"
-                  className="h-20 w-auto object-contain mix-blend-screen"
+                  className="h-16 w-auto object-contain mix-blend-screen"
                 />
               </Link>
 
@@ -320,7 +317,7 @@ export function CustomerLanding() {
             </div>
           </header>
 
-          <div className="relative z-10 -mt-[5.5rem] px-4">{heroImage}</div>
+          <div className="absolute w-full z-10 -mt-[6.5rem] px-4">{heroImage}</div>
         </div>
       </div>
 
@@ -338,7 +335,7 @@ export function CustomerLanding() {
       <main className="mx-auto w-full max-w-6xl px-4 pt-4 md:px-8 md:pt-8 lg:px-10">
         {/* Categories */}
         <section className="py-6 md:py-10">
-          <h2 className="mb-4 text-lg font-bold md:mb-6 md:text-2xl">Categories</h2>
+          <h2 className="mb-4 text-lg font-bold md:mb-6 md:text-2xl">Categorias</h2>
           <div className="grid grid-cols-4 gap-3 md:grid-cols-8 md:gap-4 lg:gap-6">
             {landingCategories.map((category) => {
               const Icon = category.icon
@@ -381,18 +378,13 @@ export function CustomerLanding() {
           {isCatalogLoading ? (
             <LoadingSkeleton className="h-28 w-full rounded-2xl md:h-40 lg:h-48" />
           ) : (
-            <div className="relative overflow-hidden rounded-2xl bg-black md:rounded-3xl">
-              <img
-                src={activePromo?.image ?? PROMO_IMAGE}
-                alt={activePromo?.title ?? 'Promoción'}
-                className="h-28 w-full object-cover opacity-60 md:h-40 lg:h-48"
+            <Link href="/menu?promo=1" className="block">
+              <PromotionBanner
+                variant="hero"
+                title={activePromo?.title?.toUpperCase() ?? '2X1 EN PINTAS'}
+                image={activePromo?.image}
               />
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40 px-4">
-                <p className="coly-promo-outline text-center text-3xl font-black uppercase leading-none md:text-5xl lg:text-6xl">
-                  {activePromo?.title?.toUpperCase() ?? '2X1 EN PINTAS'}
-                </p>
-              </div>
-            </div>
+            </Link>
           )}
         </section>
       </main>
@@ -427,11 +419,11 @@ export function CustomerLanding() {
               alt="Hacé tu pedido"
               className="h-28 w-full object-cover md:h-40 lg:h-48"
             />
-            <div className="absolute inset-0 flex items-center justify-between gap-4 bg-black/45 px-4 md:px-8 lg:px-12">
+            <div className="absolute inset-0 flex items-center justify-around gap-4 bg-black/45 px-4 md:px-8 lg:px-12">
               <img
                 src={LOGO_SRC_SVG}
                 alt="Coty Café"
-                className="h-14 w-auto object-contain mix-blend-screen md:h-20"
+                className="h-12 w-auto object-contain mix-blend-screen md:h-14"
               />
               <Link
                 href="/menu"
@@ -452,11 +444,11 @@ export function CustomerLanding() {
           {isSettingsLoading ? (
             <LandingFooterSkeleton />
           ) : (
-            <div className="grid grid-cols-3 gap-2 md:gap-8 lg:gap-12">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 md:gap-8 lg:gap-12">
               <div className="flex flex-col items-center text-center border-r-1 border-[#EAE4E0]">
                 <Clock className="mb-2 h-5 w-5 md:mb-3 md:h-6 md:w-6" style={{ color: COTY_TEAL }} />
                 <p className="text-[11px] font-semibold md:text-sm">Horarios</p>
-                <p className="mt-1 text-[10px] leading-snug text-muted-foreground md:mt-2 md:text-sm">
+                <p className="mt-1 text-xs leading-snug text-muted-foreground md:mt-2 md:text-sm">
                   Lun a Sáb {settings.openTime} - {settings.closeTime} hs
                 </p>
                 <span
@@ -468,6 +460,18 @@ export function CustomerLanding() {
                   <span className={`h-1.5 w-1.5 rounded-full md:h-2 md:w-2 ${settings.isOpen ? 'bg-green-500' : 'bg-red-500'}`} />
                   {settings.isOpen ? 'Abierto ahora' : 'Cerrado'}
                 </span>
+                {channelAvailability ? (
+                  <div className="mt-2 flex flex-wrap justify-center gap-1">
+                    {(['delivery', 'pickup'] as const).map((channel) => (
+                      <span
+                        key={channel}
+                        className={`rounded-full px-2 py-0.5 text-[9px] ${channelAvailability[channel]?.open ? 'bg-[#C5DDD9]/50 text-[#2D5A57]' : 'bg-gray-100 text-muted-foreground'}`}
+                      >
+                        {channel === 'delivery' ? 'Delivery' : 'Retiro'}: {channelAvailability[channel]?.open ? 'Abierto' : 'Cerrado'}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex flex-col items-center text-center ">
@@ -533,7 +537,7 @@ export function CustomerLanding() {
         <img
           src={LOGO_SRC_SVG_NEGRO}
           alt="Coty Café"
-          className="h-24 w-auto object-contain md:h-32"
+          className="h-16 w-auto object-contain md:h-24"
         />
         <p className="mt-4 text-center text-[10px] text-muted-foreground md:text-xs">
           Coty Café - Resto Bar. Todos los derechos reservados.

@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { PrismaClient, PaymentMethod, PaymentStatus, TableStatus, OrderStatus, OrderType, UserRole } from '@prisma/client'
+import { PrismaClient, PaymentMethod, PaymentStatus, ServiceChannel, StaffRole, TableStatus, OrderStatus, OrderType, UserRole } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 import bcrypt from 'bcryptjs'
@@ -87,6 +87,8 @@ function toTableStatus(status: string): TableStatus {
 
 async function main() {
   const defaultPassword = await bcrypt.hash('cotycafe123', 10)
+  const cashierPinHash = await bcrypt.hash('4321', 10)
+  const runnerPinHash = await bcrypt.hash('5678', 10)
 
   await prisma.orderItemSelection.deleteMany()
   await prisma.orderItem.deleteMany()
@@ -104,6 +106,8 @@ async function main() {
   await prisma.productImage.deleteMany()
   await prisma.product.deleteMany()
   await prisma.category.deleteMany()
+  await prisma.channelSchedule.deleteMany()
+  await prisma.channelSettings.deleteMany()
   await prisma.businessSettings.deleteMany()
   await prisma.session.deleteMany()
   await prisma.account.deleteMany()
@@ -173,6 +177,7 @@ async function main() {
       isOpen: businessSettings.isOpen,
       openTime: businessSettings.openTime,
       closeTime: businessSettings.closeTime,
+      timezone: 'America/Argentina/Buenos_Aires',
       phone: businessSettings.phone,
       address: businessSettings.address,
       instagram: businessSettings.instagram,
@@ -200,10 +205,23 @@ async function main() {
       avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop',
     },
     {
-      id: 'staff-login',
-      name: 'Personal Coty',
-      email: 'personal@cotycafe.com',
+      id: 'cashier-login',
+      name: 'Milagro Pérez',
+      email: 'cajero@cotycafe.com',
       role: UserRole.STAFF,
+      staffRole: StaffRole.CASHIER,
+      phone: '5491112345678',
+      pinHash: cashierPinHash,
+      avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop',
+    },
+    {
+      id: 'runner-login',
+      name: 'Isaac',
+      email: 'cadete@cotycafe.com',
+      role: UserRole.STAFF,
+      staffRole: StaffRole.RUNNER,
+      phone: '5491187654321',
+      pinHash: runnerPinHash,
       avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop',
     },
   ]
@@ -215,11 +233,64 @@ async function main() {
         name: user.name,
         email: user.email,
         role: user.role,
+        staffRole: 'staffRole' in user ? user.staffRole : null,
+        phone: 'phone' in user ? user.phone : null,
+        pinHash: 'pinHash' in user ? user.pinHash : null,
         avatarUrl: user.avatarUrl,
         passwordHash: defaultPassword,
       },
     })
   }
+
+  for (const channel of [ServiceChannel.DELIVERY, ServiceChannel.LOCAL, ServiceChannel.PICKUP] as const) {
+    await prisma.channelSettings.create({
+      data: {
+        channel,
+        enabled: true,
+      },
+    })
+  }
+
+  await prisma.channelSchedule.createMany({
+    data: [
+      {
+        channel: ServiceChannel.DELIVERY,
+        label: 'Delivery turno mañana',
+        startTime: '10:00',
+        endTime: '16:00',
+        daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+        active: true,
+        sortOrder: 0,
+      },
+      {
+        channel: ServiceChannel.DELIVERY,
+        label: 'Turno tarde',
+        startTime: '19:30',
+        endTime: '00:30',
+        daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+        active: true,
+        sortOrder: 1,
+      },
+      {
+        channel: ServiceChannel.LOCAL,
+        label: 'Coty cafe',
+        startTime: '08:00',
+        endTime: '01:00',
+        daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+        active: true,
+        sortOrder: 0,
+      },
+      {
+        channel: ServiceChannel.PICKUP,
+        label: 'Retiros',
+        startTime: '08:00',
+        endTime: '01:00',
+        daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+        active: true,
+        sortOrder: 0,
+      },
+    ],
+  })
 
   for (const table of tables) {
     await prisma.diningTable.create({

@@ -1,10 +1,12 @@
 'use client'
 
-import { X, UtensilsCrossed } from 'lucide-react'
+import { useState } from 'react'
+import { X, UtensilsCrossed, BellRing } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { COTY_HEADER, COTY_TEAL } from '@/lib/coty-theme'
 import { cn } from '@/lib/utils'
 import { useTableSession } from '@/lib/store'
+import { toast } from 'sonner'
 
 type TableSessionBannerProps = {
   className?: string
@@ -18,6 +20,25 @@ export function TableSessionBanner({
   variant = 'standalone',
 }: TableSessionBannerProps) {
   const { tableSession, isLoading, error, clearTableSession } = useTableSession()
+  const [calling, setCalling] = useState(false)
+
+  const callWaiter = async () => {
+    if (!tableSession) return
+    setCalling(true)
+    try {
+      const response = await fetch('/api/table-calls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tableId: tableSession.tableId }),
+      })
+      if (!response.ok) throw new Error('No se pudo llamar al mozo')
+      toast.success('¡Mozo avisado! En breve te atienden.')
+    } catch {
+      toast.error('No se pudo enviar la solicitud')
+    } finally {
+      setCalling(false)
+    }
+  }
 
   if (isLoading) {
     if (variant === 'inline') {
@@ -76,7 +97,19 @@ export function TableSessionBanner({
             <p className="truncate text-[11px] text-white/70">Tu pedido se enviará directo al salón.</p>
           </div>
         </div>
-        {showClear ? (
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"
+            onClick={() => void callWaiter()}
+            disabled={calling}
+            aria-label="Llamar al mozo"
+          >
+            <BellRing className="h-4 w-4" />
+          </Button>
+          {showClear ? (
           <Button
             type="button"
             variant="ghost"
@@ -88,6 +121,7 @@ export function TableSessionBanner({
             <X className="h-4 w-4" />
           </Button>
         ) : null}
+        </div>
       </div>
     )
   }
@@ -110,7 +144,19 @@ export function TableSessionBanner({
             <p className="text-xs text-white/75">Tu pedido se enviará directo al salón.</p>
           </div>
         </div>
-        {showClear ? (
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/10 hover:text-white"
+            onClick={() => void callWaiter()}
+            disabled={calling}
+            aria-label="Llamar al mozo"
+          >
+            <BellRing className="h-4 w-4" />
+          </Button>
+          {showClear ? (
           <Button
             type="button"
             variant="ghost"
@@ -122,6 +168,7 @@ export function TableSessionBanner({
             <X className="h-4 w-4" />
           </Button>
         ) : null}
+        </div>
       </div>
     </div>
   )

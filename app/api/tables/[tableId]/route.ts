@@ -24,6 +24,7 @@ const patchSchema = z.object({
   capacity: z.number().int().positive().optional(),
   status: z.enum(['free', 'occupied', 'waiting', 'finished']).optional(),
   active: z.boolean().optional(),
+  restore: z.boolean().optional(),
 })
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ tableId: string }> }) {
@@ -38,6 +39,36 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ t
 
     if (!existing) {
       return NextResponse.json({ error: 'Mesa no encontrada' }, { status: 404 })
+    }
+
+    if (body.restore) {
+      await requireSessionRole(['admin'])
+      const restored = await prisma.diningTable.update({
+        where: { id: tableId },
+        data: {
+          active: true,
+          deletedAt: null,
+        },
+        include: {
+          sessions: {
+            where: { closedAt: null },
+            orderBy: { openedAt: 'desc' },
+            take: 1,
+            include: {
+              orders: {
+                orderBy: { createdAt: 'desc' },
+                include: {
+                  items: { include: { selections: true } },
+                  payment: true,
+                  diningTable: true,
+                  createdByUser: true,
+                },
+              },
+            },
+          },
+        },
+      })
+      return NextResponse.json(serializeTable(restored))
     }
 
     if (body.status === 'occupied') {

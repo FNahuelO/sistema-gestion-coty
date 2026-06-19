@@ -7,6 +7,7 @@ import { CartItemSkeleton, LoadingSkeleton, ProductCardSkeleton } from '@/compon
 import { MenuSectionHeader } from '@/components/customer/menu-section-header'
 import { MenuGridProductCard } from '@/components/customer/menu-grid-product-card'
 import { MenuListProductCard } from '@/components/customer/menu-list-product-card'
+import { PromosView, PromosLoadingSkeleton } from '@/components/customer/promos-view'
 import { getCategoryIcon } from '@/lib/category-icons'
 import type { MenuCategoryId, MenuSection } from '@/lib/menu-categories'
 import { cn } from '@/lib/utils'
@@ -16,6 +17,7 @@ interface MenuContentProps {
   isSearchMode: boolean
   searchResults: Product[]
   selectedCategory: MenuCategoryId
+  products: Product[]
   menuSections: MenuSection[]
   categoryProducts: Product[]
   activeCategoryName?: string
@@ -35,6 +37,7 @@ export function MenuContent({
   isSearchMode,
   searchResults,
   selectedCategory,
+  products,
   menuSections,
   categoryProducts,
   activeCategoryName,
@@ -56,9 +59,13 @@ export function MenuContent({
       )}
     >
       {isLoading ? (
-        <MenuLoadingSkeleton
-          variant={isSearchMode || selectedCategory !== 'all' ? 'list' : 'grid'}
-        />
+        selectedCategory === 'promo' ? (
+          <PromosLoadingSkeleton />
+        ) : (
+          <MenuLoadingSkeleton
+            variant={isSearchMode || (selectedCategory !== 'all' && selectedCategory !== 'promo') ? 'list' : 'grid'}
+          />
+        )
       ) : isSearchMode ? (
         <SearchResults
           results={searchResults}
@@ -68,6 +75,15 @@ export function MenuContent({
           removeItem={removeItem}
           updateQuantity={updateQuantity}
           onSearchClear={onSearchClear}
+          onOpenProduct={onOpenProduct}
+        />
+      ) : selectedCategory === 'promo' ? (
+        <PromosView
+          products={products}
+          promotions={promotions}
+          items={items}
+          addItem={addItem}
+          updateQuantity={updateQuantity}
           onOpenProduct={onOpenProduct}
         />
       ) : selectedCategory === 'all' ? (
@@ -288,6 +304,7 @@ function SingleCategoryView({
           <MenuListProductCard
             key={product.id}
             product={product}
+            promotions={promotions}
             items={items}
             addItem={addItem}
             removeItem={removeItem}

@@ -10,6 +10,9 @@ export interface Product {
   featured: boolean
   available: boolean
   preparationTime: number // minutes
+  trackStock?: boolean
+  stock?: number
+  lowStockThreshold?: number
   options?: ProductOption[]
 }
 
@@ -66,6 +69,9 @@ export interface Order {
   subtotal: number
   tax: number
   deliveryFee?: number
+  tip?: number
+  discountCode?: string
+  discountAmount?: number
   total: number
   paymentMethod: PaymentMethod
   paymentStatus?: PaymentStatus
@@ -100,6 +106,7 @@ export interface Table {
 
 // User types
 export type UserRole = 'admin' | 'staff' | 'customer'
+export type StaffRole = 'cashier' | 'runner'
 
 export function isStaffRole(role?: string | null): role is 'staff' {
   return role === 'staff' || role === 'cashier' || role === 'waitress'
@@ -110,6 +117,8 @@ export interface User {
   name: string
   email: string
   role: UserRole
+  staffRole?: StaffRole | null
+  phone?: string
   avatar?: string
   active?: boolean
 }
@@ -140,6 +149,12 @@ export interface ProductSales {
   productName: string
   quantity: number
   revenue: number
+  imageUrl?: string
+}
+
+export interface HourlySales {
+  hour: number
+  revenue: number
 }
 
 export interface SalesByType {
@@ -157,7 +172,10 @@ export interface AnalyticsOverview {
   tablesServed: number
   tablesServedToday: number
   salesByType: SalesByType
+  salesByTypeToday: SalesByType
+  hourlySalesToday: HourlySales[]
   topProducts: ProductSales[]
+  topProductsByRevenue: ProductSales[]
   dailySales: DailySales[]
 }
 
@@ -169,6 +187,7 @@ export interface BusinessSettings {
   isOpen: boolean
   openTime: string
   closeTime: string
+  timezone?: string
   phone: string
   address: string
   instagram?: string
@@ -177,4 +196,20 @@ export interface BusinessSettings {
   deliveryFee: number
   minOrderAmount: number
   taxRate: number
+}
+
+export interface ChannelSchedule {
+  id: string
+  channel: 'delivery' | 'local' | 'pickup'
+  label: string
+  startTime: string
+  endTime: string
+  daysOfWeek: number[]
+  active: boolean
+  sortOrder: number
+}
+
+export interface ChannelSetting {
+  channel: 'delivery' | 'local' | 'pickup'
+  enabled: boolean
 }

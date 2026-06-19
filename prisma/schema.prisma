@@ -11,6 +11,17 @@ enum UserRole {
   STAFF
 }
 
+enum StaffRole {
+  CASHIER
+  RUNNER
+}
+
+enum ServiceChannel {
+  DELIVERY
+  LOCAL
+  PICKUP
+}
+
 enum OrderType {
   DELIVERY
   PICKUP
@@ -50,12 +61,57 @@ enum TableStatus {
   FINISHED
 }
 
+enum CashSessionStatus {
+  OPEN
+  CLOSED
+}
+
+enum CashMovementType {
+  EXPENSE
+  WITHDRAWAL
+  DEPOSIT
+}
+
+enum TableCallStatus {
+  PENDING
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum DeliveryAssignmentStatus {
+  ASSIGNED
+  PICKED_UP
+  DELIVERED
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  CANCELLED
+}
+
 model User {
   id                    String               @id @default(cuid())
   name                  String
   email                 String               @unique
   passwordHash          String
   role                  UserRole
+  staffRole             StaffRole?
+  phone                 String?
+  pinHash               String?
   avatarUrl             String?
   active                Boolean              @default(true)
   createdAt             DateTime             @default(now())
@@ -66,6 +122,11 @@ model User {
   tableSessions         TableSession[]       @relation("WaitressSessions")
   changedOrderStatuses  OrderStatusHistory[] @relation("OrderStatusChangedBy")
   auditLogs             AuditLog[]           @relation("AuditLogCreatedBy")
+  cashSessionsOpened    CashSession[]        @relation("CashOpenedBy")
+  cashSessionsClosed    CashSession[]        @relation("CashClosedBy")
+  cashMovements         CashMovement[]       @relation("CashMovementBy")
+  deliveryAssignments   DeliveryAssignment[] @relation("RunnerAssignments")
+  tableCallsAck         TableCall[]          @relation("TableCallAckBy")
 }
 
 model Account {
@@ -125,6 +186,9 @@ model Product {
   imageUrl        String
   featured        Boolean          @default(false)
   available       Boolean          @default(true)
+  trackStock      Boolean          @default(false)
+  stock           Int?
+  lowStockThreshold Int            @default(5)
   preparationTime Int              @default(0)
   categoryId      String
   category        Category         @relation(fields: [categoryId], references: [id])
@@ -212,6 +276,7 @@ model BusinessSettings {
   isOpen         Boolean  @default(true)
   openTime       String
   closeTime      String
+  timezone       String   @default("America/Argentina/Buenos_Aires")
   phone          String
   address        String
   instagram      String?
@@ -221,6 +286,24 @@ model BusinessSettings {
   minOrderAmount Decimal  @db.Decimal(10, 2)
   taxRate        Decimal  @db.Decimal(5, 4)
   updatedAt      DateTime @updatedAt
+}
+
+model ChannelSettings {
+  channel ServiceChannel @id
+  enabled Boolean        @default(true)
+}
+
+model ChannelSchedule {
+  id         String         @id @default(cuid())
+  channel    ServiceChannel
+  label      String
+  startTime  String
+  endTime    String
+  daysOfWeek Int[]
+  active     Boolean        @default(true)
+  sortOrder  Int            @default(0)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
 }
 
 model DiningTable {
@@ -234,6 +317,8 @@ model DiningTable {
   deletedAt  DateTime?
   orders     Order[]
   sessions   TableSession[]
+  tableCalls TableCall[]
+  reservations TableReservation[]
 }
 
 model TableSession {
@@ -264,7 +349,13 @@ model Order {
   subtotal               Decimal              @db.Decimal(10, 2)
   tax                    Decimal              @db.Decimal(10, 2)
   deliveryFee            Decimal              @default(0) @db.Decimal(10, 2)
+  tip                    Decimal              @default(0) @db.Decimal(10, 2)
+  discountCode           String?
+  discountAmount         Decimal              @default(0) @db.Decimal(10, 2)
+  deliveryZoneId         String?
+  customerId             String?
   total                  Decimal              @db.Decimal(10, 2)
+  kitchenAckAt           DateTime?
   whatsappMessage        String?
   whatsappSentAt         DateTime?
   diningTableId          String?
@@ -276,10 +367,14 @@ model Order {
   diningTable            DiningTable?         @relation(fields: [diningTableId], references: [id])
   tableSession           TableSession?        @relation(fields: [tableSessionId], references: [id])
   createdByUser          User?                @relation("OrderCreatedBy", fields: [createdByUserId], references: [id])
+  deliveryZone           DeliveryZone?        @relation(fields: [deliveryZoneId], references: [id])
+  customer               Customer?            @relation(fields: [customerId], references: [id])
   items                  OrderItem[]
   payment                Payment?
   statusHistory          OrderStatusHistory[]
   auditLogs              AuditLog[]
+  deliveryAssignment     DeliveryAssignment?
+  invoice                Invoice?
 }
 
 model OrderItem {
@@ -349,4 +444,128 @@ model AuditLog {
   orderId         String?
   order           Order?   @relation(fields: [orderId], references: [id])
   createdByUser   User?    @relation("AuditLogCreatedBy", fields: [createdByUserId], references: [id])
+}
+
+model CashSession {
+  id              String            @id @default(cuid())
+  status          CashSessionStatus @default(OPEN)
+  openingAmount   Decimal           @db.Decimal(10, 2)
+  closingAmount   Decimal?          @db.Decimal(10, 2)
+  expectedAmount  Decimal?          @db.Decimal(10, 2)
+  difference      Decimal?          @db.Decimal(10, 2)
+  notes           String?
+  openedByUserId  String
+  closedByUserId  String?
+  openedAt        DateTime          @default(now())
+  closedAt        DateTime?
+  openedByUser    User              @relation("CashOpenedBy", fields: [openedByUserId], references: [id])
+  closedByUser    User?             @relation("CashClosedBy", fields: [closedByUserId], references: [id])
+  movements       CashMovement[]
+}
+
+model CashMovement {
+  id              String           @id @default(cuid())
+  sessionId       String
+  type            CashMovementType
+  amount          Decimal          @db.Decimal(10, 2)
+  description     String
+  createdByUserId String
+  createdAt       DateTime         @default(now())
+  session         CashSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdByUser   User             @relation("CashMovementBy", fields: [createdByUserId], references: [id])
+}
+
+model DeliveryZone {
+  id             String   @id @default(cuid())
+  name           String
+  deliveryFee    Decimal  @db.Decimal(10, 2)
+  minOrderAmount Decimal  @default(0) @db.Decimal(10, 2)
+  active         Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  orders         Order[]
+}
+
+model DiscountCode {
+  id              String       @id @default(cuid())
+  code            String       @unique
+  type            DiscountType
+  value           Decimal      @db.Decimal(10, 2)
+  minOrderAmount  Decimal      @default(0) @db.Decimal(10, 2)
+  paymentMethod   PaymentMethod?
+  maxUses         Int?
+  usedCount       Int          @default(0)
+  validFrom       DateTime
+  validTo         DateTime
+  active          Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model Customer {
+  id          String   @id @default(cuid())
+  phone       String   @unique
+  name        String
+  addresses   Json     @default("[]")
+  orderCount  Int      @default(0)
+  totalSpent  Decimal  @default(0) @db.Decimal(10, 2)
+  lastOrderAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  orders      Order[]
+}
+
+model TableCall {
+  id                   String          @id @default(cuid())
+  tableId              String
+  status               TableCallStatus @default(PENDING)
+  createdAt            DateTime        @default(now())
+  acknowledgedAt       DateTime?
+  acknowledgedByUserId String?
+  table                DiningTable     @relation(fields: [tableId], references: [id])
+  acknowledgedByUser   User?         @relation("TableCallAckBy", fields: [acknowledgedByUserId], references: [id])
+}
+
+model TableReservation {
+  id            String            @id @default(cuid())
+  customerName  String
+  customerPhone String
+  partySize     Int
+  reservedAt    DateTime
+  durationMinutes Int             @default(90)
+  status        ReservationStatus @default(PENDING)
+  notes         String?
+  tableId       String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  table         DiningTable?      @relation(fields: [tableId], references: [id])
+}
+
+model DeliveryAssignment {
+  id          String                   @id @default(cuid())
+  orderId     String                   @unique
+  runnerId    String
+  status      DeliveryAssignmentStatus @default(ASSIGNED)
+  deliveryFee Decimal                  @default(0) @db.Decimal(10, 2)
+  assignedAt  DateTime                 @default(now())
+  pickedUpAt  DateTime?
+  deliveredAt DateTime?
+  order       Order                    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  runner      User                     @relation("RunnerAssignments", fields: [runnerId], references: [id])
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  orderId       String        @unique
+  number        String        @unique
+  customerName  String
+  customerTaxId String?
+  subtotal      Decimal       @db.Decimal(10, 2)
+  tax           Decimal       @db.Decimal(10, 2)
+  total         Decimal       @db.Decimal(10, 2)
+  status        InvoiceStatus @default(ISSUED)
+  issuedAt      DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
 }

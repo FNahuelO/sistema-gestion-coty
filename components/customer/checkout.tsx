@@ -102,7 +102,7 @@ export function CheckoutPage() {
   const pathname = usePathname()
   const { items, hydrated, updateQuantity, removeItem, clearCart } = useCart()
   const { settings, isLoading: isSettingsLoading } = useBusiness()
-  const { promotions } = useCatalog()
+  const { promotions, channelAvailability, deliveryZones } = useCatalog()
   const { subtotal, discount, total } = useCartPricing(items, promotions)
   const { addOrder } = useOrders()
   const { tableSession, isTableMode, hydrated: tableSessionHydrated } = useTableSession()
@@ -114,6 +114,10 @@ export function CheckoutPage() {
   const [customerPhone, setCustomerPhone] = useState('')
   const [customerAddress, setCustomerAddress] = useState('')
   const [notes, setNotes] = useState('')
+  const [deliveryZoneId, setDeliveryZoneId] = useState('')
+  const [couponCode, setCouponCode] = useState('')
+  const [couponDiscount, setCouponDiscount] = useState(0)
+  const [tip, setTip] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [orderComplete, setOrderComplete] = useState(false)
   const [orderId, setOrderId] = useState('')
@@ -121,10 +125,25 @@ export function CheckoutPage() {
 
   const isEmpty = items.length === 0 && !orderComplete
   const activeOrderType = isTableMode ? 'table' : orderType
-  const deliveryFee = activeOrderType === 'delivery' ? settings.deliveryFee : 0
-  const finalTotal = total + deliveryFee
-  const isClosed = !settings.isOpen && activeOrderType !== 'table'
-  const belowMinOrder = activeOrderType !== 'table' && settings.minOrderAmount > 0 && subtotal < settings.minOrderAmount
+  const selectedZone = deliveryZones.find((zone) => zone.id === deliveryZoneId)
+  const deliveryFee =
+    activeOrderType === 'delivery'
+      ? selectedZone?.deliveryFee ?? settings.deliveryFee
+      : 0
+  const minOrderAmount =
+    activeOrderType === 'delivery' && selectedZone
+      ? Math.max(settings.minOrderAmount, selectedZone.minOrderAmount)
+      : settings.minOrderAmount
+  const finalTotal = Math.max(0, total - couponDiscount) + deliveryFee + tip
+  const channelKey = activeOrderType === 'delivery' ? 'delivery' : activeOrderType === 'pickup' ? 'pickup' : 'local'
+  const channelStatus = activeOrderType === 'table' ? { open: true } : channelAvailability?.[channelKey]
+  const isClosed =
+    activeOrderType !== 'table' &&
+    (channelStatus ? !channelStatus.open : !settings.isOpen)
+  const closedMessage =
+    channelStatus?.reason ??
+    `El local está cerrado. Horario: ${settings.openTime} – ${settings.closeTime}`
+  const belowMinOrder = activeOrderType !== 'table' && minOrderAmount > 0 && subtotal < minOrderAmount
   const menuHref = tableSession ? buildMenuPathWithTable(tableSession.tableId) : '/menu'
 
   useEffect(() => {
@@ -152,6 +171,24 @@ export function CheckoutPage() {
     return buildWhatsAppUrl(settings.whatsapp, order, settings.name)
   }
 
+  const applyCoupon = async () => {
+    if (!couponCode.trim()) return
+    try {
+      const response = await fetch('/api/coupons/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: couponCode, subtotal, paymentMethod }),
+      })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error ?? 'Cupón inválido')
+      setCouponDiscount(payload.amount)
+      toast.success('Cupón aplicado')
+    } catch (error) {
+      setCouponDiscount(0)
+      toast.error(error instanceof Error ? error.message : 'Cupón inválido')
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -161,7 +198,7 @@ export function CheckoutPage() {
     }
 
     if (isClosed) {
-      toast.error('El local está cerrado en este momento')
+      toast.error(closedMessage)
       return
     }
 
@@ -181,7 +218,7 @@ export function CheckoutPage() {
     }
 
     if (belowMinOrder) {
-      toast.error(`El pedido mínimo es de ${formatPrice(settings.minOrderAmount)}`)
+      toast.error(`El pedido mínimo es de ${formatPrice(minOrderAmount)}`)
       return
     }
 
@@ -195,6 +232,9 @@ export function CheckoutPage() {
         customerPhone,
         customerAddress: activeOrderType === 'delivery' ? customerAddress : undefined,
         tableId: isTableMode ? tableSession?.tableId : undefined,
+        deliveryZoneId: activeOrderType === 'delivery' && deliveryZoneId ? deliveryZoneId : undefined,
+        discountCode: couponDiscount > 0 ? couponCode : undefined,
+        tip: tip > 0 ? tip : undefined,
         notes: notes || undefined,
         items: items.map((item) => ({
           productId: item.product.id,
@@ -256,7 +296,10 @@ export function CheckoutPage() {
           <CheckoutMain className="space-y-3 pb-4 pt-2">
             <CheckoutLoadingSkeleton />
           </CheckoutMain>
-          <div className="fixed bottom-[72px] left-0 right-0 z-40 px-4">
+          <div
+            className="fixed bottom-[72px] left-0 right-0 z-40 px-4 md:bottom-8"
+            style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+          >
             <div className="mx-auto max-w-lg">
               <LoadingSkeleton className="h-14 w-full rounded-full" />
             </div>
@@ -332,7 +375,7 @@ export function CheckoutPage() {
             <TableSessionBanner className="mb-4" showClear={false} />
             {isClosed && (
               <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                El local está cerrado. Horario: {settings.openTime} – {settings.closeTime}
+                {closedMessage}
               </div>
             )}
             {belowMinOrder && !isClosed && (
@@ -424,14 +467,32 @@ export function CheckoutPage() {
                               className="border-[#2D5A57] text-[#2D5A57]"
                             />
                             <span className="text-sm font-medium">Delivery</span>
-                            {settings.deliveryFee > 0 && (
+                            {deliveryFee > 0 && (
                               <span className="ml-auto text-xs text-muted-foreground">
-                                +{formatPrice(settings.deliveryFee)}
+                                +{formatPrice(deliveryFee)}
                               </span>
                             )}
                           </label>
                         </RadioGroup>
                       )}
+                      {!isTableMode && orderType === 'delivery' && deliveryZones.length > 0 ? (
+                        <div className="mt-3 space-y-2">
+                          <Label className="text-xs">Zona de entrega</Label>
+                          <RadioGroup
+                            value={deliveryZoneId}
+                            onValueChange={setDeliveryZoneId}
+                            className="space-y-2"
+                          >
+                            {deliveryZones.map((zone) => (
+                              <label key={zone.id} htmlFor={`zone-${zone.id}`} className="flex cursor-pointer items-center gap-2 text-sm">
+                                <RadioGroupItem value={zone.id} id={`zone-${zone.id}`} />
+                                <span>{zone.name}</span>
+                                <span className="ml-auto text-xs text-muted-foreground">+{formatPrice(zone.deliveryFee)}</span>
+                              </label>
+                            ))}
+                          </RadioGroup>
+                        </div>
+                      ) : null}
                     </CheckoutSection>
 
                     <div className="border-t border-black/8" />
@@ -451,10 +512,51 @@ export function CheckoutPage() {
                             <span className="font-medium">-{formatPrice(discount)}</span>
                           </div>
                         )}
+                        {couponDiscount > 0 ? (
+                          <div className="flex justify-between text-emerald-700">
+                            <span>Cupón {couponCode}</span>
+                            <span className="font-medium">-{formatPrice(couponDiscount)}</span>
+                          </div>
+                        ) : null}
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Código de descuento"
+                            value={couponCode}
+                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                            className="h-9"
+                          />
+                          <Button type="button" variant="outline" size="sm" onClick={() => void applyCoupon()}>
+                            Aplicar
+                          </Button>
+                        </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">{isTableMode ? 'Servicio' : 'Envío'}</span>
                           <span className="font-medium">{formatPrice(deliveryFee)}</span>
                         </div>
+                        {!isTableMode ? (
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">Propina (opcional)</Label>
+                            <div className="flex gap-2">
+                              {[0, Math.round(total * 0.1), Math.round(total * 0.15)].map((value, index) => (
+                                <Button
+                                  key={index}
+                                  type="button"
+                                  size="sm"
+                                  variant={tip === value ? 'default' : 'outline'}
+                                  onClick={() => setTip(value)}
+                                >
+                                  {index === 0 ? 'Sin propina' : formatPrice(value)}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                        {tip > 0 ? (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Propina</span>
+                            <span className="font-medium">{formatPrice(tip)}</span>
+                          </div>
+                        ) : null}
                         <div className="my-2 border-t border-black/8" />
                         <div className="flex items-center justify-between">
                           <span className="font-bold">Total</span>
@@ -470,7 +572,10 @@ export function CheckoutPage() {
             </div>
           </CheckoutMain>
 
-          <div className="fixed bottom-[72px] left-0 right-0 z-40 px-4 md:bottom-8">
+          <div
+            className="fixed bottom-[72px] left-0 right-0 z-40 px-4 md:bottom-8"
+            style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+          >
             <div className="mx-auto max-w-lg md:max-w-md md:ml-auto md:mr-8 lg:mr-12">
               {isSettingsLoading ? (
                 <LoadingSkeleton className="h-14 w-full rounded-full" />

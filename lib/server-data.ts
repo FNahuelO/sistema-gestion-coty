@@ -10,12 +10,23 @@ import {
   PaymentStatus as PrismaPaymentStatus,
   TableStatus as PrismaTableStatus,
   UserRole as PrismaUserRole,
+  StaffRole as PrismaStaffRole,
 } from '@prisma/client'
 import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getProductDiscountPercent } from '@/lib/promotions'
-import type { AnalyticsOverview, BusinessSettings, CartItem, Category, Order, PaymentMethod, Product, Promotion, SelectedOption, Table, User } from '@/lib/types'
+import type { AnalyticsOverview, BusinessSettings, CartItem, Category, ChannelSchedule, ChannelSetting, Order, PaymentMethod, Product, Promotion, SelectedOption, Table, User } from '@/lib/types'
+import { getChannelAvailability, mapOrderTypeToChannel, mapPrismaChannel, mapToPrismaChannel } from '@/lib/channel-hours'
+import { hasPermission, type Permission, type SessionRoleContext } from '@/lib/permissions'
+import { buildWhatsAppOrderMessage } from '@/lib/whatsapp-message'
+import {
+  decrementStockForOrder,
+  incrementDiscountUse,
+  listDeliveryZones,
+  upsertCustomerFromOrder,
+  validateDiscountCode,
+} from '@/lib/commerce'
 
 export const selectedOptionSchema = z.object({
   optionId: z.string().min(1),
@@ -37,6 +48,9 @@ export const createOrderSchema = z.object({
   customerAddress: z.string().trim().max(200).optional(),
   notes: z.string().trim().max(500).optional(),
   tableId: z.string().trim().optional(),
+  deliveryZoneId: z.string().trim().optional(),
+  discountCode: z.string().trim().max(32).optional(),
+  tip: z.number().min(0).optional(),
   items: z.array(cartItemInputSchema).min(1),
 })
 
@@ -70,6 +84,9 @@ export const productInputSchema = z.object({
   featured: z.boolean().default(false),
   available: z.boolean().default(true),
   preparationTime: z.number().int().min(0),
+  trackStock: z.boolean().default(false),
+  stock: z.number().int().min(0).optional().nullable(),
+  lowStockThreshold: z.number().int().min(0).default(5),
   options: z.array(productOptionInputSchema).default([]),
 })
 
@@ -112,6 +129,9 @@ export const userInputSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(160),
   role: z.enum(['admin', 'staff']),
+  staffRole: z.enum(['cashier', 'runner']).optional().nullable(),
+  phone: z.string().trim().max(30).optional().or(z.literal('')),
+  pin: z.string().regex(/^\d{4,6}$/).optional().or(z.literal('')),
   avatar: z.string().trim().url().optional().or(z.literal('')),
   active: z.boolean().default(true),
   password: z.string().min(6).max(120).optional(),
@@ -171,6 +191,14 @@ const tableInclude = {
 
 export type SessionUser = User & {
   role: 'admin' | 'staff'
+  staffRole?: User['staffRole']
+}
+
+function toSessionContext(user: SessionUser): SessionRoleContext {
+  return {
+    role: user.role,
+    staffRole: user.staffRole ?? null,
+  }
 }
 
 function decimalToNumber(value: Prisma.Decimal | number | string | null | undefined) {
@@ -212,6 +240,22 @@ function toPrismaUserRole(role: User['role']): PrismaUserRole {
       return PrismaUserRole.ADMIN
     default:
       return PrismaUserRole.STAFF
+  }
+}
+
+function toPrismaStaffRole(staffRole?: User['staffRole'] | null): PrismaStaffRole | null {
+  if (!staffRole) return null
+  return staffRole === 'cashier' ? PrismaStaffRole.CASHIER : PrismaStaffRole.RUNNER
+}
+
+function mapPrismaStaffRole(value?: string | null): User['staffRole'] | undefined {
+  switch (value) {
+    case 'CASHIER':
+      return 'cashier'
+    case 'RUNNER':
+      return 'runner'
+    default:
+      return undefined
   }
 }
 
@@ -318,6 +362,7 @@ export async function getSessionUser() {
     name: session.user.name ?? '',
     email: session.user.email ?? '',
     role: session.user.role,
+    staffRole: session.user.staffRole ?? undefined,
     avatar: session.user.avatar ?? undefined,
   } satisfies SessionUser
 }
@@ -333,6 +378,14 @@ export async function requireSessionUser() {
 export async function requireSessionRole(roles: Array<User['role']>) {
   const user = await requireSessionUser()
   if (!roles.includes(user.role)) {
+    throw new Error('FORBIDDEN')
+  }
+  return user
+}
+
+export async function requirePermission(permission: Permission) {
+  const user = await requireSessionUser()
+  if (!hasPermission(toSessionContext(user), permission)) {
     throw new Error('FORBIDDEN')
   }
   return user
@@ -361,6 +414,9 @@ export function serializeProduct(product: Prisma.ProductGetPayload<{ include: ty
     featured: product.featured,
     available: product.available,
     preparationTime: product.preparationTime,
+    trackStock: product.trackStock,
+    stock: product.stock ?? undefined,
+    lowStockThreshold: product.lowStockThreshold,
     options: product.options.map((option) => ({
       id: option.id,
       name: option.name,
@@ -398,6 +454,7 @@ export function serializeSettings(settings: Prisma.BusinessSettingsGetPayload<ob
     isOpen: settings.isOpen,
     openTime: settings.openTime,
     closeTime: settings.closeTime,
+    timezone: settings.timezone ?? 'America/Argentina/Buenos_Aires',
     phone: settings.phone,
     address: settings.address,
     instagram: settings.instagram ?? undefined,
@@ -414,6 +471,8 @@ export function serializeUser(user: {
   name: string
   email: string
   role: PrismaUserRole | User['role']
+  staffRole?: string | null
+  phone?: string | null
   avatarUrl: string | null
   active: boolean
 }): User {
@@ -422,6 +481,8 @@ export function serializeUser(user: {
     name: user.name,
     email: user.email,
     role: mapUserRole(user.role),
+    staffRole: mapPrismaStaffRole(user.staffRole),
+    phone: user.phone ?? undefined,
     avatar: user.avatarUrl ?? undefined,
     active: user.active,
   }
@@ -444,6 +505,9 @@ export function serializeOrder(order: Prisma.OrderGetPayload<{ include: typeof o
     subtotal: decimalToNumber(order.subtotal),
     tax: decimalToNumber(order.tax),
     deliveryFee: decimalToNumber(order.deliveryFee),
+    tip: decimalToNumber(order.tip ?? 0),
+    discountCode: order.discountCode ?? undefined,
+    discountAmount: decimalToNumber(order.discountAmount ?? 0),
     total: decimalToNumber(order.total),
     tableId: order.diningTableId ?? undefined,
     tableNumber: order.diningTable?.number ?? undefined,
@@ -525,7 +589,7 @@ export async function getPublicTable(tableId: string) {
 }
 
 export async function getPublicCatalog() {
-  const [settings, categories, products, promotions] = await Promise.all([
+  const [settings, categories, products, promotions, channelSettings, schedules, deliveryZones] = await Promise.all([
     prisma.businessSettings.findUnique({ where: { id: 'main' } }),
     prisma.category.findMany({
       where: { deletedAt: null, active: true },
@@ -544,13 +608,57 @@ export async function getPublicCatalog() {
       orderBy: { validFrom: 'desc' },
       include: promotionInclude,
     }),
+    prisma.channelSettings.findMany(),
+    prisma.channelSchedule.findMany({ orderBy: [{ channel: 'asc' }, { sortOrder: 'asc' }] }),
+    listDeliveryZones(),
   ])
 
+  const serializedSettings = settings ? serializeSettings(settings) : null
+  const serializedSchedules = schedules.map((entry) => ({
+    id: entry.id,
+    channel: mapPrismaChannel(entry.channel),
+    label: entry.label,
+    startTime: entry.startTime,
+    endTime: entry.endTime,
+    daysOfWeek: entry.daysOfWeek,
+    active: entry.active,
+    sortOrder: entry.sortOrder,
+  }))
+  const serializedChannelSettings = channelSettings.map((entry) => ({
+    channel: mapPrismaChannel(entry.channel),
+    enabled: entry.enabled,
+  }))
+
+  const channelAvailability = serializedSettings
+    ? {
+        delivery: getChannelAvailability(
+          'delivery',
+          new Date(),
+          serializedSettings,
+          serializedChannelSettings,
+          serializedSchedules
+        ),
+        local: getChannelAvailability('local', new Date(), serializedSettings, serializedChannelSettings, serializedSchedules),
+        pickup: getChannelAvailability('pickup', new Date(), serializedSettings, serializedChannelSettings, serializedSchedules),
+      }
+    : null
+
   return {
-    settings: settings ? serializeSettings(settings) : null,
+    settings: serializedSettings,
     categories: categories.map((category) => serializeCategory(category)),
     products: products.map(serializeProduct),
     promotions: promotions.map(serializePromotion),
+    channelSettings: serializedChannelSettings,
+    schedules: serializedSchedules,
+    channelAvailability,
+    deliveryZones: deliveryZones
+      .filter((zone) => zone.active)
+      .map((zone) => ({
+        id: zone.id,
+        name: zone.name,
+        deliveryFee: decimalToNumber(zone.deliveryFee),
+        minOrderAmount: decimalToNumber(zone.minOrderAmount),
+      })),
   }
 }
 
@@ -566,11 +674,24 @@ export async function getOperationalOrders() {
   return orders.map(serializeOrder)
 }
 
-export async function getTablesSnapshot() {
+export async function getTablesSnapshot(options?: { includeDeleted?: boolean; activeOnly?: boolean }) {
+  const where: {
+    deletedAt?: null | { not: null }
+    active?: boolean
+  } = {}
+
+  if (options?.includeDeleted) {
+    where.deletedAt = { not: null }
+  } else {
+    where.deletedAt = null
+  }
+
+  if (options?.activeOnly) {
+    where.active = true
+  }
+
   const tables = await prisma.diningTable.findMany({
-    where: {
-      deletedAt: null,
-    },
+    where,
     orderBy: { number: 'asc' },
     include: tableInclude,
   })
@@ -616,9 +737,7 @@ function buildTrackingCode() {
   return `TRK-${randomUUID().slice(0, 8).toUpperCase()}`
 }
 
-import { buildWhatsAppOrderMessage } from '@/lib/whatsapp-message'
-
-export async function createOrderFromPayload(payload: z.infer<typeof createOrderSchema>, createdByUserId?: string) {
+export async function createOrderFromPayload(payload: z.input<typeof createOrderSchema>, createdByUserId?: string) {
   const input = createOrderSchema.parse(payload)
   const settings = await prisma.businessSettings.findUnique({ where: { id: 'main' } })
 
@@ -628,6 +747,13 @@ export async function createOrderFromPayload(payload: z.infer<typeof createOrder
 
   if (!settings.isOpen && input.type !== 'table') {
     throw new Error('BUSINESS_CLOSED')
+  }
+
+  if (input.type !== 'table') {
+    const availability = await getOrderChannelAvailability(input.type, settings)
+    if (!availability.open) {
+      throw new Error('CHANNEL_CLOSED')
+    }
   }
 
   const productIds = [...new Set(input.items.map((item) => item.productId))]
@@ -654,6 +780,13 @@ export async function createOrderFromPayload(payload: z.infer<typeof createOrder
     throw new Error('INVALID_PRODUCTS')
   }
 
+  for (const product of products) {
+    if (product.trackStock && product.stock !== null) {
+      const requested = input.items.filter((i) => i.productId === product.id).reduce((s, i) => s + i.quantity, 0)
+      if (product.stock < requested) throw new Error('OUT_OF_STOCK')
+    }
+  }
+
   const serializedPromotions = activePromotions.map(serializePromotion)
 
   let diningTable:
@@ -671,11 +804,15 @@ export async function createOrderFromPayload(payload: z.infer<typeof createOrder
 
     const table = await prisma.diningTable.findUnique({
       where: { id: input.tableId },
-      select: { id: true, number: true },
+      select: { id: true, number: true, active: true, deletedAt: true },
     })
 
     if (!table) {
       throw new Error('TABLE_NOT_FOUND')
+    }
+
+    if (!table.active || table.deletedAt) {
+      throw new Error('TABLE_UNAVAILABLE')
     }
 
     diningTable = table
@@ -742,17 +879,45 @@ export async function createOrderFromPayload(payload: z.infer<typeof createOrder
   })
 
   const subtotal = itemsToCreate.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
-  const deliveryFee = input.type === 'delivery' ? decimalToNumber(settings.deliveryFee) : 0
+
+  let deliveryFee = input.type === 'delivery' ? decimalToNumber(settings.deliveryFee) : 0
+  let deliveryZoneId: string | undefined
+
+  if (input.type === 'delivery' && input.deliveryZoneId) {
+    const zone = await prisma.deliveryZone.findFirst({
+      where: { id: input.deliveryZoneId, active: true },
+    })
+    if (zone) {
+      deliveryFee = decimalToNumber(zone.deliveryFee)
+      deliveryZoneId = zone.id
+      const zoneMin = decimalToNumber(zone.minOrderAmount)
+      if (zoneMin > 0 && subtotal < zoneMin) throw new Error('MIN_ORDER_AMOUNT')
+    }
+  }
+
+  let discountAmount = 0
+  let discountCode: string | undefined
+  if (input.discountCode) {
+    const discount = await validateDiscountCode(input.discountCode, subtotal, input.paymentMethod)
+    discountAmount = discount.amount
+    discountCode = discount.code
+  }
 
   if (input.type !== 'table') {
     const minAmount = decimalToNumber(settings.minOrderAmount)
-    if (minAmount > 0 && subtotal < minAmount) {
+    if (minAmount > 0 && subtotal - discountAmount < minAmount) {
       throw new Error('MIN_ORDER_AMOUNT')
     }
   }
 
-  const tax = subtotal * decimalToNumber(settings.taxRate)
-  const total = subtotal + tax + deliveryFee
+  const tip = input.tip ?? 0
+  const tax = (subtotal - discountAmount) * decimalToNumber(settings.taxRate)
+  const total = Math.max(0, subtotal - discountAmount) + tax + deliveryFee + tip
+
+  const customer =
+    input.type !== 'table'
+      ? await upsertCustomerFromOrder(input.customerPhone, input.customerName, input.customerAddress)
+      : null
 
   const createdOrder = await prisma.order.create({
     data: {
@@ -785,6 +950,11 @@ export async function createOrderFromPayload(payload: z.infer<typeof createOrder
       subtotal,
       tax,
       deliveryFee,
+      tip,
+      discountCode,
+      discountAmount,
+      deliveryZoneId,
+      customerId: customer?.id,
       total,
       diningTableId: diningTable?.id,
       tableSessionId,
@@ -1150,32 +1320,59 @@ export async function getAnalytics(): Promise<AnalyticsOverview> {
     .filter((order) => order.status !== PrismaOrderStatus.CANCELLED)
     .reduce((sum, order) => sum + decimalToNumber(order.total), 0)
 
-  const salesByType = orders.reduce(
-    (accumulator, order) => {
-      if (order.status === PrismaOrderStatus.CANCELLED) return accumulator
-      const amount = decimalToNumber(order.total)
-      if (order.type === PrismaOrderType.DELIVERY) accumulator.delivery += amount
-      if (order.type === PrismaOrderType.PICKUP) accumulator.pickup += amount
-      if (order.type === PrismaOrderType.TABLE) accumulator.table += amount
-      return accumulator
-    },
-    { delivery: 0, pickup: 0, table: 0 }
-  )
+  const computeSalesByType = (orderList: typeof orders) =>
+    orderList.reduce(
+      (accumulator, order) => {
+        if (order.status === PrismaOrderStatus.CANCELLED) return accumulator
+        const amount = decimalToNumber(order.total)
+        if (order.type === PrismaOrderType.DELIVERY) accumulator.delivery += amount
+        if (order.type === PrismaOrderType.PICKUP) accumulator.pickup += amount
+        if (order.type === PrismaOrderType.TABLE) accumulator.table += amount
+        return accumulator
+      },
+      { delivery: 0, pickup: 0, table: 0 }
+    )
 
-  const productMap = new Map<string, { productName: string; quantity: number; revenue: number }>()
+  const salesByType = computeSalesByType(orders)
+  const salesByTypeToday = computeSalesByType(todayOrders)
+
+  const hourlyBuckets = Array.from({ length: 24 }, (_, hour) => ({ hour, revenue: 0 }))
+  for (const order of todayOrders) {
+    if (order.status === PrismaOrderStatus.CANCELLED) continue
+    hourlyBuckets[order.createdAt.getHours()].revenue += decimalToNumber(order.total)
+  }
+
+  const productMap = new Map<string, { productName: string; quantity: number; revenue: number; imageUrl?: string }>()
   for (const order of orders) {
     if (order.status === PrismaOrderStatus.CANCELLED) continue
     for (const item of order.items) {
-      const current = productMap.get(item.productId ?? item.productName) ?? {
+      const key = item.productId ?? item.productName
+      const current = productMap.get(key) ?? {
         productName: item.productName,
         quantity: 0,
         revenue: 0,
+        imageUrl: item.imageUrl ?? undefined,
       }
       current.quantity += item.quantity
       current.revenue += decimalToNumber(item.unitPrice) * item.quantity
-      productMap.set(item.productId ?? item.productName, current)
+      if (!current.imageUrl && item.imageUrl) current.imageUrl = item.imageUrl
+      productMap.set(key, current)
     }
   }
+
+  const mapProducts = (sortBy: 'quantity' | 'revenue') =>
+    [...productMap.entries()]
+      .map(([productId, value]) => ({
+        productId,
+        productName: value.productName,
+        quantity: value.quantity,
+        revenue: value.revenue,
+        imageUrl: value.imageUrl,
+      }))
+      .sort((left, right) =>
+        sortBy === 'quantity' ? right.quantity - left.quantity : right.revenue - left.revenue
+      )
+      .slice(0, 5)
 
   const dailyMap = new Map<string, { revenue: number; orders: number }>()
   for (const order of orders) {
@@ -1198,15 +1395,10 @@ export async function getAnalytics(): Promise<AnalyticsOverview> {
       (session) => session.closedAt && session.closedAt.toDateString() === now.toDateString()
     ).length,
     salesByType,
-    topProducts: [...productMap.entries()]
-      .map(([productId, value]) => ({
-        productId,
-        productName: value.productName,
-        quantity: value.quantity,
-        revenue: value.revenue,
-      }))
-      .sort((left, right) => right.quantity - left.quantity)
-      .slice(0, 5),
+    salesByTypeToday,
+    hourlySalesToday: hourlyBuckets,
+    topProducts: mapProducts('quantity'),
+    topProductsByRevenue: mapProducts('revenue'),
     dailySales: [...dailyMap.entries()]
       .map(([date, value]) => ({
         date,
@@ -1274,6 +1466,9 @@ export async function upsertProduct(id: string | null, payload: z.infer<typeof p
     featured: input.featured,
     available: input.available,
     preparationTime: input.preparationTime,
+    trackStock: input.trackStock,
+    stock: input.trackStock ? (input.stock ?? 0) : null,
+    lowStockThreshold: input.lowStockThreshold,
     images: {
       create: [
         {
@@ -1416,12 +1611,31 @@ export async function getAdminUsers() {
       name: true,
       email: true,
       role: true,
+      staffRole: true,
+      phone: true,
       avatarUrl: true,
       active: true,
     },
   })
 
   return users.map(serializeUser)
+}
+
+async function assertUniquePin(pin: string, excludeUserId?: string) {
+  const users = await prisma.user.findMany({
+    where: {
+      active: true,
+      pinHash: { not: null },
+      ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+    },
+    select: { id: true, pinHash: true },
+  })
+
+  for (const user of users) {
+    if (user.pinHash && (await bcrypt.compare(pin, user.pinHash))) {
+      throw new Error('USER_PIN_EXISTS')
+    }
+  }
 }
 
 export async function upsertUser(id: string | null, payload: z.infer<typeof userInputSchema>) {
@@ -1441,13 +1655,31 @@ export async function upsertUser(id: string | null, payload: z.infer<typeof user
     throw new Error('USER_PASSWORD_REQUIRED')
   }
 
+  if (input.pin) {
+    await assertUniquePin(input.pin, id ?? undefined)
+  }
+
   const baseData = {
     name: input.name,
     email: normalizedEmail,
     role: toPrismaUserRole(input.role),
+    staffRole: input.role === 'staff' ? toPrismaStaffRole(input.staffRole ?? 'runner') : null,
+    phone: input.phone || null,
     avatarUrl: input.avatar || null,
     active: input.active,
+    ...(input.pin ? { pinHash: await bcrypt.hash(input.pin, 10) } : {}),
   }
+
+  const userSelect = {
+    id: true,
+    name: true,
+    email: true,
+    role: true,
+    staffRole: true,
+    phone: true,
+    avatarUrl: true,
+    active: true,
+  } as const
 
   if (id) {
     const updated = await prisma.user.update({
@@ -1460,14 +1692,7 @@ export async function upsertUser(id: string | null, payload: z.infer<typeof user
             }
           : {}),
       },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        avatarUrl: true,
-        active: true,
-      },
+      select: userSelect,
     })
 
     return serializeUser(updated)
@@ -1478,15 +1703,135 @@ export async function upsertUser(id: string | null, payload: z.infer<typeof user
       ...baseData,
       passwordHash: await bcrypt.hash(input.password!, 10),
     },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      avatarUrl: true,
-      active: true,
-    },
+    select: userSelect,
   })
 
   return serializeUser(created)
+}
+
+async function getOrderChannelAvailability(
+  orderType: 'delivery' | 'pickup' | 'table',
+  settings: Prisma.BusinessSettingsGetPayload<object>
+) {
+  const [channelSettings, schedules] = await Promise.all([
+    prisma.channelSettings.findMany(),
+    prisma.channelSchedule.findMany({ orderBy: [{ channel: 'asc' }, { sortOrder: 'asc' }] }),
+  ])
+
+  return getChannelAvailability(
+    mapOrderTypeToChannel(orderType),
+    new Date(),
+    serializeSettings(settings),
+    channelSettings.map((entry) => ({
+      channel: mapPrismaChannel(entry.channel),
+      enabled: entry.enabled,
+    })),
+    schedules.map((entry) => ({
+      id: entry.id,
+      channel: mapPrismaChannel(entry.channel),
+      label: entry.label,
+      startTime: entry.startTime,
+      endTime: entry.endTime,
+      daysOfWeek: entry.daysOfWeek,
+      active: entry.active,
+      sortOrder: entry.sortOrder,
+    }))
+  )
+}
+
+export async function getChannelSchedulesData(): Promise<{
+  schedules: ChannelSchedule[]
+  channelSettings: ChannelSetting[]
+}> {
+  const [schedules, channelSettings] = await Promise.all([
+    prisma.channelSchedule.findMany({ orderBy: [{ channel: 'asc' }, { sortOrder: 'asc' }] }),
+    prisma.channelSettings.findMany(),
+  ])
+
+  return {
+    schedules: schedules.map((entry) => ({
+      id: entry.id,
+      channel: mapPrismaChannel(entry.channel),
+      label: entry.label,
+      startTime: entry.startTime,
+      endTime: entry.endTime,
+      daysOfWeek: entry.daysOfWeek,
+      active: entry.active,
+      sortOrder: entry.sortOrder,
+    })),
+    channelSettings: channelSettings.map((entry) => ({
+      channel: mapPrismaChannel(entry.channel),
+      enabled: entry.enabled,
+    })),
+  }
+}
+
+export const channelScheduleInputSchema = z.object({
+  id: z.string().optional(),
+  channel: z.enum(['delivery', 'local', 'pickup']),
+  label: z.string().trim().min(1).max(80),
+  startTime: z.string().trim().min(4).max(5),
+  endTime: z.string().trim().min(4).max(5),
+  daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1),
+  active: z.boolean().default(true),
+  sortOrder: z.number().int().min(0).default(0),
+})
+
+export async function upsertChannelSchedule(payload: z.infer<typeof channelScheduleInputSchema>) {
+  const input = channelScheduleInputSchema.parse(payload)
+  const data = {
+    channel: mapToPrismaChannel(input.channel),
+    label: input.label,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    daysOfWeek: input.daysOfWeek,
+    active: input.active,
+    sortOrder: input.sortOrder,
+  }
+
+  if (input.id) {
+    const updated = await prisma.channelSchedule.update({
+      where: { id: input.id },
+      data,
+    })
+    return {
+      id: updated.id,
+      channel: mapPrismaChannel(updated.channel),
+      label: updated.label,
+      startTime: updated.startTime,
+      endTime: updated.endTime,
+      daysOfWeek: updated.daysOfWeek,
+      active: updated.active,
+      sortOrder: updated.sortOrder,
+    } satisfies ChannelSchedule
+  }
+
+  const created = await prisma.channelSchedule.create({ data })
+  return {
+    id: created.id,
+    channel: mapPrismaChannel(created.channel),
+    label: created.label,
+    startTime: created.startTime,
+    endTime: created.endTime,
+    daysOfWeek: created.daysOfWeek,
+    active: created.active,
+    sortOrder: created.sortOrder,
+  } satisfies ChannelSchedule
+}
+
+export async function deleteChannelSchedule(id: string) {
+  await prisma.channelSchedule.delete({ where: { id } })
+}
+
+export async function updateChannelSettings(channel: ChannelSetting['channel'], enabled: boolean) {
+  const updated = await prisma.channelSettings.upsert({
+    where: { channel: mapToPrismaChannel(channel) },
+    update: { enabled },
+    create: { channel: mapToPrismaChannel(channel), enabled },
+  })
+
+  return {
+    channel: mapPrismaChannel(updated.channel),
+    enabled: updated.enabled,
+  } satisfies ChannelSetting
 }

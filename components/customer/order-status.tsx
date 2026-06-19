@@ -182,6 +182,11 @@ export function OrderStatusPage() {
                           <span>Total</span>
                           <span className="font-serif">${order.total.toFixed(2)}</span>
                         </div>
+                        {order.publicTrackingCode ? (
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            Código de seguimiento: <span className="font-mono">{order.publicTrackingCode}</span>
+                          </p>
+                        ) : null}
                       </div>
 
                       {/* Order Type */}

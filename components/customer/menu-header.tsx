@@ -32,6 +32,7 @@ export function MenuHeader({
 }: MenuHeaderProps) {
   const { tableSession, isLoading, error } = useTableSession()
   const hasTableIndicator = isLoading || Boolean(tableSession) || Boolean(error)
+  const isPromoPage = selectedCategory === 'promo'
 
   return (
     <div
@@ -44,7 +45,7 @@ export function MenuHeader({
             <img
               src={LOGO_SRC_SVG}
               alt="Coty Café"
-              className="h-20 w-auto object-contain mix-blend-screen"
+              className="h-16 w-auto object-contain mix-blend-screen"
             />
           </Link>
 
@@ -82,6 +83,8 @@ export function MenuHeader({
                   {searchResultCount === 1 ? 'producto encontrado' : 'productos encontrados'}
                 </p>
               </>
+            ) : isPromoPage ? (
+              <h1 className="my-4 text-xl font-bold text-white md:text-2xl">Promos</h1>
             ) : hasTableIndicator ? null : (
               <h1 className="my-4 text-xl font-bold text-white md:text-2xl">Menú</h1>
             )}

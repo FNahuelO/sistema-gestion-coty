@@ -55,7 +55,7 @@ function optionsKey(options: SelectedOption[], notes?: string) {
   return `${JSON.stringify(options)}|${notes ?? ''}`
 }
 
-export function WaitressPanel({ embedded = false }: { embedded?: boolean }) {
+export function TablesSection({ embedded = false }: { embedded?: boolean }) {
   const { tables, updateTableStatus, closeTable, createTableOrder } = useTables()
   const { orders } = useOrders()
   const { products, categories, promotions, settings } = useCatalog()

@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTablesSnapshot, requireSessionRole, tableInputSchema, upsertTable } from '@/lib/server-data'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    await requireSessionRole(['admin', 'staff'])
-    const tables = await getTablesSnapshot()
+    const user = await requireSessionRole(['admin', 'staff'])
+    const includeDeleted = request.nextUrl.searchParams.get('includeDeleted') === 'true'
+
+    const tables = await getTablesSnapshot({
+      includeDeleted,
+      activeOnly: user.role === 'staff',
+    })
     return NextResponse.json(tables)
   } catch (error) {
     if (error instanceof Error && error.message === 'UNAUTHORIZED') {

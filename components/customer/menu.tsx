@@ -49,6 +49,7 @@ export function MenuPage() {
         isSearchMode={isSearchMode}
         searchResults={searchResults}
         selectedCategory={selectedCategory}
+        products={products}
         menuSections={menuSections}
         categoryProducts={categoryProducts}
         activeCategoryName={activeCategoryName}

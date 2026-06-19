@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error) {
       const knownMessages = new Map<string, [string, number]>([
         ['BUSINESS_CLOSED', ['El local se encuentra cerrado en este momento', 400]],
+        ['CHANNEL_CLOSED', ['Este canal no está disponible en este horario', 400]],
         ['INVALID_PRODUCTS', ['Hay productos inválidos o no disponibles', 400]],
         ['INVALID_PRODUCT', ['Producto inválido', 400]],
         ['INVALID_OPTION', ['Opción de producto inválida', 400]],

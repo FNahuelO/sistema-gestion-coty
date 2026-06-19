@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { SessionProvider, signIn, signOut, useSession } from 'next-auth/react'
-import type { AnalyticsOverview, BusinessSettings, CartItem, Category, Order, OrderStatus, PaymentMethod, Product, Promotion, SelectedOption, Table, User } from '@/lib/types'
+import type { AnalyticsOverview, BusinessSettings, CartItem, Category, ChannelSchedule, ChannelSetting, Order, OrderStatus, PaymentMethod, Product, Promotion, SelectedOption, Table, User } from '@/lib/types'
 import { getOfflineCache, isBrowserOffline, OFFLINE_CACHE_KEYS, setOfflineCache } from '@/lib/offline-cache'
 import {
   enqueueOfflineOrder,
@@ -28,6 +28,9 @@ type AdminUserInput = {
   name: string
   email: string
   role: User['role']
+  staffRole?: User['staffRole'] | null
+  phone?: string
+  pin?: string
   avatar?: string
   active: boolean
   password?: string
@@ -41,6 +44,8 @@ type AdminData = {
   tables: Table[]
   orders: Order[]
   settings: BusinessSettings | null
+  schedules: ChannelSchedule[]
+  channelSettings: ChannelSetting[]
   analytics: AnalyticsOverview | null
   history: Order[]
   addProduct: (payload: Omit<Product, 'id'>) => Promise<Product>
@@ -55,10 +60,15 @@ type AdminData = {
   addTable: (payload: Omit<Table, 'id'>) => Promise<Table>
   updateTable: (id: string, payload: Partial<Omit<Table, 'id'>>) => Promise<Table>
   deleteTable: (id: string) => Promise<void>
+  restoreTable: (id: string) => Promise<Table>
+  createTableOrder: (tableId: string, items: Array<{ productId: string; quantity: number; selectedOptions: SelectedOption[]; notes?: string }>) => Promise<void>
   addUser: (payload: AdminUserInput) => Promise<User>
   updateUser: (id: string, payload: AdminUserInput) => Promise<User>
   deleteUser: (id: string) => Promise<void>
   updateSettings: (payload: BusinessSettings) => Promise<BusinessSettings>
+  saveSchedule: (payload: Omit<ChannelSchedule, 'id'> & { id?: string }) => Promise<ChannelSchedule>
+  deleteSchedule: (id: string) => Promise<void>
+  updateChannelSetting: (channel: ChannelSetting['channel'], enabled: boolean) => Promise<ChannelSetting>
   exportSalesUrl: (format?: 'xlsx' | 'csv') => string
   refreshAll: () => Promise<void>
 }
@@ -371,14 +381,14 @@ export function useAuth() {
       name: data.user.name ?? '',
       email: data.user.email ?? '',
       role: data.user.role,
+      staffRole: data.user.staffRole ?? undefined,
       avatar: data.user.avatar ?? undefined,
     }
   }, [data])
 
-  const login = useCallback(async (email: string, password: string) => {
+  const loginWithCredentials = useCallback(async (credentials: Record<string, string>) => {
     const result = await signIn('credentials', {
-      email,
-      password,
+      ...credentials,
       redirect: false,
     })
 
@@ -394,9 +404,29 @@ export function useAuth() {
       name: session.user.name ?? '',
       email: session.user.email ?? '',
       role: session.user.role,
+      staffRole: session.user.staffRole ?? undefined,
       avatar: session.user.avatar ?? undefined,
     } satisfies User
   }, [])
+
+  const login = useCallback(
+    async (email: string, password: string) =>
+      loginWithCredentials({
+        loginMode: 'password',
+        email,
+        password,
+      }),
+    [loginWithCredentials]
+  )
+
+  const loginWithPin = useCallback(
+    async (pin: string) =>
+      loginWithCredentials({
+        loginMode: 'pin',
+        pin,
+      }),
+    [loginWithCredentials]
+  )
 
   const logout = useCallback(async () => {
     await signOut({ redirect: false })
@@ -405,6 +435,7 @@ export function useAuth() {
   return {
     user,
     login,
+    loginWithPin,
     logout,
     isLoading: status === 'loading',
   }
@@ -448,6 +479,8 @@ export function useCatalog() {
     categories: Category[]
     products: Product[]
     promotions: Array<Promotion & { validFrom: string | Date; validTo: string | Date }>
+    channelAvailability?: Record<'delivery' | 'local' | 'pickup', { open: boolean; reason?: string }> | null
+    deliveryZones?: Array<{ id: string; name: string; deliveryFee: number; minOrderAmount: number }>
   }
 
   const { data, error, isLoading, mutate } = useSWR<CatalogData>(
@@ -464,6 +497,8 @@ export function useCatalog() {
     categories: data?.categories ?? [],
     products: data?.products ?? [],
     promotions: (data?.promotions ?? []).map(parsePromotion),
+    channelAvailability: data?.channelAvailability ?? null,
+    deliveryZones: data?.deliveryZones ?? [],
     error,
     isLoading,
     isOfflineCache: isBrowserOffline() && Boolean(getOfflineCache(OFFLINE_CACHE_KEYS.catalog)),
@@ -750,6 +785,10 @@ export function useAdminData(): AdminData {
     fetchJson
   )
   const { data: settingsData, mutate: mutateSettings } = useSWR<BusinessSettings>('/api/admin/settings', fetchJson)
+  const { data: schedulesData, mutate: mutateSchedules } = useSWR<{ schedules: ChannelSchedule[]; channelSettings: ChannelSetting[] }>(
+    '/api/admin/schedules',
+    fetchJson
+  )
   const { data: tablesData, mutate: mutateTables } = useSWR<Table[]>('/api/tables', fetchJson)
   const { data: ordersData, mutate: mutateOrders } = useSWR<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
     '/api/orders',
@@ -771,12 +810,13 @@ export function useAdminData(): AdminData {
       mutateCategories(),
       mutatePromotions(),
       mutateSettings(),
+      mutateSchedules(),
       mutateTables(),
       mutateOrders(),
       mutateAnalytics(),
       mutateHistory(),
     ])
-  }, [mutateAnalytics, mutateCategories, mutateHistory, mutateOrders, mutateProducts, mutatePromotions, mutateSettings, mutateTables, mutateUsers])
+  }, [mutateAnalytics, mutateCategories, mutateHistory, mutateOrders, mutateProducts, mutatePromotions, mutateSchedules, mutateSettings, mutateTables, mutateUsers])
 
   return {
     users: usersData ?? [],
@@ -786,6 +826,8 @@ export function useAdminData(): AdminData {
     tables: tablesData ?? [],
     orders: (ordersData ?? []).map(parseOrder),
     settings: settingsData ?? null,
+    schedules: schedulesData?.schedules ?? [],
+    channelSettings: schedulesData?.channelSettings ?? [],
     analytics: analyticsData ?? null,
     history: (historyData ?? []).map(parseOrder),
     addProduct: async (payload) => {
@@ -846,6 +888,15 @@ export function useAdminData(): AdminData {
       await fetch(`/api/tables/${id}`, { method: 'DELETE', credentials: 'include' })
       await mutateTables()
     },
+    restoreTable: async (id) => {
+      const table = await sendJson<Table>(`/api/tables/${id}`, 'PATCH', { restore: true })
+      await mutateTables()
+      return table
+    },
+    createTableOrder: async (tableId, items) => {
+      await sendJson(`/api/tables/${tableId}/orders`, 'POST', { items })
+      await Promise.all([mutateTables(), mutateOrders()])
+    },
     addUser: async (payload) => {
       const user = await sendJson<User>('/api/admin/users', 'POST', payload)
       await mutateUsers()
@@ -864,6 +915,20 @@ export function useAdminData(): AdminData {
       const settings = await sendJson<BusinessSettings>('/api/admin/settings', 'PATCH', payload)
       await mutateSettings()
       return settings
+    },
+    saveSchedule: async (payload) => {
+      const schedule = await sendJson<ChannelSchedule>('/api/admin/schedules', 'POST', payload)
+      await mutateSchedules()
+      return schedule
+    },
+    deleteSchedule: async (id) => {
+      await sendJson('/api/admin/schedules', 'DELETE', { id })
+      await mutateSchedules()
+    },
+    updateChannelSetting: async (channel, enabled) => {
+      const setting = await sendJson<ChannelSetting>('/api/admin/channel-settings', 'PATCH', { channel, enabled })
+      await mutateSchedules()
+      return setting
     },
     exportSalesUrl: (format = 'xlsx') => `/api/admin/exports/sales?format=${format}`,
     refreshAll,

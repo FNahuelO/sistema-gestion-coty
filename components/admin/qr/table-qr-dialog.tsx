@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import { QrCode } from 'lucide-react'
 import { NativeDialog } from '@/components/ui/native-dialog'
 import { Button } from '@/components/ui/button'
-import { QrCodeCard } from '@/components/admin/qr-code-card'
+import { QrCodeCard } from '@/components/admin/qr/qr-code-card'
 import { buildMenuUrl, getAppBaseUrl } from '@/lib/menu-url'
 import type { Table } from '@/lib/types'
 
@@ -50,7 +50,7 @@ export function TableQrButton({ onClick }: TableQrButtonProps) {
       type="button"
       variant="outline"
       size="sm"
-      className="border-[#C5DDD9] bg-white text-[#2D5A57] hover:bg-[#C5DDD9]/40"
+      className="h-9 min-h-[44px] border-[#C5DDD9] bg-white px-3 text-[#2D5A57] hover:bg-[#C5DDD9]/40 sm:h-8 sm:min-h-0"
       onClick={onClick}
     >
       <QrCode className="mr-1.5 h-3.5 w-3.5" />

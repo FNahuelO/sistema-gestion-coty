@@ -83,7 +83,7 @@ function StatCard({
   )
 }
 
-export function CashierDashboard({ embedded = false }: { embedded?: boolean }) {
+export function OrdersSection({ embedded = false }: { embedded?: boolean }) {
   const { orders, updateOrderStatus, closeOrder } = useOrders()
   const { isPending, isBusy, run } = usePendingAction()
   const previousPendingCount = useRef<number | null>(null)
@@ -231,10 +231,10 @@ export function CashierDashboard({ embedded = false }: { embedded?: boolean }) {
         </div>
 
         <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-          <TabsList className="h-auto w-full justify-start gap-1 bg-[#F8FBFA] p-1">
+          <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto bg-[#F8FBFA] p-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <TabsTrigger
               value="all"
-              className="gap-1.5 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
+              className="min-h-11 shrink-0 gap-1.5 px-3 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
             >
               <Package className="h-4 w-4" />
               Todos
@@ -246,21 +246,21 @@ export function CashierDashboard({ embedded = false }: { embedded?: boolean }) {
             </TabsTrigger>
             <TabsTrigger
               value="delivery"
-              className="gap-1.5 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
+              className="min-h-11 shrink-0 gap-1.5 px-3 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
             >
               <Truck className="h-4 w-4" />
               Delivery
             </TabsTrigger>
             <TabsTrigger
               value="pickup"
-              className="gap-1.5 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
+              className="min-h-11 shrink-0 gap-1.5 px-3 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
             >
               <Store className="h-4 w-4" />
               Recoger
             </TabsTrigger>
             <TabsTrigger
               value="table"
-              className="gap-1.5 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
+              className="min-h-11 shrink-0 gap-1.5 px-3 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
             >
               <Users className="h-4 w-4" />
               Mesas

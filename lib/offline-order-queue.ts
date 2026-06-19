@@ -21,6 +21,9 @@ export type CreateOrderPayload = {
   customerPhone: string
   customerAddress?: string
   tableId?: string
+  deliveryZoneId?: string
+  discountCode?: string
+  tip?: number
   notes?: string
   items: CreateOrderItemInput[]
 }

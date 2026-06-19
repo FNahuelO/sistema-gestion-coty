@@ -78,3 +78,10 @@ export function getPromotedProducts(products: Product[], promotions: Promotion[]
     (product) => product.available && getProductDiscountPercent(product, promotions, now) > 0
   )
 }
+
+export function getProductsForPromotion(products: Product[], promotion: Promotion, now = new Date()) {
+  if (!isPromotionActive(promotion, now)) return []
+  return products.filter(
+    (product) => product.available && promotionAppliesToProduct(promotion, product)
+  )
+}

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { AdminDashboard } from '@/components/admin/admin-dashboard'
 import { AuthProvider, useAuth } from '@/lib/store'
 import { LoadingScreen } from '@/components/shared/loading'
+import { canAccessAdmin } from '@/lib/permissions'
 
 function AdminContent() {
   const { user, isLoading } = useAuth()
@@ -13,12 +14,15 @@ function AdminContent() {
   useEffect(() => {
     if (!isLoading && !user) {
       router.push('/login')
-    } else if (!isLoading && user?.role !== 'admin') {
+      return
+    }
+
+    if (!isLoading && user && !canAccessAdmin({ role: user.role === 'admin' ? 'admin' : 'staff', staffRole: user.staffRole })) {
       router.push('/staff')
     }
   }, [isLoading, router, user])
 
-  if (isLoading || !user || user.role !== 'admin') {
+  if (isLoading || !user || !canAccessAdmin({ role: user.role === 'admin' ? 'admin' : 'staff', staffRole: user.staffRole })) {
     return <LoadingScreen />
   }
 

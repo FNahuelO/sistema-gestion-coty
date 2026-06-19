@@ -1,6 +1,6 @@
 import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
-import { isStaffRole } from '@/lib/types'
+import { canAccessAdmin, mapStaffRole } from '@/lib/permissions'
 
 export default withAuth(
   function proxy(req) {
@@ -16,15 +16,19 @@ export default withAuth(
         const pathname = req.nextUrl.pathname
 
         if (pathname.startsWith('/admin')) {
-          return token?.role === 'admin'
+          if (!token?.role) return false
+          return canAccessAdmin({
+            role: token.role,
+            staffRole: mapStaffRole(token.staffRole as string | null | undefined),
+          })
         }
 
         if (pathname.startsWith('/staff')) {
-          return isStaffRole(token?.role) || token?.role === 'admin'
+          return token?.role === 'admin' || token?.role === 'staff'
         }
 
         if (pathname.startsWith('/cashier') || pathname.startsWith('/waitress')) {
-          return isStaffRole(token?.role) || token?.role === 'admin'
+          return token?.role === 'admin' || token?.role === 'staff'
         }
 
         return !!token

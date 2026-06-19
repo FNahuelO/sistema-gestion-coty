@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { getAnalytics, requireSessionRole } from '@/lib/server-data'
+import { getAnalytics, requirePermission } from '@/lib/server-data'
 
 export async function GET() {
   try {
-    await requireSessionRole(['admin'])
+    await requirePermission('analytics:read')
     const analytics = await getAnalytics()
     return NextResponse.json(analytics)
   } catch (error) {
