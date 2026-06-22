@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { X, UtensilsCrossed, BellRing } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { COTY_HEADER, COTY_TEAL } from '@/lib/coty-theme'
+import { COTY_HEADER } from '@/lib/coty-theme'
 import { cn } from '@/lib/utils'
 import { useTableSession } from '@/lib/store'
 import { toast } from 'sonner'

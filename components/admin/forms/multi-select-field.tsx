@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, type ComponentProps, type ReactNode } from 'react'
+import { useMemo, useState, type ComponentProps } from 'react'
 import { ChevronDown, Search, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

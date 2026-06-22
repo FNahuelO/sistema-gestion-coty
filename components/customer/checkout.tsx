@@ -2,11 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import {
-  MessageSquare,
-  Bike,
-  ShoppingCart,
   ShoppingBag,
   ArrowRight,
   Check,
@@ -100,9 +97,10 @@ function CheckoutSection({
 
 export function CheckoutPage() {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { items, hydrated, updateQuantity, removeItem, clearCart } = useCart()
   const { settings, isLoading: isSettingsLoading } = useBusiness()
-  const { promotions, channelAvailability, deliveryZones } = useCatalog()
+  const { promotions, channelAvailability, deliveryZones, mercadoPagoAvailable } = useCatalog()
   const { subtotal, discount, total } = useCartPricing(items, promotions)
   const { addOrder } = useOrders()
   const { tableSession, isTableMode, hydrated: tableSessionHydrated } = useTableSession()
@@ -165,6 +163,18 @@ export function CheckoutPage() {
   useEffect(() => {
     setConfirmOpen(false)
   }, [pathname])
+
+  useEffect(() => {
+    if (searchParams.get('status') === 'failure') {
+      toast.error('El pago con Mercado Pago no se completó. Podés reintentar o elegir otro método.')
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    if (!mercadoPagoAvailable && paymentMethod === 'mercado_pago') {
+      setPaymentMethod('cash')
+    }
+  }, [mercadoPagoAvailable, paymentMethod])
 
   const generateWhatsAppMessage = (order: Order) => {
     if (!settings.whatsapp) return null
@@ -250,16 +260,26 @@ export function CheckoutPage() {
         const paymentOrder = await fetch('/api/payments/mercadopago/create-preference', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId: createdOrder.id }),
+          body: JSON.stringify({
+            orderId: createdOrder.id,
+            trackingProof: createdOrder.trackingProof,
+          }),
         }).then(async (response) => {
           const payload = await response.json()
           if (!response.ok) {
             throw new Error(payload?.error ?? 'No se pudo iniciar el pago online')
           }
-          return payload as Order
+          return payload as Pick<Order, 'paymentUrl'>
         })
 
-        const whatsappUrl = generateWhatsAppMessage(createdOrder)
+        const whatsappOrder: Order = {
+          ...createdOrder,
+          customerName,
+          customerPhone,
+          customerAddress: activeOrderType === 'delivery' ? customerAddress : undefined,
+          items,
+        }
+        const whatsappUrl = generateWhatsAppMessage(whatsappOrder)
         if (whatsappUrl) {
           window.open(whatsappUrl, '_blank')
         }
@@ -277,7 +297,14 @@ export function CheckoutPage() {
         toast.success('Pedido guardado. Se enviará automáticamente al recuperar conexión.')
       }
 
-      const whatsappUrl = generateWhatsAppMessage(createdOrder)
+      const whatsappOrder: Order = {
+        ...createdOrder,
+        customerName,
+        customerPhone,
+        customerAddress: activeOrderType === 'delivery' ? customerAddress : undefined,
+        items,
+      }
+      const whatsappUrl = generateWhatsAppMessage(whatsappOrder)
       if (whatsappUrl) {
         window.open(whatsappUrl, '_blank')
       }
@@ -659,7 +686,7 @@ export function CheckoutPage() {
                     { value: 'cash', label: 'Efectivo', icon: Banknote },
                     { value: 'card', label: 'Tarjeta (al recibir)', icon: CreditCard },
                     { value: 'transfer', label: 'Transferencia', icon: Building2 },
-                    ...(isTableMode
+                    ...(isTableMode || !mercadoPagoAvailable
                       ? []
                       : [{ value: 'mercado_pago' as const, label: 'Mercado Pago', icon: CreditCard }]),
                   ].map(({ value, label, icon: Icon }) => (

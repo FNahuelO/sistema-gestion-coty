@@ -285,6 +285,7 @@ model BusinessSettings {
   deliveryFee    Decimal  @db.Decimal(10, 2)
   minOrderAmount Decimal  @db.Decimal(10, 2)
   taxRate        Decimal  @db.Decimal(5, 4)
+  mercadoPagoEnabled Boolean @default(true)
   updatedAt      DateTime @updatedAt
 }
 

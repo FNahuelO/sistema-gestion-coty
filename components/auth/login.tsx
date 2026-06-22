@@ -180,21 +180,23 @@ export function LoginPage() {
               </TabsContent>
             </Tabs>
 
-            <div className="rounded-xl border border-gray-100 bg-[#F8FBFA] p-4">
-              <p className={cn(PANEL_TITLE, 'mb-2 text-xs')}>Cuentas de prueba</p>
-              <div className="space-y-1 text-xs text-muted-foreground">
-                <p>
-                  <span className="font-medium text-[#2D5A57]">Admin:</span> admin@cotycafe.com
-                </p>
-                <p>
-                  <span className="font-medium text-[#2D5A57]">Cajero:</span> cajero@cotycafe.com · PIN 4321
-                </p>
-                <p>
-                  <span className="font-medium text-[#2D5A57]">Cadete:</span> cadete@cotycafe.com · PIN 5678
-                </p>
-                <p className="mt-2 italic">Contraseña de prueba: cotycafe123</p>
+            {process.env.NODE_ENV === 'development' ? (
+              <div className="rounded-xl border border-gray-100 bg-[#F8FBFA] p-4">
+                <p className={cn(PANEL_TITLE, 'mb-2 text-xs')}>Cuentas de prueba</p>
+                <div className="space-y-1 text-xs text-muted-foreground">
+                  <p>
+                    <span className="font-medium text-[#2D5A57]">Admin:</span> admin@cotycafe.com
+                  </p>
+                  <p>
+                    <span className="font-medium text-[#2D5A57]">Cajero:</span> cajero@cotycafe.com · PIN 4321
+                  </p>
+                  <p>
+                    <span className="font-medium text-[#2D5A57]">Cadete:</span> cadete@cotycafe.com · PIN 5678
+                  </p>
+                  <p className="mt-2 italic">Contraseña de prueba: cotycafe123</p>
+                </div>
               </div>
-            </div>
+            ) : null}
           </div>
         </div>
       </motion.div>

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireSessionRole, serializeSettings, settingsInputSchema, updateSettings } from '@/lib/server-data'
+import { requirePermission, serializeSettings, settingsInputSchema, updateSettings } from '@/lib/server-data'
 
 export async function GET() {
   try {
-    await requireSessionRole(['admin'])
+    await requirePermission('settings:read')
     const settings = await prisma.businessSettings.findUnique({
       where: { id: 'main' },
     })
@@ -30,7 +30,7 @@ export async function GET() {
 
 export async function PATCH(request: NextRequest) {
   try {
-    await requireSessionRole(['admin'])
+    await requirePermission('settings:write')
     const settings = await updateSettings(settingsInputSchema.parse(await request.json()))
     return NextResponse.json(settings)
   } catch (error) {

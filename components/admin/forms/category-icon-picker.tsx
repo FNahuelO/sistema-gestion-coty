@@ -8,7 +8,8 @@ import { NativeDialog, NATIVE_SCROLL_CLASS } from '@/components/ui/native-dialog
 import { useIsMobile } from '@/hooks/use-mobile'
 import { COTY_TEAL } from '@/lib/coty-theme'
 import { CATEGORY_ICON_OPTIONS } from '@/lib/category-icon-options'
-import { formatCategoryIconLabel, getCategoryIcon } from '@/lib/category-icons'
+import { formatCategoryIconLabel } from '@/lib/category-icons'
+import { renderCategoryIcon } from '@/lib/render-category-icon'
 import { cn } from '@/lib/utils'
 
 type CategoryIconPickerProps = {
@@ -32,7 +33,6 @@ function IconPickerGrid({
   return (
     <div className="grid grid-cols-6 gap-1 sm:grid-cols-7">
       {filteredIcons.map((option) => {
-        const Icon = getCategoryIcon(option.slug)
         const isSelected = value === option.slug
         return (
           <button
@@ -47,7 +47,7 @@ function IconPickerGrid({
                 : 'text-muted-foreground hover:bg-[#F8FBFA] hover:text-[#2D5A57]'
             )}
           >
-            <Icon className="h-4 w-4" />
+            {renderCategoryIcon(option.slug, { className: 'h-4 w-4' })}
           </button>
         )
       })}
@@ -92,8 +92,6 @@ function PickerTrigger({
   value,
   ...props
 }: { value: string } & ComponentProps<'button'>) {
-  const SelectedIcon = getCategoryIcon(value)
-
   return (
     <button
       type="button"
@@ -105,7 +103,7 @@ function PickerTrigger({
     >
       <span className="flex min-w-0 items-center gap-2">
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#F8FBFA]">
-          <SelectedIcon className="h-4 w-4" style={{ color: COTY_TEAL }} />
+          {renderCategoryIcon(value, { className: 'h-4 w-4', style: { color: COTY_TEAL } })}
         </span>
         <span className="truncate text-foreground">
           {value ? formatCategoryIconLabel(value) : 'Elegir icono'}

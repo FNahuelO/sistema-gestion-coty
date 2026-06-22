@@ -3,13 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   getOfflineOrderQueue,
-  getPendingOfflineOrders,
   OFFLINE_QUEUE_CHANGED_EVENT,
   queuedEntryToOrder,
   type QueuedOrderEntry,
 } from '@/lib/offline-order-queue'
 import { syncOfflineOrderQueue } from '@/lib/offline-order-sync'
-import type { Order } from '@/lib/types'
 
 export function useOfflineQueue() {
   const [queue, setQueue] = useState<QueuedOrderEntry[]>([])

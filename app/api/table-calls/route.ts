@@ -25,6 +25,12 @@ export async function POST(request: NextRequest) {
     const call = await createTableCall(tableId)
     return NextResponse.json(call)
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 })
+    }
+    if (error instanceof Error && error.message === 'TABLE_NOT_FOUND') {
+      return NextResponse.json({ error: 'Mesa no encontrada' }, { status: 404 })
+    }
     console.error('POST /api/table-calls', error)
     return NextResponse.json({ error: 'No se pudo solicitar al mozo' }, { status: 500 })
   }

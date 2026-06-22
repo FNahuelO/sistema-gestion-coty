@@ -8,7 +8,7 @@ import { MenuSectionHeader } from '@/components/customer/menu-section-header'
 import { MenuGridProductCard } from '@/components/customer/menu-grid-product-card'
 import { MenuListProductCard } from '@/components/customer/menu-list-product-card'
 import { PromosView, PromosLoadingSkeleton } from '@/components/customer/promos-view'
-import { getCategoryIcon } from '@/lib/category-icons'
+import { renderCategoryIcon } from '@/lib/render-category-icon'
 import type { MenuCategoryId, MenuSection } from '@/lib/menu-categories'
 import { cn } from '@/lib/utils'
 
@@ -222,12 +222,10 @@ function AllCategoriesView({
 
   return (
     <div className="space-y-8">
-      {menuSections.map((section) => {
-        const Icon = getCategoryIcon(section.icon)
-        return (
+      {menuSections.map((section) => (
           <section key={section.id} className="space-y-4">
             <MenuSectionHeader
-              icon={<Icon className="h-6 w-6 text-[#7EC8C4]" strokeWidth={1.75} />}
+              icon={renderCategoryIcon(section.icon, { className: 'h-6 w-6 text-[#7EC8C4]', strokeWidth: 1.75 })}
               name={section.name}
               count={section.products.length}
             />
@@ -245,8 +243,7 @@ function AllCategoriesView({
               ))}
             </div>
           </section>
-        )
-      })}
+        ))}
     </div>
   )
 }
@@ -287,13 +284,13 @@ function SingleCategoryView({
     )
   }
 
-  const Icon = getCategoryIcon(categoryId === 'promo' ? 'Star' : categoryIcon ?? 'UtensilsCrossed')
+  const iconName = categoryId === 'promo' ? 'Star' : categoryIcon ?? 'UtensilsCrossed'
 
   return (
     <>
       {categoryName && (
         <MenuSectionHeader
-          icon={<Icon className="h-7 w-7 text-[#7EC8C4]" strokeWidth={1.75} />}
+          icon={renderCategoryIcon(iconName, { className: 'h-7 w-7 text-[#7EC8C4]', strokeWidth: 1.75 })}
           name={categoryName}
           count={products.length}
           className="mb-4"

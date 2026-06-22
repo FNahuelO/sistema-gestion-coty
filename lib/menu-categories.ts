@@ -17,11 +17,7 @@ export function resolveMenuCategoryId(value: string | null): MenuCategoryId {
   return value
 }
 
-export function buildMenuSections(
-  products: Product[],
-  categories: Category[],
-  promotions: Promotion[] = []
-): MenuSection[] {
+export function buildMenuSections(products: Product[], categories: Category[]): MenuSection[] {
   const available = products.filter((product) => product.available)
   const activeCategories = [...categories]
     .filter((category) => category.active !== false)

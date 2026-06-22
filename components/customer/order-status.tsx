@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   Coffee,
@@ -21,6 +22,7 @@ import { EmptyState } from '@/components/shared/empty-state'
 import type { OrderStatus } from '@/lib/types'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { toast } from 'sonner'
 
 const statusSteps: { status: OrderStatus; label: string; icon: React.ElementType }[] = [
   { status: 'pending', label: 'Pendiente', icon: Clock },
@@ -29,9 +31,47 @@ const statusSteps: { status: OrderStatus; label: string; icon: React.ElementType
   { status: 'ready', label: 'Listo', icon: CheckCircle2 },
 ]
 
-export function OrderStatusPage() {
+function PaymentReturnNotice({ status }: { status: string | null }) {
+  if (status === 'approved') {
+    return (
+      <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+        <div className="flex items-center gap-2 font-medium">
+          <CheckCircle2 className="h-4 w-4" />
+          Pago aprobado
+        </div>
+        <p className="mt-1 text-emerald-800">Tu pedido fue confirmado. Acá podés seguir el estado en tiempo real.</p>
+      </div>
+    )
+  }
+
+  if (status === 'pending') {
+    return (
+      <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <div className="flex items-center gap-2 font-medium">
+          <Clock className="h-4 w-4" />
+          Pago pendiente
+        </div>
+        <p className="mt-1 text-amber-800">Mercado Pago está procesando el pago. Actualizaremos el estado cuando se acredite.</p>
+      </div>
+    )
+  }
+
+  return null
+}
+
+function OrderStatusContent() {
+  const searchParams = useSearchParams()
+  const paymentStatus = searchParams.get('status')
   const [searchId, setSearchId] = useState('')
   const { orders } = useTrackedOrders(searchId)
+
+  useEffect(() => {
+    if (paymentStatus === 'approved') {
+      toast.success('¡Pago confirmado! Tu pedido ya está en preparación.')
+    } else if (paymentStatus === 'pending') {
+      toast.message('Pago pendiente de confirmación')
+    }
+  }, [paymentStatus])
 
   const filteredOrders = orders.filter((order) => order.type !== 'table')
 
@@ -73,6 +113,7 @@ export function OrderStatusPage() {
       </header>
 
       <main className="container px-4 py-6">
+        <PaymentReturnNotice status={paymentStatus} />
         {filteredOrders.length === 0 ? (
           <EmptyState
             icon="package"
@@ -205,5 +246,13 @@ export function OrderStatusPage() {
         )}
       </main>
     </div>
+  )
+}
+
+export function OrderStatusPage() {
+  return (
+    <Suspense fallback={null}>
+      <OrderStatusContent />
+    </Suspense>
   )
 }

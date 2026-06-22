@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { SessionProvider, signIn, signOut, useSession } from 'next-auth/react'
-import type { AnalyticsOverview, BusinessSettings, CartItem, Category, ChannelSchedule, ChannelSetting, Order, OrderStatus, PaymentMethod, Product, Promotion, SelectedOption, Table, User } from '@/lib/types'
+import type { AnalyticsOverview, BusinessSettings, CartItem, Category, ChannelSchedule, ChannelSetting, Order, OrderStatus, Product, Promotion, SelectedOption, Table, User } from '@/lib/types'
 import { getOfflineCache, isBrowserOffline, OFFLINE_CACHE_KEYS, setOfflineCache } from '@/lib/offline-cache'
 import {
   enqueueOfflineOrder,
@@ -12,6 +12,7 @@ import {
   queuedEntryToOrder,
   type CreateOrderPayload,
 } from '@/lib/offline-order-queue'
+import { hasPermission, type Permission, type SessionRoleContext } from '@/lib/permissions'
 
 const CART_STORAGE_KEY = 'coty-cafe-cart'
 const TRACKING_CODES_KEY = 'coty-cafe-tracking-codes'
@@ -481,6 +482,7 @@ export function useCatalog() {
     promotions: Array<Promotion & { validFrom: string | Date; validTo: string | Date }>
     channelAvailability?: Record<'delivery' | 'local' | 'pickup', { open: boolean; reason?: string }> | null
     deliveryZones?: Array<{ id: string; name: string; deliveryFee: number; minOrderAmount: number }>
+    mercadoPagoAvailable?: boolean
   }
 
   const { data, error, isLoading, mutate } = useSWR<CatalogData>(
@@ -499,6 +501,7 @@ export function useCatalog() {
     promotions: (data?.promotions ?? []).map(parsePromotion),
     channelAvailability: data?.channelAvailability ?? null,
     deliveryZones: data?.deliveryZones ?? [],
+    mercadoPagoAvailable: data?.mercadoPagoAvailable ?? false,
     error,
     isLoading,
     isOfflineCache: isBrowserOffline() && Boolean(getOfflineCache(OFFLINE_CACHE_KEYS.catalog)),
@@ -777,46 +780,75 @@ export function useTables() {
 }
 
 export function useAdminData(): AdminData {
-  const { data: usersData, mutate: mutateUsers } = useSWR<User[]>('/api/admin/users', fetchJson)
-  const { data: productsData, mutate: mutateProducts } = useSWR<Product[]>('/api/admin/products', fetchJson)
-  const { data: categoriesData, mutate: mutateCategories } = useSWR<Category[]>('/api/admin/categories', fetchJson)
+  const { user } = useAuth()
+  const roleContext = useMemo<SessionRoleContext>(
+    () => ({
+      role: user?.role === 'admin' ? 'admin' : 'staff',
+      staffRole: user?.staffRole ?? null,
+    }),
+    [user]
+  )
+  const can = useCallback((permission: Permission) => hasPermission(roleContext, permission), [roleContext])
+
+  const { data: usersData, mutate: mutateUsers } = useSWR<User[]>(can('staff:manage') ? '/api/admin/users' : null, fetchJson)
+  const { data: productsData, mutate: mutateProducts } = useSWR<Product[]>(can('settings:write') ? '/api/admin/products' : null, fetchJson)
+  const { data: categoriesData, mutate: mutateCategories } = useSWR<Category[]>(can('settings:write') ? '/api/admin/categories' : null, fetchJson)
   const { data: promotionsData, mutate: mutatePromotions } = useSWR<Array<Promotion & { validFrom: string | Date; validTo: string | Date }>>(
-    '/api/admin/promotions',
+    can('settings:write') ? '/api/admin/promotions' : null,
     fetchJson
   )
-  const { data: settingsData, mutate: mutateSettings } = useSWR<BusinessSettings>('/api/admin/settings', fetchJson)
+  const { data: settingsData, mutate: mutateSettings } = useSWR<BusinessSettings>(
+    can('settings:read') ? '/api/admin/settings' : null,
+    fetchJson
+  )
   const { data: schedulesData, mutate: mutateSchedules } = useSWR<{ schedules: ChannelSchedule[]; channelSettings: ChannelSetting[] }>(
-    '/api/admin/schedules',
+    can('schedules:manage') ? '/api/admin/schedules' : null,
     fetchJson
   )
-  const { data: tablesData, mutate: mutateTables } = useSWR<Table[]>('/api/tables', fetchJson)
+  const { data: tablesData, mutate: mutateTables } = useSWR<Table[]>(can('tables:manage') ? '/api/tables' : null, fetchJson)
   const { data: ordersData, mutate: mutateOrders } = useSWR<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
-    '/api/orders',
+    can('staff:operate') ? '/api/orders' : null,
     fetchJson
   )
-  const { data: analyticsData, mutate: mutateAnalytics } = useSWR<AnalyticsOverview>('/api/admin/analytics', fetchJson, {
-    refreshInterval: 15000,
-    revalidateOnFocus: true,
-  })
+  const { data: analyticsData, mutate: mutateAnalytics } = useSWR<AnalyticsOverview>(
+    can('analytics:read') ? '/api/admin/analytics' : null,
+    fetchJson,
+    {
+      refreshInterval: can('analytics:read') ? 15000 : 0,
+      revalidateOnFocus: true,
+    }
+  )
   const { data: historyData, mutate: mutateHistory } = useSWR<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
-    '/api/admin/orders/history',
+    can('analytics:read') ? '/api/admin/orders/history' : null,
     fetchJson
   )
 
   const refreshAll = useCallback(async () => {
     await Promise.all([
-      mutateProducts(),
-      mutateUsers(),
-      mutateCategories(),
-      mutatePromotions(),
-      mutateSettings(),
-      mutateSchedules(),
-      mutateTables(),
-      mutateOrders(),
-      mutateAnalytics(),
-      mutateHistory(),
+      can('settings:write') ? mutateProducts() : Promise.resolve(),
+      can('staff:manage') ? mutateUsers() : Promise.resolve(),
+      can('settings:write') ? mutateCategories() : Promise.resolve(),
+      can('settings:write') ? mutatePromotions() : Promise.resolve(),
+      can('settings:read') ? mutateSettings() : Promise.resolve(),
+      can('schedules:manage') ? mutateSchedules() : Promise.resolve(),
+      can('tables:manage') ? mutateTables() : Promise.resolve(),
+      can('staff:operate') ? mutateOrders() : Promise.resolve(),
+      can('analytics:read') ? mutateAnalytics() : Promise.resolve(),
+      can('analytics:read') ? mutateHistory() : Promise.resolve(),
     ])
-  }, [mutateAnalytics, mutateCategories, mutateHistory, mutateOrders, mutateProducts, mutatePromotions, mutateSchedules, mutateSettings, mutateTables, mutateUsers])
+  }, [
+    can,
+    mutateAnalytics,
+    mutateCategories,
+    mutateHistory,
+    mutateOrders,
+    mutateProducts,
+    mutatePromotions,
+    mutateSchedules,
+    mutateSettings,
+    mutateTables,
+    mutateUsers,
+  ])
 
   return {
     users: usersData ?? [],

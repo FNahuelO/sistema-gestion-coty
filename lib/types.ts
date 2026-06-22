@@ -87,6 +87,7 @@ export interface Order {
   createdAt: Date
   updatedAt: Date
   offlinePending?: boolean
+  trackingProof?: string
 }
 
 // Table types
@@ -196,6 +197,7 @@ export interface BusinessSettings {
   deliveryFee: number
   minOrderAmount: number
   taxRate: number
+  mercadoPagoEnabled?: boolean
 }
 
 export interface ChannelSchedule {

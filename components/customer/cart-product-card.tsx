@@ -30,7 +30,6 @@ interface CartProductCardProps {
 
 export function CartProductCard({
   item,
-  index = 0,
   variant = 'cart',
   onIncrease,
   onDecrease,

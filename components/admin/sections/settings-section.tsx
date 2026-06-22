@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { LayoutGrid, Package } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,8 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TITLE, PANEL_TOGGLE_ROW } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
-import { useAdminData } from '@/lib/store'
+import { useAdminData, useAuth } from '@/lib/store'
+import { hasPermission, type SessionRoleContext } from '@/lib/permissions'
 import { ImageUploadField } from '@/components/admin/forms/image-upload-field'
 import { MenuQrSection } from '@/components/admin/qr/menu-qr-section'
 import { useFormPanel } from '../hooks/use-form-panel'
@@ -23,6 +24,16 @@ import { MetricCard } from '../ui/metric-card'
 
 export function SettingsSection() {
   const admin = useAdminData()
+  const { user } = useAuth()
+  const roleContext: SessionRoleContext = useMemo(
+    () => ({
+      role: user?.role === 'admin' ? 'admin' : 'staff',
+      staffRole: user?.staffRole ?? null,
+    }),
+    [user]
+  )
+  const canWriteSettings = hasPermission(roleContext, 'settings:write')
+  const canExportSales = hasPermission(roleContext, 'analytics:read')
   const { open, setOpen, openPanel } = useFormPanel('settings')
   const [settingsDraft, setSettingsDraft] = useState(admin.settings)
 
@@ -31,7 +42,7 @@ export function SettingsSection() {
   }, [admin.settings])
 
   const saveSettings = async () => {
-    if (!settingsDraft) return
+    if (!settingsDraft || !canWriteSettings) return
     try {
       await admin.updateSettings(settingsDraft)
       toast.success('Configuración actualizada')
@@ -44,11 +55,12 @@ export function SettingsSection() {
     <div className="mx-auto max-w-6xl space-y-4">
       <AdminPageHeader
         title="Configuración"
-        description="Datos del negocio y operación"
+        description={canWriteSettings ? 'Datos del negocio y operación' : 'Vista de solo lectura'}
+        onNew={canWriteSettings ? () => openPanel() : undefined}
         newLabel="Editar"
-        onNew={() => openPanel()}
       />
       <div className="space-y-6">
+        {canWriteSettings ? (
         <AdminFormPanel
           panelId="settings"
           title="Datos del negocio"
@@ -81,8 +93,29 @@ export function SettingsSection() {
             <Label>Negocio abierto</Label>
             <Switch checked={settingsDraft?.isOpen ?? false} onCheckedChange={(checked) => setSettingsDraft((previous) => previous ? { ...previous, isOpen: checked } : previous)} />
           </div>
+          <div className={PANEL_TOGGLE_ROW}>
+            <Label>Mercado Pago habilitado</Label>
+            <Switch
+              checked={settingsDraft?.mercadoPagoEnabled ?? true}
+              onCheckedChange={(checked) =>
+                setSettingsDraft((previous) => (previous ? { ...previous, mercadoPagoEnabled: checked } : previous))
+              }
+            />
+          </div>
           <Button className={cn('w-full', PANEL_PRIMARY_BTN)} onClick={() => void saveSettings()}>Guardar configuración</Button>
         </AdminFormPanel>
+        ) : (
+          <Card className={PANEL_CARD}>
+            <CardHeader><CardTitle className={PANEL_TITLE}>Datos del negocio</CardTitle></CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p><span className="font-medium text-foreground">Nombre:</span> {admin.settings?.name}</p>
+              <p><span className="font-medium text-foreground">Teléfono:</span> {admin.settings?.phone}</p>
+              <p><span className="font-medium text-foreground">Dirección:</span> {admin.settings?.address}</p>
+              <p><span className="font-medium text-foreground">Horario:</span> {admin.settings?.openTime} – {admin.settings?.closeTime}</p>
+              <p><span className="font-medium text-foreground">Estado:</span> {admin.settings?.isOpen ? 'Abierto' : 'Cerrado'}</p>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className={PANEL_CARD}>
           <CardHeader>
@@ -96,6 +129,7 @@ export function SettingsSection() {
           </CardContent>
         </Card>
 
+        {canExportSales ? (
         <Card className={PANEL_CARD}>
           <CardHeader><CardTitle className={PANEL_TITLE}>Control operativo</CardTitle></CardHeader>
           <CardContent className="space-y-4">
@@ -125,6 +159,7 @@ export function SettingsSection() {
             </div>
           </CardContent>
         </Card>
+        ) : null}
       </div>
     </div>
   )

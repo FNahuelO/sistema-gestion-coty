@@ -186,6 +186,7 @@ async function main() {
       deliveryFee: businessSettings.deliveryFee,
       minOrderAmount: businessSettings.minOrderAmount,
       taxRate: businessSettings.taxRate,
+      mercadoPagoEnabled: true,
     },
   })
 

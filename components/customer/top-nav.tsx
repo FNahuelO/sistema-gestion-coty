@@ -4,11 +4,6 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
-  LayoutGrid,
-  UtensilsCrossed,
-  ShoppingCart,
-  Ticket,
-  User,
   ShoppingBag,
   Search,
   Instagram,

@@ -24,6 +24,7 @@ export const businessSettings: BusinessSettings = {
   deliveryFee: 35,
   minOrderAmount: 100,
   taxRate: 0.16,
+  mercadoPagoEnabled: true,
 }
 
 export const categories: Category[] = [

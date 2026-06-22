@@ -9,8 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import type { Product, Promotion, SelectedOption } from '@/lib/types'
-import { getDiscountedUnitPrice, getProductDiscountPercent } from '@/lib/promotions'
-import { formatPrice } from '@/lib/coty-theme'
+import { getDiscountedUnitPrice } from '@/lib/promotions'
 
 interface ProductDetailModalProps {
   product: Product
@@ -30,7 +29,7 @@ export function ProductDetailModal({ product, promotions = [], onClose, onAddToC
       setSelectedOptions([])
       setNotes('')
     }
-  }, [product?.id])
+  }, [product])
 
   const handleOptionChange = (optionId: string, choiceId: string, multiple: boolean) => {
     setSelectedOptions((prev) => {
@@ -62,7 +61,6 @@ export function ProductDetailModal({ product, promotions = [], onClose, onAddToC
     })
   }
 
-  const discountPercent = getProductDiscountPercent(product, promotions)
   const unitPrice = getDiscountedUnitPrice(product, selectedOptions, promotions)
   const calculatePrice = () => unitPrice * quantity
 

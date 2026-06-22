@@ -20,9 +20,14 @@ import type { AnalyticsOverview, BusinessSettings, CartItem, Category, ChannelSc
 import { getChannelAvailability, mapOrderTypeToChannel, mapPrismaChannel, mapToPrismaChannel } from '@/lib/channel-hours'
 import { hasPermission, type Permission, type SessionRoleContext } from '@/lib/permissions'
 import { buildWhatsAppOrderMessage } from '@/lib/whatsapp-message'
+import { createTrackingProof, verifyTrackingProof } from '@/lib/tracking-proof'
 import {
-  decrementStockForOrder,
-  incrementDiscountUse,
+  buildMercadoPagoPreferenceItems,
+  isMercadoPagoAvailable,
+  resolveMercadoPagoCheckoutUrl,
+  resolveMercadoPagoPayerEmail,
+} from '@/lib/mercadopago-utils'
+import {
   listDeliveryZones,
   upsertCustomerFromOrder,
   validateDiscountCode,
@@ -116,6 +121,7 @@ export const settingsInputSchema = z.object({
   deliveryFee: z.number().min(0),
   minOrderAmount: z.number().min(0),
   taxRate: z.number().min(0).max(1),
+  mercadoPagoEnabled: z.boolean().default(true),
 })
 
 export const tableInputSchema = z.object({
@@ -463,6 +469,7 @@ export function serializeSettings(settings: Prisma.BusinessSettingsGetPayload<ob
     deliveryFee: decimalToNumber(settings.deliveryFee),
     minOrderAmount: decimalToNumber(settings.minOrderAmount),
     taxRate: decimalToNumber(settings.taxRate),
+    mercadoPagoEnabled: settings.mercadoPagoEnabled,
   }
 }
 
@@ -491,13 +498,13 @@ export function serializeUser(user: {
 export function serializeOrder(order: Prisma.OrderGetPayload<{ include: typeof orderInclude }>): Order {
   return {
     id: order.id,
-    displayCode: order.displayCode,
-    publicTrackingCode: order.publicTrackingCode,
+    displayCode: order.displayCode ?? undefined,
+    publicTrackingCode: order.publicTrackingCode ?? undefined,
     type: mapOrderType(order.type),
     status: mapOrderStatus(order.status),
     paymentMethod: mapPaymentMethod(order.paymentMethod),
     paymentStatus: mapPaymentStatus(order.payment?.status),
-    paymentUrl: order.payment?.initPoint ?? order.payment?.sandboxInitPoint ?? undefined,
+    paymentUrl: resolveMercadoPagoCheckoutUrl(order.payment?.initPoint, order.payment?.sandboxInitPoint),
     customerName: order.customerName,
     customerPhone: order.customerPhone,
     customerAddress: order.customerAddress ?? undefined,
@@ -543,6 +550,49 @@ export function serializeOrder(order: Prisma.OrderGetPayload<{ include: typeof o
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
   }
+}
+
+/** Oculta PII y campos internos en respuestas públicas o de cliente. */
+export function stripOrderPii(order: Order): Order {
+  return {
+    ...order,
+    customerName: order.customerName.split('·')[0]?.trim() || 'Cliente',
+    customerPhone: '',
+    customerAddress: undefined,
+    paymentUrl: undefined,
+    createdByUserId: undefined,
+    tableId: undefined,
+    tableNumber: undefined,
+    tableSessionId: undefined,
+  }
+}
+
+/** Respuesta segura al crear pedido desde el cliente (sin PII + prueba HMAC para MP). */
+export function buildCustomerOrderResponse(order: Order): Order & { trackingProof: string } {
+  const trackingCode = order.publicTrackingCode ?? order.id
+
+  return {
+    ...stripOrderPii(order),
+    paymentUrl: order.paymentUrl,
+    trackingProof: createTrackingProof(order.id, trackingCode),
+  }
+}
+
+/** Respuesta mínima tras crear preferencia MP (sin PII). */
+export function buildPaymentPreferenceResponse(order: Order) {
+  return {
+    id: order.id,
+    displayCode: order.displayCode,
+    publicTrackingCode: order.publicTrackingCode,
+    status: order.status,
+    paymentStatus: order.paymentStatus,
+    paymentUrl: order.paymentUrl,
+  }
+}
+
+/** Versión pública para seguimiento de pedido: sin PII ni URLs de pago. */
+export function serializePublicTrackedOrder(order: Prisma.OrderGetPayload<{ include: typeof orderInclude }>): Order {
+  return stripOrderPii(serializeOrder(order))
 }
 
 export function serializeTable(table: Prisma.DiningTableGetPayload<{ include: typeof tableInclude }>): Table {
@@ -659,6 +709,7 @@ export async function getPublicCatalog() {
         deliveryFee: decimalToNumber(zone.deliveryFee),
         minOrderAmount: decimalToNumber(zone.minOrderAmount),
       })),
+    mercadoPagoAvailable: isMercadoPagoAvailable(settings),
   }
 }
 
@@ -737,6 +788,43 @@ function buildTrackingCode() {
   return `TRK-${randomUUID().slice(0, 8).toUpperCase()}`
 }
 
+async function applyStockDeltaForOrderItems(
+  tx: Prisma.TransactionClient,
+  items: Array<{ productId: string | null; quantity: number }>,
+  direction: 'decrement' | 'increment'
+) {
+  const quantities = new Map<string, number>()
+
+  for (const item of items) {
+    if (!item.productId) continue
+    quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity)
+  }
+
+  for (const [productId, requested] of quantities) {
+    const product = await tx.product.findUnique({
+      where: { id: productId },
+      select: { trackStock: true, stock: true },
+    })
+
+    if (!product?.trackStock || product.stock === null) continue
+
+    if (direction === 'decrement') {
+      const updated = await tx.product.updateMany({
+        where: { id: productId, stock: { gte: requested } },
+        data: { stock: { decrement: requested } },
+      })
+      if (updated.count === 0) {
+        throw new Error('OUT_OF_STOCK')
+      }
+    } else {
+      await tx.product.update({
+        where: { id: productId },
+        data: { stock: { increment: requested } },
+      })
+    }
+  }
+}
+
 export async function createOrderFromPayload(payload: z.input<typeof createOrderSchema>, createdByUserId?: string) {
   const input = createOrderSchema.parse(payload)
   const settings = await prisma.businessSettings.findUnique({ where: { id: 'main' } })
@@ -747,6 +835,10 @@ export async function createOrderFromPayload(payload: z.input<typeof createOrder
 
   if (!settings.isOpen && input.type !== 'table') {
     throw new Error('BUSINESS_CLOSED')
+  }
+
+  if (input.paymentMethod === 'mercado_pago' && !isMercadoPagoAvailable(settings)) {
+    throw new Error('MERCADOPAGO_UNAVAILABLE')
   }
 
   if (input.type !== 'table') {
@@ -919,106 +1011,119 @@ export async function createOrderFromPayload(payload: z.input<typeof createOrder
       ? await upsertCustomerFromOrder(input.customerPhone, input.customerName, input.customerAddress)
       : null
 
-  const createdOrder = await prisma.order.create({
-    data: {
-      displayCode: buildDisplayCode(),
-      publicTrackingCode: buildTrackingCode(),
-      type:
-        input.type === 'delivery'
-          ? 'DELIVERY'
-          : input.type === 'pickup'
-            ? 'PICKUP'
-            : 'TABLE',
-      status: input.paymentMethod === 'mercado_pago' ? 'PENDING' : 'CONFIRMED',
-      paymentMethod:
-        input.paymentMethod === 'card'
-          ? 'CARD'
-          : input.paymentMethod === 'transfer'
-            ? 'TRANSFER'
-            : input.paymentMethod === 'mercado_pago'
-              ? 'MERCADO_PAGO'
-              : 'CASH',
-      customerName:
-        input.type === 'table' && diningTable
-          ? input.customerName.trim()
-            ? `${input.customerName.trim()} · Mesa ${diningTable.number}`
-            : `Mesa ${diningTable.number}`
-          : input.customerName,
-      customerPhone: input.customerPhone,
-      customerAddress: input.type === 'delivery' ? input.customerAddress : undefined,
-      notes: input.notes,
-      subtotal,
-      tax,
-      deliveryFee,
-      tip,
-      discountCode,
-      discountAmount,
-      deliveryZoneId,
-      customerId: customer?.id,
-      total,
-      diningTableId: diningTable?.id,
-      tableSessionId,
-      createdByUserId,
-      items: {
-        create: itemsToCreate.map((item) => ({
-          productId: item.productId,
-          productName: item.productName,
-          productDescription: item.productDescription,
-          basePrice: item.basePrice,
-          unitPrice: item.unitPrice,
-          imageUrl: item.imageUrl,
-          quantity: item.quantity,
-          notes: item.notes,
-          selections: {
-            create: item.selections,
-          },
-        })),
-      },
-      payment: {
-        create: {
-          provider: input.paymentMethod === 'mercado_pago' ? 'mercadopago' : 'manual',
-          method:
-            input.paymentMethod === 'card'
-              ? 'CARD'
-              : input.paymentMethod === 'transfer'
-                ? 'TRANSFER'
-                : input.paymentMethod === 'mercado_pago'
-                  ? 'MERCADO_PAGO'
-                  : 'CASH',
-          status:
-            input.paymentMethod === 'mercado_pago'
+  const orderData = {
+    displayCode: buildDisplayCode(),
+    publicTrackingCode: buildTrackingCode(),
+    type:
+      input.type === 'delivery'
+        ? 'DELIVERY'
+        : input.type === 'pickup'
+          ? 'PICKUP'
+          : 'TABLE',
+    status: input.paymentMethod === 'mercado_pago' ? 'PENDING' : 'CONFIRMED',
+    paymentMethod:
+      input.paymentMethod === 'card'
+        ? 'CARD'
+        : input.paymentMethod === 'transfer'
+          ? 'TRANSFER'
+          : input.paymentMethod === 'mercado_pago'
+            ? 'MERCADO_PAGO'
+            : 'CASH',
+    customerName:
+      input.type === 'table' && diningTable
+        ? input.customerName.trim()
+          ? `${input.customerName.trim()} · Mesa ${diningTable.number}`
+          : `Mesa ${diningTable.number}`
+        : input.customerName,
+    customerPhone: input.customerPhone,
+    customerAddress: input.type === 'delivery' ? input.customerAddress : undefined,
+    notes: input.notes,
+    subtotal,
+    tax,
+    deliveryFee,
+    tip,
+    discountCode,
+    discountAmount,
+    deliveryZoneId,
+    customerId: customer?.id,
+    total,
+    diningTableId: diningTable?.id,
+    tableSessionId,
+    createdByUserId,
+    items: {
+      create: itemsToCreate.map((item) => ({
+        productId: item.productId,
+        productName: item.productName,
+        productDescription: item.productDescription,
+        basePrice: item.basePrice,
+        unitPrice: item.unitPrice,
+        imageUrl: item.imageUrl,
+        quantity: item.quantity,
+        notes: item.notes,
+        selections: {
+          create: item.selections,
+        },
+      })),
+    },
+    payment: {
+      create: {
+        provider: input.paymentMethod === 'mercado_pago' ? 'mercadopago' : 'manual',
+        method:
+          input.paymentMethod === 'card'
+            ? 'CARD'
+            : input.paymentMethod === 'transfer'
+              ? 'TRANSFER'
+              : input.paymentMethod === 'mercado_pago'
+                ? 'MERCADO_PAGO'
+                : 'CASH',
+        status:
+          input.paymentMethod === 'mercado_pago'
+            ? 'PENDING'
+            : input.type === 'table'
               ? 'PENDING'
-              : input.type === 'table'
-                ? 'PENDING'
-                : 'APPROVED',
-          amount: total,
-        },
-      },
-      statusHistory: {
-        create: {
-          status: input.paymentMethod === 'mercado_pago' ? 'PENDING' : 'CONFIRMED',
-          changedByUserId: createdByUserId,
-          note: input.paymentMethod === 'mercado_pago' ? 'Pedido creado, pendiente de pago online' : 'Pedido creado',
-        },
+              : 'APPROVED',
+        amount: total,
       },
     },
-    include: orderInclude,
-  })
+    statusHistory: {
+      create: {
+        status: input.paymentMethod === 'mercado_pago' ? 'PENDING' : 'CONFIRMED',
+        changedByUserId: createdByUserId,
+        note: input.paymentMethod === 'mercado_pago' ? 'Pedido creado, pendiente de pago online' : 'Pedido creado',
+      },
+    },
+  } 
 
-  if (diningTable?.id && tableSessionId) {
-    await Promise.all([
-      prisma.diningTable.update({
+  const deferStockDecrement = input.paymentMethod === 'mercado_pago'
+
+  const createdOrder = await prisma.$transaction(async (tx) => {
+    if (!deferStockDecrement) {
+      await applyStockDeltaForOrderItems(tx, itemsToCreate.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+      })), 'decrement')
+    }
+
+    const order = await tx.order.create({
+      data: orderData,
+      include: orderInclude,
+    })
+
+    if (diningTable?.id && tableSessionId) {
+      await tx.diningTable.update({
         where: { id: diningTable.id },
         data: { status: 'WAITING' },
-      }),
-      prisma.tableSession.update({
+      })
+      await tx.tableSession.update({
         where: { id: tableSessionId },
         data: {
           accumulatedTotal: { increment: total },
         },
-      }),
-    ])
-  }
+      })
+    }
+
+    return order
+  })
 
   const serialized = serializeOrder(createdOrder)
 
@@ -1033,7 +1138,10 @@ export async function createOrderFromPayload(payload: z.input<typeof createOrder
   return {
     ...serialized,
     notes: input.notes,
-    paymentUrl: createdOrder.payment?.initPoint ?? undefined,
+    paymentUrl: resolveMercadoPagoCheckoutUrl(
+      createdOrder.payment?.initPoint,
+      createdOrder.payment?.sandboxInitPoint
+    ),
   }
 }
 
@@ -1048,7 +1156,7 @@ function getMercadoPagoConfig() {
   })
 }
 
-export async function createPreferenceForOrder(orderId: string, baseUrl: string) {
+export async function createPreferenceForOrder(orderId: string, baseUrl: string, trackingProof: string) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: orderInclude,
@@ -1058,6 +1166,19 @@ export async function createPreferenceForOrder(orderId: string, baseUrl: string)
     throw new Error('ORDER_NOT_FOUND')
   }
 
+  const publicTrackingCode = order.publicTrackingCode
+  if (!publicTrackingCode || !verifyTrackingProof(orderId, publicTrackingCode, trackingProof)) {
+    throw new Error('INVALID_TRACKING_PROOF')
+  }
+
+  if (order.paymentMethod !== 'MERCADO_PAGO') {
+    throw new Error('INVALID_PAYMENT_METHOD')
+  }
+
+  if (order.status !== 'PENDING') {
+    throw new Error('ORDER_NOT_PAYABLE')
+  }
+
   const settings = await prisma.businessSettings.findUnique({
     where: { id: 'main' },
   })
@@ -1065,6 +1186,8 @@ export async function createPreferenceForOrder(orderId: string, baseUrl: string)
   if (!settings) {
     throw new Error('SETTINGS_NOT_FOUND')
   }
+
+  const { items: preferenceItems, couponAmount } = buildMercadoPagoPreferenceItems(order)
 
   const preferenceClient = new Preference(getMercadoPagoConfig())
   const response = await preferenceClient.create({
@@ -1080,20 +1203,13 @@ export async function createPreferenceForOrder(orderId: string, baseUrl: string)
       },
       payer: {
         name: order.customerName,
-        email: undefined,
+        email: resolveMercadoPagoPayerEmail(order.customerName, order.customerPhone),
         phone: {
           number: order.customerPhone,
         },
       },
-      items: order.items.map((item) => ({
-        id: item.productId ?? item.id,
-        title: item.productName,
-        description: item.productDescription ?? undefined,
-        picture_url: item.imageUrl ?? undefined,
-        quantity: item.quantity,
-        currency_id: 'ARS',
-        unit_price: decimalToNumber(item.unitPrice),
-      })),
+      items: preferenceItems,
+      ...(couponAmount ? { coupon_amount: couponAmount } : {}),
     },
   })
 
@@ -1114,7 +1230,15 @@ export async function createPreferenceForOrder(orderId: string, baseUrl: string)
     include: orderInclude,
   })
 
-  return updated ? serializeOrder(updated) : null
+  return updated
+    ? buildPaymentPreferenceResponse({
+        ...serializeOrder(updated),
+        paymentUrl: resolveMercadoPagoCheckoutUrl(
+          updated.payment?.initPoint,
+          updated.payment?.sandboxInitPoint
+        ),
+      })
+    : null
 }
 
 export async function syncMercadoPagoPayment(paymentId: string | number, payload?: unknown) {
@@ -1142,28 +1266,49 @@ export async function syncMercadoPagoPayment(paymentId: string | number, payload
         ? PrismaOrderStatus.CANCELLED
         : PrismaOrderStatus.PENDING
 
-  await prisma.payment.updateMany({
-    where: {
-      OR: [{ orderId: externalReference }, { providerPaymentId: String(paymentResponse.id) }],
-    },
-    data: {
-      providerPaymentId: String(paymentResponse.id),
-      status: paymentStatus,
-      rawPayload: payload ? (payload as Prisma.InputJsonValue) : (paymentResponse as Prisma.InputJsonValue),
-    },
-  })
+  await prisma.$transaction(async (tx) => {
+    const existingOrder = await tx.order.findUnique({
+      where: { id: externalReference },
+      include: { items: true },
+    })
 
-  await prisma.order.update({
-    where: { id: externalReference },
-    data: {
-      status: orderStatus,
-      statusHistory: {
-        create: {
-          status: orderStatus,
-          note: `Webhook Mercado Pago: ${paymentResponse.status ?? 'pending'}`,
+    if (!existingOrder) {
+      throw new Error('ORDER_NOT_FOUND')
+    }
+
+    const previousStatus = existingOrder.status
+
+    await tx.payment.updateMany({
+      where: {
+        OR: [{ orderId: externalReference }, { providerPaymentId: String(paymentResponse.id) }],
+      },
+      data: {
+        providerPaymentId: String(paymentResponse.id),
+        status: paymentStatus,
+        rawPayload: payload ? (payload as Prisma.InputJsonValue) : (paymentResponse as Prisma.InputJsonValue),
+      },
+    })
+
+    await tx.order.update({
+      where: { id: externalReference },
+      data: {
+        status: orderStatus,
+        statusHistory: {
+          create: {
+            status: orderStatus,
+            note: `Webhook Mercado Pago: ${paymentResponse.status ?? 'pending'}`,
+          },
         },
       },
-    },
+    })
+
+    if (
+      paymentStatus === PrismaPaymentStatus.APPROVED &&
+      previousStatus === PrismaOrderStatus.PENDING &&
+      existingOrder.paymentMethod === PrismaPaymentMethod.MERCADO_PAGO
+    ) {
+      await applyStockDeltaForOrderItems(tx, existingOrder.items, 'decrement')
+    }
   })
 }
 

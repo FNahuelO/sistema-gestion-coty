@@ -61,7 +61,7 @@ export function PromotionsSection() {
 
   const submitPromotion = async () => {
     try {
-      const payload: any = {
+      const payload = {
         title: promotionForm.title,
         description: promotionForm.description,
         image: promotionForm.image,

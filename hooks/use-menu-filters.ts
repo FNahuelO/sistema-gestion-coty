@@ -91,8 +91,8 @@ export function useMenuFilters(products: Product[], categories: Category[], prom
   }, [products, searchQuery])
 
   const menuSections = useMemo(
-    () => buildMenuSections(products, categories, promotions),
-    [products, categories, promotions]
+    () => buildMenuSections(products, categories),
+    [products, categories]
   )
 
   const categoryProducts = useMemo(

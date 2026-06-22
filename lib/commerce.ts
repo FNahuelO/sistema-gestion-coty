@@ -264,6 +264,11 @@ export async function listCustomers() {
 // ─── Table calls ─────────────────────────────────────────────────────────────
 
 export async function createTableCall(tableId: string) {
+  const table = await prisma.diningTable.findFirst({
+    where: { id: tableId, active: true, deletedAt: null },
+  })
+  if (!table) throw new Error('TABLE_NOT_FOUND')
+
   const pending = await prisma.tableCall.findFirst({
     where: { tableId, status: TableCallStatus.PENDING },
   })
