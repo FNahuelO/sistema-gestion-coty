@@ -2,7 +2,7 @@
 
 import { usePathname, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { COTY_TEAL } from '@/lib/coty-theme'
+import { COTY_HEADER } from '@/lib/coty-theme'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Inicio', icon: '/icons/inicio.svg', match: (path: string) => path === '/' },
@@ -48,21 +48,30 @@ export function CustomerBottomNav() {
                   src={icon}
                   alt=""
                   aria-hidden
-                  className={cn('h-5 w-5', isActive ? 'opacity-100' : 'opacity-60')}
+                  className={cn('h-5 w-5', isActive ? 'opacity-100' : 'opacity-50')}
+                  style={
+                    isActive
+                      ? {
+                          filter:
+                            'brightness(0) saturate(100%) invert(12%) sepia(28%) saturate(1200%) hue-rotate(125deg) brightness(95%)',
+                        }
+                      : undefined
+                  }
                 />
               </div>
               <span
                 className={cn(
                   'text-[10px] font-medium',
-                  isActive ? 'text-[#2D5A57] ' : 'text-[#9BB8B5]',
+                  isActive ? 'font-semibold' : 'text-[#9BB8B5]',
                 )}
+                style={isActive ? { color: COTY_HEADER } : undefined}
               >
                 {label}
               </span>
               {isActive && (
                 <span
-                  className="absolute -bottom-0.5 h-0.5 w-3/4 rounded-full"
-                  style={{ backgroundColor: COTY_TEAL }}
+                  className="absolute -bottom-0.5 h-1 w-10 rounded-full"
+                  style={{ backgroundColor: COTY_HEADER }}
                 />
               )}
             </a>

@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect, useRef, type ElementType } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Bell,
   Truck,
   Store,
   Users,
@@ -13,6 +12,7 @@ import {
   Filter,
   ChefHat,
   Package,
+  ArrowUpDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -22,9 +22,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useOrders } from '@/lib/store'
 import { usePendingAction } from '@/hooks/use-pending-action'
 import { OrderDetailSheet } from '@/components/staff/order-detail-sheet'
+import { StaffNotificationsButton } from '@/components/staff/staff-notifications-button'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
 import { formatOrderStatus } from '@/lib/order-labels'
+import { ORDER_SORT_OPTIONS, sortOrders, type OrderSortKey } from '@/lib/order-sort'
 import type { Order, OrderStatus, OrderType } from '@/lib/types'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -83,13 +85,20 @@ function StatCard({
   )
 }
 
-export function OrdersSection({ embedded = false }: { embedded?: boolean }) {
+export function OrdersSection({
+  embedded = false,
+  onNavigateToCalls,
+}: {
+  embedded?: boolean
+  onNavigateToCalls?: () => void
+}) {
   const { orders, updateOrderStatus, closeOrder } = useOrders()
   const { isPending, isBusy, run } = usePendingAction()
   const previousPendingCount = useRef<number | null>(null)
   const [selectedTab, setSelectedTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('active')
+  const [sortBy, setSortBy] = useState<OrderSortKey>('status')
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
 
   const filteredOrders = useMemo(() => {
@@ -114,6 +123,11 @@ export function OrdersSection({ embedded = false }: { embedded?: boolean }) {
       return true
     })
   }, [orders, selectedTab, statusFilter, searchQuery])
+
+  const sortedOrders = useMemo(
+    () => sortOrders(filteredOrders, sortBy),
+    [filteredOrders, sortBy]
+  )
 
   const orderStats = useMemo(() => {
     const active = orders.filter((o) => !['completed', 'cancelled'].includes(o.status))
@@ -219,14 +233,24 @@ export function OrdersSection({ embedded = false }: { embedded?: boolean }) {
                 <SelectItem value="completed">Completados</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon" className={cn('relative shrink-0', PANEL_OUTLINE_BTN)}>
-              <Bell className="h-4 w-4" />
-              {orderStats.pending > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-white">
-                  {orderStats.pending}
-                </span>
-              )}
-            </Button>
+            <Select value={sortBy} onValueChange={(value) => setSortBy(value as OrderSortKey)}>
+              <SelectTrigger className="w-full border-gray-200 bg-[#F8FBFA] md:w-52">
+                <ArrowUpDown className="mr-2 h-4 w-4 shrink-0 text-[#2D5A57]" />
+                <SelectValue placeholder="Ordenar" />
+              </SelectTrigger>
+              <SelectContent>
+                {ORDER_SORT_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <StaffNotificationsButton
+              orders={orders}
+              onSelectOrder={setSelectedOrder}
+              onNavigateToCalls={onNavigateToCalls}
+            />
           </div>
         </div>
 
@@ -268,7 +292,7 @@ export function OrdersSection({ embedded = false }: { embedded?: boolean }) {
           </TabsList>
 
           <TabsContent value={selectedTab} className="mt-4">
-            {filteredOrders.length === 0 ? (
+            {sortedOrders.length === 0 ? (
               <div className={PANEL_CARD}>
                 <EmptyState
                   icon="package"
@@ -279,7 +303,7 @@ export function OrdersSection({ embedded = false }: { embedded?: boolean }) {
             ) : (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 <AnimatePresence>
-                  {filteredOrders.map((order, index) => {
+                  {sortedOrders.map((order, index) => {
                     const TypeIcon = orderTypeIcons[order.type]
                     const action = order.offlinePending ? null : statusActions[order.status]
 

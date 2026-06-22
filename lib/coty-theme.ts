@@ -1,5 +1,7 @@
 export const COTY_TEAL = '#2D5A57'
 export const COTY_HEADER = '#053E38'
+export const COTY_MINT = '#B2D8D0'
+export const COTY_PAGE_BG = '#F9F9F7'
 export const COTY_COMBOS_GRADIENT =
   'linear-gradient(145.61deg, #2E514E 9.59%, #579E98 147.45%)'
 export const COTY_CTA_GRADIENT =

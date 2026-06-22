@@ -4,7 +4,6 @@ import { serializePublicTrackedOrder } from '@/lib/server-data'
 
 function buildExactMatchWhere(query: string) {
   return {
-    type: { not: 'TABLE' as const },
     OR: [
       { id: { equals: query, mode: 'insensitive' as const } },
       { displayCode: { equals: query, mode: 'insensitive' as const } },
@@ -31,7 +30,6 @@ export async function GET(request: NextRequest) {
       where: query
         ? buildExactMatchWhere(query)
         : {
-            type: { not: 'TABLE' },
             OR: [
               { publicTrackingCode: { in: codes! } },
               { id: { in: codes! } },

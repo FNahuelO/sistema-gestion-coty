@@ -2,8 +2,8 @@
 
 import { Percent, Star } from 'lucide-react'
 import { EmptyState } from '@/components/shared/empty-state'
-import { LoadingSkeleton, ProductCardSkeleton } from '@/components/shared/loading'
-import { MenuGridProductCard } from '@/components/customer/menu-grid-product-card'
+import { LoadingSkeleton } from '@/components/shared/loading'
+import { MenuProductCarousel, MenuProductCarouselSkeleton } from '@/components/customer/menu-product-carousel'
 import { MenuSectionHeader } from '@/components/customer/menu-section-header'
 import { PromotionBanner } from '@/components/customer/promotion-banner'
 import { getActivePromotions, getProductsForPromotion } from '@/lib/promotions'
@@ -67,19 +67,14 @@ export function PromosView({
             <Percent className="h-4 w-4 shrink-0 text-[#7EB8B3]" />
             <span>{promotion.discount}% de descuento en los productos de esta promo</span>
           </div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
-            {promoProducts.map((product) => (
-              <MenuGridProductCard
-                key={`${promotion.id}-${product.id}`}
-                product={product}
-                promotions={promotions}
-                items={items}
-                addItem={addItem}
-                updateQuantity={updateQuantity}
-                onOpenDetail={() => onOpenProduct(product)}
-              />
-            ))}
-          </div>
+          <MenuProductCarousel
+            products={promoProducts}
+            items={items}
+            promotions={promotions}
+            addItem={addItem}
+            updateQuantity={updateQuantity}
+            onOpenProduct={onOpenProduct}
+          />
         </section>
       ))}
     </div>
@@ -100,11 +95,7 @@ export function PromosLoadingSkeleton() {
             </div>
           </div>
           <LoadingSkeleton className="h-10 w-full rounded-xl" />
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <ProductCardSkeleton key={index} />
-            ))}
-          </div>
+          <MenuProductCarouselSkeleton count={3} />
         </div>
       ))}
     </div>

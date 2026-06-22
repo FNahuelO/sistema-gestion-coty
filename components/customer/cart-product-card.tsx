@@ -22,7 +22,7 @@ export function getCartItemUnitPrice(item: CartItem) {
 interface CartProductCardProps {
   item: CartItem
   index?: number
-  variant?: 'search' | 'cart'
+  variant?: 'search' | 'cart' | 'table'
   onIncrease: () => void
   onDecrease: () => void
   onRemove: () => void
@@ -48,7 +48,38 @@ export function CartProductCard({
           .join(' • ')
       : null
 
-  const description = optionsLabel || item.product.description
+  const description = optionsLabel || item.notes || item.product.description
+  const lineTotal = unitPrice * item.quantity
+
+  if (variant === 'table') {
+    return (
+      <article className="flex items-start gap-3 border-b border-black/8 py-3 last:border-b-0">
+        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl">
+          <img
+            src={item.product.image}
+            alt={item.product.name}
+            className="h-full w-full object-cover"
+          />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-bold leading-tight text-foreground">{item.product.name}</h3>
+          {description ? (
+            <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+              {description}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <span className="rounded-md bg-[#F0F0F0] px-2 py-0.5 text-[11px] font-medium text-foreground">
+            x{item.quantity}
+          </span>
+          <p className="text-sm font-bold text-foreground">{formatPrice(lineTotal)}</p>
+        </div>
+      </article>
+    )
+  }
 
   const quantityControl =
     variant === 'search' ? (

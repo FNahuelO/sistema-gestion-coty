@@ -51,6 +51,72 @@ export function OrderCardSkeleton() {
   )
 }
 
+export function CustomerOrderStatusSkeleton() {
+  return (
+    <article className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+      <div className="border-b border-gray-100 px-4 py-5">
+        <div className="flex flex-col items-center gap-2">
+          <LoadingSkeleton className="h-5 w-44" />
+          <LoadingSkeleton className="h-4 w-32" />
+          <LoadingSkeleton className="h-7 w-24 rounded-full" />
+        </div>
+      </div>
+
+      <div className="space-y-5 px-4 py-5">
+        <div className="flex justify-between px-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="flex w-[22%] flex-col items-center gap-2">
+              <LoadingSkeleton className="h-10 w-10 rounded-full" />
+              <LoadingSkeleton className="h-3 w-full" />
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-2xl bg-[#F8FBFA] p-4">
+          <LoadingSkeleton className="mx-auto h-4 w-20" />
+          <div className="mt-4 space-y-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="flex items-start justify-between gap-3">
+                <div className="flex-1 space-y-2">
+                  <LoadingSkeleton className="h-4 w-3/4" />
+                  <LoadingSkeleton className="h-3 w-1/2" />
+                </div>
+                <LoadingSkeleton className="h-4 w-14" />
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 space-y-2 border-t border-[#D6E8E6] pt-3">
+            <div className="flex justify-between">
+              <LoadingSkeleton className="h-4 w-16" />
+              <LoadingSkeleton className="h-4 w-14" />
+            </div>
+            <div className="flex justify-between">
+              <LoadingSkeleton className="h-4 w-20" />
+              <LoadingSkeleton className="h-4 w-14" />
+            </div>
+            <div className="flex justify-between pt-1">
+              <LoadingSkeleton className="h-5 w-12" />
+              <LoadingSkeleton className="h-5 w-16" />
+            </div>
+          </div>
+        </div>
+
+        <LoadingSkeleton className="mx-auto h-10 w-40 rounded-xl" />
+      </div>
+    </article>
+  )
+}
+
+export function CustomerOrderStatusListSkeleton({ count = 2 }: { count?: number }) {
+  return (
+    <div className="space-y-5">
+      {Array.from({ length: count }).map((_, index) => (
+        <CustomerOrderStatusSkeleton key={index} />
+      ))}
+    </div>
+  )
+}
+
 export function TableCardSkeleton() {
   return (
     <div className="rounded-xl border bg-card p-4">

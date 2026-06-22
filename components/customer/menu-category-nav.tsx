@@ -3,6 +3,7 @@
 import { Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getCategoryIcon } from '@/lib/category-icons'
+import { LoadingSkeleton } from '@/components/shared/loading'
 import type { Category } from '@/lib/types'
 import type { MenuCategoryId } from '@/lib/menu-categories'
 
@@ -59,6 +60,24 @@ export function MenuCategoryNav({ categories, selected, onSelect }: MenuCategory
             </button>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+export function MenuCategoryNavSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <div className="-mx-1 overflow-hidden md:mx-0" aria-hidden="true">
+      <div className="flex min-w-max px-1 md:min-w-0 md:justify-center md:gap-2 lg:gap-3">
+        {Array.from({ length: count }).map((_, index) => (
+          <div
+            key={index}
+            className="flex w-[72px] shrink-0 flex-col items-center gap-2 md:w-20 lg:w-[88px]"
+          >
+            <LoadingSkeleton className="h-14 w-14 rounded-2xl shadow-md md:h-16 md:w-16" />
+            <LoadingSkeleton className="h-3 w-14 rounded-md" />
+          </div>
+        ))}
       </div>
     </div>
   )

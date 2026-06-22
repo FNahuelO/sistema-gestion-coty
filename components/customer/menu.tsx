@@ -10,7 +10,7 @@ import { ProductDetailModal } from '@/components/customer/product-detail-modal'
 
 export function MenuPage() {
   const { products, categories, promotions, isLoading } = useCatalog()
-  const { items, itemCount, addItem, removeItem, updateQuantity } = useCart()
+  const { items, itemCount, addItem, updateQuantity } = useCart()
   const { total } = useCartPricing(items, promotions)
 
   const {
@@ -40,6 +40,7 @@ export function MenuPage() {
         searchResultCount={searchResults.length}
         selectedCategory={selectedCategory}
         categories={categories}
+        isCatalogLoading={isLoading}
         onSearchChange={handleSearchChange}
         onCategorySelect={handleCategorySelect}
       />
@@ -57,7 +58,6 @@ export function MenuPage() {
         promotions={promotions}
         items={items}
         addItem={addItem}
-        removeItem={removeItem}
         updateQuantity={updateQuantity}
         onSearchClear={() => handleSearchChange('')}
         onCategoryReset={() => handleCategorySelect('all')}

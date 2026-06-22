@@ -45,19 +45,48 @@ export const cartItemInputSchema = z.object({
   notes: z.string().trim().max(500).optional(),
 })
 
-export const createOrderSchema = z.object({
-  type: z.enum(['delivery', 'pickup', 'table']),
-  paymentMethod: z.enum(['cash', 'card', 'transfer', 'mercado_pago']),
-  customerName: z.string().trim().min(2).max(120),
-  customerPhone: z.string().trim().min(3).max(40),
-  customerAddress: z.string().trim().max(200).optional(),
-  notes: z.string().trim().max(500).optional(),
-  tableId: z.string().trim().optional(),
-  deliveryZoneId: z.string().trim().optional(),
-  discountCode: z.string().trim().max(32).optional(),
-  tip: z.number().min(0).optional(),
-  items: z.array(cartItemInputSchema).min(1),
-})
+export const createOrderSchema = z
+  .object({
+    type: z.enum(['delivery', 'pickup', 'table']),
+    paymentMethod: z.enum(['cash', 'card', 'transfer', 'mercado_pago']),
+    customerName: z.string().trim().max(120).default(''),
+    customerPhone: z.string().trim().max(40).default(''),
+    customerAddress: z.string().trim().max(200).optional(),
+    notes: z.string().trim().max(500).optional(),
+    tableId: z.string().trim().optional(),
+    deliveryZoneId: z.string().trim().optional(),
+    discountCode: z.string().trim().max(32).optional(),
+    tip: z.number().min(0).optional(),
+    items: z.array(cartItemInputSchema).min(1),
+  })
+  .superRefine((data, ctx) => {
+    if (data.type === 'table') {
+      if (!data.tableId?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'TABLE_REQUIRED',
+          path: ['tableId'],
+        })
+      }
+      return
+    }
+
+    if (data.customerName.length < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El nombre debe tener al menos 2 caracteres',
+        path: ['customerName'],
+      })
+    }
+
+    if (data.customerPhone.length < 3) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'El teléfono debe tener al menos 3 caracteres',
+        path: ['customerPhone'],
+      })
+    }
+  })
 
 export const categoryInputSchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -554,15 +583,21 @@ export function serializeOrder(order: Prisma.OrderGetPayload<{ include: typeof o
 
 /** Oculta PII y campos internos en respuestas públicas o de cliente. */
 export function stripOrderPii(order: Order): Order {
+  const isTable = order.type === 'table'
+
   return {
     ...order,
-    customerName: order.customerName.split('·')[0]?.trim() || 'Cliente',
+    customerName: isTable
+      ? order.tableNumber
+        ? `Mesa ${order.tableNumber}`
+        : order.customerName
+      : order.customerName.split('·')[0]?.trim() || 'Cliente',
     customerPhone: '',
     customerAddress: undefined,
     paymentUrl: undefined,
     createdByUserId: undefined,
     tableId: undefined,
-    tableNumber: undefined,
+    tableNumber: isTable ? order.tableNumber : undefined,
     tableSessionId: undefined,
   }
 }
@@ -1031,11 +1066,9 @@ export async function createOrderFromPayload(payload: z.input<typeof createOrder
             : 'CASH',
     customerName:
       input.type === 'table' && diningTable
-        ? input.customerName.trim()
-          ? `${input.customerName.trim()} · Mesa ${diningTable.number}`
-          : `Mesa ${diningTable.number}`
+        ? `Mesa ${diningTable.number}`
         : input.customerName,
-    customerPhone: input.customerPhone,
+    customerPhone: input.type === 'table' ? input.customerPhone || 'mesa' : input.customerPhone,
     customerAddress: input.type === 'delivery' ? input.customerAddress : undefined,
     notes: input.notes,
     subtotal,

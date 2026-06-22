@@ -1,15 +1,39 @@
+import os from 'node:os'
+
 /** @type {import('next').NextConfig} */
+function getLocalNetworkHosts() {
+  const hosts = []
+
+  for (const iface of Object.values(os.networkInterfaces())) {
+    for (const address of iface ?? []) {
+      if (address.family === 'IPv4' && !address.internal) {
+        hosts.push(address.address)
+      }
+    }
+  }
+
+  return hosts
+}
+
 const allowedDevOrigins = Array.from(
   new Set(
-    [process.env.TUNNEL_URL, process.env.NEXTAUTH_URL]
+    [
+      process.env.TUNNEL_URL,
+      process.env.NEXTAUTH_URL,
+      process.env.ALLOWED_DEV_ORIGIN,
+      ...(process.env.NODE_ENV === 'development' ? getLocalNetworkHosts() : []),
+    ]
       .filter(Boolean)
-      .map((value) => {
+      .flatMap((value) => {
         try {
-          return new URL(value).host
+          const host = new URL(value).hostname
+          return [host, new URL(value).host]
         } catch {
-          return value
+          const normalized = value
             .replace(/^https?:\/\//, '')
             .replace(/\/.*$/, '')
+          const hostname = normalized.split(':')[0]
+          return [hostname, normalized].filter(Boolean)
         }
       })
       .filter(Boolean)

@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import {
   ShoppingBag,
   ArrowRight,
-  Check,
+  ArrowLeft,
   User,
   Phone,
   MapPin,
@@ -14,6 +14,8 @@ import {
   Banknote,
   Building2,
   Users,
+  Armchair,
+  Info,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,16 +28,56 @@ import { buildMenuPathWithTable } from '@/lib/menu-url'
 import { TableSessionBanner } from '@/components/customer/table-session-banner'
 import { useCartPricing } from '@/hooks/use-cart-pricing'
 import { CartProductCard } from '@/components/customer/cart-product-card'
+import { OrderConfirmationView } from '@/components/customer/order-confirmation'
 import { CheckoutFormSkeleton, CheckoutLoadingSkeleton, LoadingSkeleton } from '@/components/shared/loading'
-import { COTY_HEADER, COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
-import { buildWhatsAppUrl } from '@/lib/whatsapp-message'
+import { COTY_HEADER, COTY_MINT, COTY_QTY_BG, COTY_TEAL, formatPrice, LOGO_SRC_SVG } from '@/lib/coty-theme'
 import { useOnlineStatus } from '@/hooks/use-online-status'
 import { cn } from '@/lib/utils'
-import type { OrderType, PaymentMethod, Order } from '@/lib/types'
+import type { OrderType, PaymentMethod, Order, OrderStatus } from '@/lib/types'
 import { toast } from 'sonner'
 import Image from 'next/image'
 
-function CheckoutHeader() {
+function CheckoutHeader({
+  tableNumber,
+  backHref,
+}: {
+  tableNumber?: number
+  backHref?: string
+}) {
+  if (tableNumber != null) {
+    return (
+      <div className="w-full" style={{ backgroundColor: COTY_HEADER }}>
+        <header className="relative mx-auto flex max-w-lg items-center justify-between px-4 py-4 md:max-w-4xl lg:max-w-6xl">
+          <Link
+            href={backHref ?? '/menu'}
+            className="flex h-9 w-9 items-center justify-center text-white"
+            aria-label="Volver al menú"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+
+          <Link href="/" className="absolute left-1/2 -translate-x-1/2">
+            <img
+              src={LOGO_SRC_SVG}
+              alt="Coty Café"
+              className="h-10 w-auto object-contain mix-blend-screen"
+            />
+          </Link>
+
+          <div
+            className="flex items-center gap-1.5 rounded-full px-3 py-1.5"
+            style={{ backgroundColor: COTY_MINT }}
+          >
+            <Armchair className="h-3.5 w-3.5" style={{ color: COTY_HEADER }} strokeWidth={2} />
+            <span className="text-xs font-semibold" style={{ color: COTY_HEADER }}>
+              Mesa {tableNumber}
+            </span>
+          </div>
+        </header>
+      </div>
+    )
+  }
+
   return (
     <div
       className="w-full rounded-b-4xl md:rounded-b-[2.5rem]"
@@ -47,6 +89,20 @@ function CheckoutHeader() {
           Revisá tu orden antes de confirmar
         </p>
       </header>
+    </div>
+  )
+}
+
+function TableOrderTitle({ tableNumber }: { tableNumber: number }) {
+  return (
+    <div className="mb-4 flex items-center gap-3">
+      <div
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+        style={{ backgroundColor: COTY_HEADER }}
+      >
+        <Users className="h-5 w-5 text-white" />
+      </div>
+      <h1 className="text-lg font-bold text-foreground md:text-xl">Tu pedido — Mesa {tableNumber}</h1>
     </div>
   )
 }
@@ -119,6 +175,11 @@ export function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [orderComplete, setOrderComplete] = useState(false)
   const [orderId, setOrderId] = useState('')
+  const [completedOrderType, setCompletedOrderType] = useState<OrderType>('pickup')
+  const [completedEstimatedMinutes, setCompletedEstimatedMinutes] = useState(20)
+  const [completedTableNumber, setCompletedTableNumber] = useState<number | undefined>()
+  const [completedTableId, setCompletedTableId] = useState<string | undefined>()
+  const [completedOrderStatus, setCompletedOrderStatus] = useState<OrderStatus>('preparing')
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   const isEmpty = items.length === 0 && !orderComplete
@@ -176,11 +237,6 @@ export function CheckoutPage() {
     }
   }, [mercadoPagoAvailable, paymentMethod])
 
-  const generateWhatsAppMessage = (order: Order) => {
-    if (!settings.whatsapp) return null
-    return buildWhatsAppUrl(settings.whatsapp, order, settings.name)
-  }
-
   const applyCoupon = async () => {
     if (!couponCode.trim()) return
     try {
@@ -212,7 +268,7 @@ export function CheckoutPage() {
       return
     }
 
-    if (!customerName || !customerPhone) {
+    if (!isTableMode && (!customerName || !customerPhone)) {
       toast.error('Por favor completá todos los campos requeridos')
       return
     }
@@ -238,8 +294,8 @@ export function CheckoutPage() {
       const createdOrder = await addOrder({
         type: activeOrderType,
         paymentMethod: isTableMode && paymentMethod === 'mercado_pago' ? 'cash' : paymentMethod,
-        customerName,
-        customerPhone,
+        customerName: isTableMode ? `Mesa ${tableSession?.tableNumber}` : customerName,
+        customerPhone: isTableMode ? 'mesa' : customerPhone,
         customerAddress: activeOrderType === 'delivery' ? customerAddress : undefined,
         tableId: isTableMode ? tableSession?.tableId : undefined,
         deliveryZoneId: activeOrderType === 'delivery' && deliveryZoneId ? deliveryZoneId : undefined,
@@ -255,6 +311,13 @@ export function CheckoutPage() {
       })
 
       setOrderId(createdOrder.displayCode ?? createdOrder.id)
+      setCompletedOrderType(activeOrderType)
+      setCompletedEstimatedMinutes(
+        Math.max(15, ...items.map((item) => item.product.preparationTime || 0), 20)
+      )
+      setCompletedTableNumber(tableSession?.tableNumber)
+      setCompletedTableId(tableSession?.tableId)
+      setCompletedOrderStatus(createdOrder.status)
 
       if (paymentMethod === 'mercado_pago') {
         const paymentOrder = await fetch('/api/payments/mercadopago/create-preference', {
@@ -272,18 +335,6 @@ export function CheckoutPage() {
           return payload as Pick<Order, 'paymentUrl'>
         })
 
-        const whatsappOrder: Order = {
-          ...createdOrder,
-          customerName,
-          customerPhone,
-          customerAddress: activeOrderType === 'delivery' ? customerAddress : undefined,
-          items,
-        }
-        const whatsappUrl = generateWhatsAppMessage(whatsappOrder)
-        if (whatsappUrl) {
-          window.open(whatsappUrl, '_blank')
-        }
-
         clearCart()
         window.location.href = paymentOrder.paymentUrl ?? '/order-status'
         return
@@ -296,18 +347,6 @@ export function CheckoutPage() {
       if (createdOrder.offlinePending || isOffline) {
         toast.success('Pedido guardado. Se enviará automáticamente al recuperar conexión.')
       }
-
-      const whatsappOrder: Order = {
-        ...createdOrder,
-        customerName,
-        customerPhone,
-        customerAddress: activeOrderType === 'delivery' ? customerAddress : undefined,
-        items,
-      }
-      const whatsappUrl = generateWhatsAppMessage(whatsappOrder)
-      if (whatsappUrl) {
-        window.open(whatsappUrl, '_blank')
-      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo procesar el pedido')
     } finally {
@@ -315,11 +354,17 @@ export function CheckoutPage() {
     }
   }
 
+  const tableNumber = tableSession?.tableNumber
+  const headerProps =
+    isTableMode && tableNumber != null
+      ? { tableNumber, backHref: menuHref }
+      : {}
+
   return (
     <>
       {!hydrated ? (
         <div className="coly-landing min-h-screen bg-white pb-36">
-          <CheckoutHeader />
+          <CheckoutHeader {...headerProps} />
           <CheckoutMain className="space-y-3 pb-4 pt-2">
             <CheckoutLoadingSkeleton />
           </CheckoutMain>
@@ -334,7 +379,7 @@ export function CheckoutPage() {
         </div>
       ) : isEmpty ? (
         <div className="coly-landing min-h-screen bg-white pb-24 md:pb-10">
-          <CheckoutHeader />
+          <CheckoutHeader {...headerProps} />
 
           <CheckoutMain className="py-12 md:py-16">
             <div className="flex flex-col items-center text-center">
@@ -360,46 +405,22 @@ export function CheckoutPage() {
           </CheckoutMain>
         </div>
       ) : orderComplete ? (
-        <div className="coly-landing min-h-screen bg-white pb-24 md:pb-10">
-          <CheckoutHeader />
-
-          <CheckoutMain className="py-12 md:py-16">
-            <div className="flex flex-col items-center text-center">
-              <div
-                className="mb-6 flex h-20 w-20 items-center justify-center rounded-full"
-                style={{ backgroundColor: COTY_QTY_BG }}
-              >
-                <Check className="h-10 w-10" style={{ color: COTY_TEAL }} />
-              </div>
-              <h2 className="text-2xl font-bold">¡Pedido confirmado!</h2>
-              <p className="mt-2 text-muted-foreground">
-                {isTableMode
-                  ? `Tu pedido #${orderId} fue enviado a la Mesa ${tableSession?.tableNumber}`
-                  : `Tu pedido #${orderId} ha sido enviado por WhatsApp`}
-              </p>
-              <div className="mt-6 w-full max-w-xs space-y-3">
-                {!isTableMode ? (
-                  <Link href="/order-status">
-                    <Button className="w-full rounded-full py-6 font-bold" style={{ backgroundColor: COTY_TEAL }}>
-                      Ver estado del pedido
-                    </Button>
-                  </Link>
-                ) : null}
-                <Link href={menuHref}>
-                  <Button variant="outline" className="w-full rounded-full py-6 font-bold">
-                    Hacer otro pedido
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </CheckoutMain>
-        </div>
+        <OrderConfirmationView
+          orderId={orderId}
+          orderType={completedOrderType}
+          tableNumber={completedTableNumber}
+          tableId={completedTableId}
+          menuHref={menuHref}
+          estimatedMinutes={completedEstimatedMinutes}
+          status={completedOrderStatus}
+        />
       ) : (
         <div className="coly-landing min-h-screen bg-white pb-36 md:pb-24">
-          <CheckoutHeader />
+          <CheckoutHeader {...headerProps} />
 
-          <CheckoutMain className="pb-4 pt-6 md:pt-8">
-            <TableSessionBanner className="mb-4" showClear={false} />
+          <CheckoutMain className={cn('pb-4', isTableMode ? 'pt-4 md:pt-6' : 'pt-6 md:pt-8')}>
+            {isTableMode && tableNumber != null ? <TableOrderTitle tableNumber={tableNumber} /> : null}
+            {!isTableMode ? <TableSessionBanner className="mb-4" showClear={false} /> : null}
             {isClosed && (
               <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 {closedMessage}
@@ -410,14 +431,14 @@ export function CheckoutPage() {
                 Pedido mínimo: {formatPrice(settings.minOrderAmount)}. Te faltan {formatPrice(settings.minOrderAmount - subtotal)}.
               </div>
             )}
-            <div className="lg:grid lg:grid-cols-5 lg:items-start lg:gap-8">
-              <div className="space-y-3 lg:col-span-3">
+            <div className={cn(isTableMode ? 'space-y-3' : 'lg:grid lg:grid-cols-5 lg:items-start lg:gap-8')}>
+              <div className={cn(isTableMode ? 'rounded-2xl border border-black/8 bg-white px-3 shadow-sm' : 'space-y-3 lg:col-span-3')}>
                 {items.map((item, index) => (
                   <CartProductCard
                     key={item.id}
                     item={item}
                     index={index}
-                    variant="cart"
+                    variant={isTableMode ? 'table' : 'cart'}
                     onIncrease={() => updateQuantity(item.id, item.quantity + 1)}
                     onDecrease={() => updateQuantity(item.id, item.quantity - 1)}
                     onRemove={() => removeItem(item.id)}
@@ -425,7 +446,7 @@ export function CheckoutPage() {
                 ))}
               </div>
 
-              <div className="mt-3 lg:col-span-2 lg:mt-0 lg:sticky lg:top-24">
+              <div className={cn(isTableMode ? 'space-y-3' : 'mt-3 lg:col-span-2 lg:mt-0 lg:sticky lg:top-24')}>
                 {isSettingsLoading ? (
                   <CheckoutFormSkeleton />
                 ) : (
@@ -434,93 +455,91 @@ export function CheckoutPage() {
                       icon={<Image src="/icons/nota.svg" alt="Nota" width={17} height={17} />}
                       title={
                         <>
-                          Nota para el local{' '}
+                          {isTableMode ? 'Notas para cocina' : 'Nota para el local'}{' '}
                           <span className="text-sm font-normal text-muted-foreground">(Opcional)</span>
                         </>
                       }
                     >
                       <Textarea
-                        placeholder="Ej: Sin cebolla, sin tomate, retirar a las 21 hs"
+                        placeholder={
+                          isTableMode
+                            ? 'Ej: Sin cebolla, sin tomate, bien cocido, etc.'
+                            : 'Ej: Sin cebolla, sin tomate, retirar a las 21 hs'
+                        }
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         rows={2}
-                        className="mt-2 resize-none rounded-none border-0 bg-transparent p-0 text-sm shadow-none placeholder:text-gray-40 placeholder:px-1 focus-visible:ring-0"
+                        className={cn(
+                          'mt-2 resize-none text-sm shadow-none focus-visible:ring-1',
+                          isTableMode
+                            ? 'rounded-xl border border-black/8 bg-[#FAFAFA] p-3 placeholder:text-gray-400 focus-visible:ring-[#2D5A57]/30'
+                            : 'rounded-none border-0 bg-transparent p-0 placeholder:px-1 placeholder:text-gray-400 focus-visible:ring-0'
+                        )}
                       />
                     </CheckoutSection>
 
-                    <div className="border-t border-black/8" />
+                    {!isTableMode ? (
+                      <>
+                        <div className="border-t border-black/8" />
 
-                    <CheckoutSection
-                      icon={
-                        isTableMode ? (
-                          <Users className="h-5 w-5 text-white" />
-                        ) : (
-                          <Image src="/icons/delivery.svg" alt="Delivery" width={22} height={22} />
-                        )
-                      }
-                      title={isTableMode ? 'Pedido en mesa' : 'Método de entrega'}
-                    >
-                      {isTableMode ? (
-                        <div className="mt-2 rounded-xl border border-black/8 bg-[#F8FBFA] px-3 py-3 text-sm">
-                          <p className="font-medium text-[#2D5A57]">Mesa {tableSession?.tableNumber}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            El pedido llega al salón y podés seguir agregando productos durante tu visita.
-                          </p>
-                        </div>
-                      ) : (
-                        <RadioGroup
-                          value={orderType}
-                          onValueChange={(v) => setOrderType(v as OrderType)}
-                          className="mt-2 space-y-3"
+                        <CheckoutSection
+                          icon={<Image src="/icons/delivery.svg" alt="Delivery" width={22} height={22} />}
+                          title="Método de entrega"
                         >
-                          <label htmlFor="pickup" className="flex cursor-pointer items-center gap-3">
-                            <RadioGroupItem
-                              value="pickup"
-                              id="pickup"
-                              className="border-[#2D5A57] text-[#2D5A57] data-[state=checked]:border-[#2D5A57]"
-                            />
-                            <span className="text-sm font-medium">Retiro en el local</span>
-                            <span
-                              className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold text-[#2D5A57]"
-                              style={{ backgroundColor: COTY_QTY_BG }}
-                            >
-                              Gratis
-                            </span>
-                          </label>
-                          <label htmlFor="delivery" className="flex cursor-pointer items-center gap-3">
-                            <RadioGroupItem
-                              value="delivery"
-                              id="delivery"
-                              className="border-[#2D5A57] text-[#2D5A57]"
-                            />
-                            <span className="text-sm font-medium">Delivery</span>
-                            {deliveryFee > 0 && (
-                              <span className="ml-auto text-xs text-muted-foreground">
-                                +{formatPrice(deliveryFee)}
-                              </span>
-                            )}
-                          </label>
-                        </RadioGroup>
-                      )}
-                      {!isTableMode && orderType === 'delivery' && deliveryZones.length > 0 ? (
-                        <div className="mt-3 space-y-2">
-                          <Label className="text-xs">Zona de entrega</Label>
                           <RadioGroup
-                            value={deliveryZoneId}
-                            onValueChange={setDeliveryZoneId}
-                            className="space-y-2"
+                            value={orderType}
+                            onValueChange={(v) => setOrderType(v as OrderType)}
+                            className="mt-2 space-y-3"
                           >
-                            {deliveryZones.map((zone) => (
-                              <label key={zone.id} htmlFor={`zone-${zone.id}`} className="flex cursor-pointer items-center gap-2 text-sm">
-                                <RadioGroupItem value={zone.id} id={`zone-${zone.id}`} />
-                                <span>{zone.name}</span>
-                                <span className="ml-auto text-xs text-muted-foreground">+{formatPrice(zone.deliveryFee)}</span>
-                              </label>
-                            ))}
+                            <label htmlFor="pickup" className="flex cursor-pointer items-center gap-3">
+                              <RadioGroupItem
+                                value="pickup"
+                                id="pickup"
+                                className="border-[#2D5A57] text-[#2D5A57] data-[state=checked]:border-[#2D5A57]"
+                              />
+                              <span className="text-sm font-medium">Retiro en el local</span>
+                              <span
+                                className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold text-[#2D5A57]"
+                                style={{ backgroundColor: COTY_QTY_BG }}
+                              >
+                                Gratis
+                              </span>
+                            </label>
+                            <label htmlFor="delivery" className="flex cursor-pointer items-center gap-3">
+                              <RadioGroupItem
+                                value="delivery"
+                                id="delivery"
+                                className="border-[#2D5A57] text-[#2D5A57]"
+                              />
+                              <span className="text-sm font-medium">Delivery</span>
+                              {deliveryFee > 0 && (
+                                <span className="ml-auto text-xs text-muted-foreground">
+                                  +{formatPrice(deliveryFee)}
+                                </span>
+                              )}
+                            </label>
                           </RadioGroup>
-                        </div>
-                      ) : null}
-                    </CheckoutSection>
+                          {orderType === 'delivery' && deliveryZones.length > 0 ? (
+                            <div className="mt-3 space-y-2">
+                              <Label className="text-xs">Zona de entrega</Label>
+                              <RadioGroup
+                                value={deliveryZoneId}
+                                onValueChange={setDeliveryZoneId}
+                                className="space-y-2"
+                              >
+                                {deliveryZones.map((zone) => (
+                                  <label key={zone.id} htmlFor={`zone-${zone.id}`} className="flex cursor-pointer items-center gap-2 text-sm">
+                                    <RadioGroupItem value={zone.id} id={`zone-${zone.id}`} />
+                                    <span>{zone.name}</span>
+                                    <span className="ml-auto text-xs text-muted-foreground">+{formatPrice(zone.deliveryFee)}</span>
+                                  </label>
+                                ))}
+                              </RadioGroup>
+                            </div>
+                          ) : null}
+                        </CheckoutSection>
+                      </>
+                    ) : null}
 
                     <div className="border-t border-black/8" />
 
@@ -530,40 +549,52 @@ export function CheckoutPage() {
                     >
                       <div className="mt-2 space-y-2 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Productos</span>
-                          <span className="font-medium">{formatPrice(subtotal + discount)}</span>
+                          <span className="text-muted-foreground">{isTableMode ? 'Subtotal' : 'Productos'}</span>
+                          <span className="font-medium">
+                            {formatPrice(isTableMode ? total - couponDiscount : subtotal + discount)}
+                          </span>
                         </div>
-                        {discount > 0 && (
+                        {!isTableMode && discount > 0 && (
                           <div className="flex justify-between text-emerald-700">
                             <span>Descuento promos</span>
                             <span className="font-medium">-{formatPrice(discount)}</span>
                           </div>
                         )}
-                        {couponDiscount > 0 ? (
+                        {!isTableMode && couponDiscount > 0 ? (
                           <div className="flex justify-between text-emerald-700">
                             <span>Cupón {couponCode}</span>
                             <span className="font-medium">-{formatPrice(couponDiscount)}</span>
                           </div>
                         ) : null}
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Código de descuento"
-                            value={couponCode}
-                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                            className="h-9"
-                          />
-                          <Button type="button" variant="outline" size="sm" onClick={() => void applyCoupon()}>
-                            Aplicar
-                          </Button>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">{isTableMode ? 'Servicio' : 'Envío'}</span>
-                          <span className="font-medium">{formatPrice(deliveryFee)}</span>
-                        </div>
                         {!isTableMode ? (
-                          <div className="space-y-2">
-                            <Label className="text-xs text-muted-foreground">Propina (opcional)</Label>
-                            <div className="flex gap-2">
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Código de descuento"
+                              value={couponCode}
+                              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                              className="h-9"
+                            />
+                            <Button type="button" variant="outline" size="sm" onClick={() => void applyCoupon()}>
+                              Aplicar
+                            </Button>
+                          </div>
+                        ) : null}
+                        {!isTableMode ? (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Envío</span>
+                            <span className="font-medium">{formatPrice(deliveryFee)}</span>
+                          </div>
+                        ) : null}
+                        {isTableMode ? (
+                          <>
+                            <div className="flex items-center justify-between">
+                              <span className="flex items-center gap-1 text-muted-foreground">
+                                Servicio (opcional)
+                                <Info className="h-3.5 w-3.5" aria-hidden />
+                              </span>
+                              <span className="font-medium">{formatPrice(tip)}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
                               {[0, Math.round(total * 0.1), Math.round(total * 0.15)].map((value, index) => (
                                 <Button
                                   key={index}
@@ -571,23 +602,44 @@ export function CheckoutPage() {
                                   size="sm"
                                   variant={tip === value ? 'default' : 'outline'}
                                   onClick={() => setTip(value)}
+                                  className={tip === value ? 'text-white' : undefined}
+                                  style={tip === value ? { backgroundColor: COTY_TEAL } : undefined}
                                 >
-                                  {index === 0 ? 'Sin propina' : formatPrice(value)}
+                                  {index === 0 ? 'Sin servicio' : formatPrice(value)}
                                 </Button>
                               ))}
                             </div>
-                          </div>
-                        ) : null}
-                        {tip > 0 ? (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Propina</span>
-                            <span className="font-medium">{formatPrice(tip)}</span>
-                          </div>
-                        ) : null}
+                          </>
+                        ) : (
+                          <>
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">Propina (opcional)</Label>
+                              <div className="flex gap-2">
+                                {[0, Math.round(total * 0.1), Math.round(total * 0.15)].map((value, index) => (
+                                  <Button
+                                    key={index}
+                                    type="button"
+                                    size="sm"
+                                    variant={tip === value ? 'default' : 'outline'}
+                                    onClick={() => setTip(value)}
+                                  >
+                                    {index === 0 ? 'Sin propina' : formatPrice(value)}
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                            {tip > 0 ? (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Propina</span>
+                                <span className="font-medium">{formatPrice(tip)}</span>
+                              </div>
+                            ) : null}
+                          </>
+                        )}
                         <div className="my-2 border-t border-black/8" />
                         <div className="flex items-center justify-between">
                           <span className="font-bold">Total</span>
-                          <span className="text-xl font-bold" style={{ color: COTY_TEAL }}>
+                          <span className="text-xl font-bold" style={{ color: COTY_HEADER }}>
                             {formatPrice(finalTotal)}
                           </span>
                         </div>
@@ -609,12 +661,20 @@ export function CheckoutPage() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => setConfirmOpen(true)}
-                  disabled={isClosed || belowMinOrder}
+                  onClick={(e) => {
+                    if (isTableMode) {
+                      void handleSubmit(e as unknown as React.FormEvent)
+                      return
+                    }
+                    setConfirmOpen(true)
+                  }}
+                  disabled={isSubmitting || isClosed || belowMinOrder}
                   className="flex w-full items-center justify-between rounded-full px-6 py-4 text-base font-bold text-white shadow-lg transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
-                  style={{ backgroundColor: '#053E38' }}
+                  style={{ backgroundColor: COTY_HEADER }}
                 >
-                  <span className="flex-1 text-center">Confirmar pedido</span>
+                  <span className="flex-1 text-center">
+                    {isSubmitting ? 'Procesando...' : isTableMode ? 'Enviar pedido' : 'Confirmar pedido'}
+                  </span>
                   <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white">
                     <ArrowRight className="h-5 w-5" style={{ color: COTY_TEAL }} />
                   </span>
@@ -625,7 +685,7 @@ export function CheckoutPage() {
         </div>
       )}
 
-      {confirmOpen && !isEmpty && !orderComplete && (
+      {confirmOpen && !isEmpty && !orderComplete && !isTableMode && (
         <SimpleModal open onClose={() => setConfirmOpen(false)} title="Datos para confirmar" className="max-w-md rounded-2xl">
           <div className="overflow-y-auto p-4 pt-10">
             <form onSubmit={handleSubmit} className="space-y-4">

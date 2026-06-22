@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { Search, X, ShoppingBag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { MenuCategoryNav } from '@/components/customer/menu-category-nav'
+import { MenuCategoryNav, MenuCategoryNavSkeleton } from '@/components/customer/menu-category-nav'
 import { TableSessionBanner } from '@/components/customer/table-session-banner'
 import { COTY_HEADER, COTY_TEAL, LOGO_SRC_SVG, formatPrice } from '@/lib/coty-theme'
 import { useTableSession } from '@/lib/store'
@@ -17,6 +17,7 @@ interface MenuHeaderProps {
   searchResultCount: number
   selectedCategory: MenuCategoryId
   categories: Category[]
+  isCatalogLoading?: boolean
   onSearchChange: (value: string) => void
   onCategorySelect: (categoryId: MenuCategoryId) => void
 }
@@ -27,11 +28,12 @@ export function MenuHeader({
   searchResultCount,
   selectedCategory,
   categories,
+  isCatalogLoading = false,
   onSearchChange,
   onCategorySelect,
 }: MenuHeaderProps) {
-  const { tableSession, isLoading, error } = useTableSession()
-  const hasTableIndicator = isLoading || Boolean(tableSession) || Boolean(error)
+  const { tableSession, isLoading: isTableSessionLoading, error } = useTableSession()
+  const hasTableIndicator = isTableSessionLoading || Boolean(tableSession) || Boolean(error)
   const isPromoPage = selectedCategory === 'promo'
 
   return (
@@ -94,7 +96,15 @@ export function MenuHeader({
         {!isSearchMode && (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 translate-y-1/2 px-4 md:px-6 lg:px-8">
             <div className="pointer-events-auto md:mx-auto md:max-w-4xl lg:max-w-5xl">
-              <MenuCategoryNav categories={categories} selected={selectedCategory} onSelect={onCategorySelect} />
+              {isCatalogLoading ? (
+                <MenuCategoryNavSkeleton />
+              ) : (
+                <MenuCategoryNav
+                  categories={categories}
+                  selected={selectedCategory}
+                  onSelect={onCategorySelect}
+                />
+              )}
             </div>
           </div>
         )}

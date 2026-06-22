@@ -54,7 +54,7 @@ function HomeSearchBar() {
         <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
         <input
           type="search"
-          placeholder="Buscar"
+          placeholder="Buscar productos..."
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
           className="w-full rounded-full bg-white py-3 pl-11 pr-4 text-sm text-foreground placeholder:text-gray-400 focus:outline-none md:py-3.5 md:text-base"

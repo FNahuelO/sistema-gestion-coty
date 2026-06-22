@@ -3,10 +3,9 @@
 import type { CartItem, Product, Promotion } from '@/lib/types'
 import { useCart } from '@/lib/store'
 import { EmptyState } from '@/components/shared/empty-state'
-import { CartItemSkeleton, LoadingSkeleton, ProductCardSkeleton } from '@/components/shared/loading'
+import { LoadingSkeleton } from '@/components/shared/loading'
 import { MenuSectionHeader } from '@/components/customer/menu-section-header'
-import { MenuGridProductCard } from '@/components/customer/menu-grid-product-card'
-import { MenuListProductCard } from '@/components/customer/menu-list-product-card'
+import { MenuProductCarousel, MenuProductCarouselSkeleton } from '@/components/customer/menu-product-carousel'
 import { PromosView, PromosLoadingSkeleton } from '@/components/customer/promos-view'
 import { renderCategoryIcon } from '@/lib/render-category-icon'
 import type { MenuCategoryId, MenuSection } from '@/lib/menu-categories'
@@ -25,7 +24,6 @@ interface MenuContentProps {
   items: CartItem[]
   promotions: Promotion[]
   addItem: ReturnType<typeof useCart>['addItem']
-  removeItem: ReturnType<typeof useCart>['removeItem']
   updateQuantity: ReturnType<typeof useCart>['updateQuantity']
   onSearchClear: () => void
   onCategoryReset: () => void
@@ -45,7 +43,6 @@ export function MenuContent({
   items,
   promotions,
   addItem,
-  removeItem,
   updateQuantity,
   onSearchClear,
   onCategoryReset,
@@ -63,7 +60,7 @@ export function MenuContent({
           <PromosLoadingSkeleton />
         ) : (
           <MenuLoadingSkeleton
-            variant={isSearchMode || (selectedCategory !== 'all' && selectedCategory !== 'promo') ? 'list' : 'grid'}
+            variant={isSearchMode || (selectedCategory !== 'all' && selectedCategory !== 'promo') ? 'carousel' : 'sections'}
           />
         )
       ) : isSearchMode ? (
@@ -72,7 +69,6 @@ export function MenuContent({
           items={items}
           promotions={promotions}
           addItem={addItem}
-          removeItem={removeItem}
           updateQuantity={updateQuantity}
           onSearchClear={onSearchClear}
           onOpenProduct={onOpenProduct}
@@ -104,7 +100,6 @@ export function MenuContent({
           items={items}
           promotions={promotions}
           addItem={addItem}
-          removeItem={removeItem}
           updateQuantity={updateQuantity}
           onCategoryReset={onCategoryReset}
           onOpenProduct={onOpenProduct}
@@ -114,15 +109,9 @@ export function MenuContent({
   )
 }
 
-function MenuLoadingSkeleton({ variant }: { variant: 'grid' | 'list' }) {
-  if (variant === 'list') {
-    return (
-      <div className="space-y-3">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <CartItemSkeleton key={index} />
-        ))}
-      </div>
-    )
+function MenuLoadingSkeleton({ variant }: { variant: 'sections' | 'carousel' }) {
+  if (variant === 'carousel') {
+    return <MenuProductCarouselSkeleton count={3} />
   }
 
   return (
@@ -136,11 +125,7 @@ function MenuLoadingSkeleton({ variant }: { variant: 'grid' | 'list' }) {
               <LoadingSkeleton className="h-3 w-20" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <ProductCardSkeleton key={index} />
-            ))}
-          </div>
+          <MenuProductCarouselSkeleton count={3} />
         </div>
       ))}
     </div>
@@ -152,7 +137,6 @@ function SearchResults({
   items,
   promotions,
   addItem,
-  removeItem,
   updateQuantity,
   onSearchClear,
   onOpenProduct,
@@ -161,7 +145,6 @@ function SearchResults({
   items: CartItem[]
   promotions: Promotion[]
   addItem: ReturnType<typeof useCart>['addItem']
-  removeItem: ReturnType<typeof useCart>['removeItem']
   updateQuantity: ReturnType<typeof useCart>['updateQuantity']
   onSearchClear: () => void
   onOpenProduct: (product: Product) => void
@@ -178,20 +161,14 @@ function SearchResults({
   }
 
   return (
-    <div className="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3">
-      {results.map((product) => (
-        <MenuListProductCard
-          key={product.id}
-          product={product}
-          promotions={promotions}
-          items={items}
-          addItem={addItem}
-          removeItem={removeItem}
-          updateQuantity={updateQuantity}
-          onOpenDetail={() => onOpenProduct(product)}
-        />
-      ))}
-    </div>
+    <MenuProductCarousel
+      products={results}
+      items={items}
+      promotions={promotions}
+      addItem={addItem}
+      updateQuantity={updateQuantity}
+      onOpenProduct={onOpenProduct}
+    />
   )
 }
 
@@ -229,19 +206,14 @@ function AllCategoriesView({
               name={section.name}
               count={section.products.length}
             />
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
-              {section.products.map((product) => (
-                <MenuGridProductCard
-                  key={product.id}
-                  product={product}
-                  promotions={promotions}
-                  items={items}
-                  addItem={addItem}
-                  updateQuantity={updateQuantity}
-                  onOpenDetail={() => onOpenProduct(product)}
-                />
-              ))}
-            </div>
+            <MenuProductCarousel
+              products={section.products}
+              items={items}
+              promotions={promotions}
+              addItem={addItem}
+              updateQuantity={updateQuantity}
+              onOpenProduct={onOpenProduct}
+            />
           </section>
         ))}
     </div>
@@ -256,7 +228,6 @@ function SingleCategoryView({
   items,
   promotions,
   addItem,
-  removeItem,
   updateQuantity,
   onCategoryReset,
   onOpenProduct,
@@ -268,7 +239,6 @@ function SingleCategoryView({
   items: CartItem[]
   promotions: Promotion[]
   addItem: ReturnType<typeof useCart>['addItem']
-  removeItem: ReturnType<typeof useCart>['removeItem']
   updateQuantity: ReturnType<typeof useCart>['updateQuantity']
   onCategoryReset: () => void
   onOpenProduct: (product: Product) => void
@@ -296,20 +266,14 @@ function SingleCategoryView({
           className="mb-4"
         />
       )}
-      <div className="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3">
-        {products.map((product) => (
-          <MenuListProductCard
-            key={product.id}
-            product={product}
-            promotions={promotions}
-            items={items}
-            addItem={addItem}
-            removeItem={removeItem}
-            updateQuantity={updateQuantity}
-            onOpenDetail={() => onOpenProduct(product)}
-          />
-        ))}
-      </div>
+      <MenuProductCarousel
+        products={products}
+        items={items}
+        promotions={promotions}
+        addItem={addItem}
+        updateQuantity={updateQuantity}
+        onOpenProduct={onOpenProduct}
+      />
     </>
   )
 }

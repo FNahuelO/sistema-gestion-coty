@@ -26,7 +26,9 @@ export function StaffDashboard() {
     <StaffShell activeSection={activeSection} onSectionChange={setActiveSection}>
       <div className="mx-auto max-w-6xl space-y-4">
         <StaffPageHeader title={copy.title} description={copy.description} />
-        {activeSection === 'orders' ? <OrdersSection embedded /> : null}
+        {activeSection === 'orders' ? (
+          <OrdersSection embedded onNavigateToCalls={() => setActiveSection('calls')} />
+        ) : null}
         {activeSection === 'kitchen' ? <KitchenSection /> : null}
         {activeSection === 'tables' ? <TablesSection embedded /> : null}
         {activeSection === 'delivery' ? <DeliverySection /> : null}

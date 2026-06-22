@@ -606,10 +606,12 @@ export function useOrders() {
 
 export function useTrackedOrders(searchId: string) {
   const [codes, setCodes] = useState<string[]>([])
+  const [codesBootstrapped, setCodesBootstrapped] = useState(false)
   const [offlineOrders, setOfflineOrders] = useState<Order[]>([])
 
   useEffect(() => {
     setCodes(getStoredTrackingCodes())
+    setCodesBootstrapped(true)
   }, [])
 
   useEffect(() => {
@@ -670,7 +672,10 @@ export function useTrackedOrders(searchId: string) {
   return {
     orders,
     error,
-    isLoading,
+    isLoading:
+      !codesBootstrapped ||
+      (Boolean(queryString) && data === undefined && !error) ||
+      isLoading,
     refresh: mutate,
     rememberTrackingCode: (value: string) => {
       storeTrackingCode(value)

@@ -11,20 +11,20 @@ interface StatusBadgeProps {
 }
 
 const orderStatusStyles: Record<OrderStatus, string> = {
-  pending: 'bg-warning/20 text-warning-foreground border-warning/30',
-  confirmed: 'bg-info/20 text-info-foreground border-info/30',
-  preparing: 'bg-accent/20 text-accent-foreground border-accent/30',
-  ready: 'bg-success/20 text-success-foreground border-success/30',
-  delivered: 'bg-success/20 text-success-foreground border-success/30',
-  completed: 'bg-muted text-muted-foreground border-muted',
-  cancelled: 'bg-destructive/20 text-destructive border-destructive/30',
+  pending: 'border-amber-300 bg-amber-100 text-amber-950',
+  confirmed: 'border-sky-300 bg-sky-100 text-sky-950',
+  preparing: 'border-orange-300 bg-orange-100 text-orange-950',
+  ready: 'border-emerald-300 bg-emerald-100 text-emerald-950',
+  delivered: 'border-emerald-300 bg-emerald-100 text-emerald-950',
+  completed: 'border-gray-300 bg-gray-100 text-gray-800',
+  cancelled: 'border-red-300 bg-red-100 text-red-950',
 }
 
 const tableStatusStyles: Record<TableStatus, string> = {
-  free: 'bg-success/20 text-success-foreground border-success/30',
-  occupied: 'bg-accent/20 text-accent-foreground border-accent/30',
-  waiting: 'bg-warning/20 text-warning-foreground border-warning/30',
-  finished: 'bg-info/20 text-info-foreground border-info/30',
+  free: 'border-emerald-300 bg-emerald-100 text-emerald-950',
+  occupied: 'border-teal-300 bg-[#C5DDD9] text-[#053E38]',
+  waiting: 'border-amber-300 bg-amber-100 text-amber-950',
+  finished: 'border-sky-300 bg-sky-100 text-sky-950',
 }
 
 const orderStatusOnDarkStyles: Record<OrderStatus, string> = {
@@ -64,7 +64,7 @@ export function StatusBadge({ status, className, variant = 'default' }: StatusBa
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold',
+        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-bold',
         styleClass,
         className
       )}

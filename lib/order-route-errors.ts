@@ -21,8 +21,12 @@ const ORDER_ERROR_MESSAGES = new Map<string, [string, number]>([
 
 export function handleOrderRouteError(error: unknown, context: string) {
   if (error instanceof ZodError) {
-    const message = error.errors[0]?.message ?? 'Datos del pedido inválidos'
-    return NextResponse.json({ error: message }, { status: 400 })
+    const issueMessage = error.errors[0]?.message ?? 'Datos del pedido inválidos'
+    if (ORDER_ERROR_MESSAGES.has(issueMessage)) {
+      const [message, status] = ORDER_ERROR_MESSAGES.get(issueMessage)!
+      return NextResponse.json({ error: message }, { status })
+    }
+    return NextResponse.json({ error: issueMessage }, { status: 400 })
   }
 
   if (error instanceof Error) {
