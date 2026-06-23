@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   ShoppingBag,
   ArrowRight,
@@ -25,13 +25,16 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { SimpleModal } from '@/components/ui/simple-modal'
 import { useCart, useBusiness, useCatalog, useOrders, useTableSession, rememberOrderTracking } from '@/lib/store'
 import {
+  buildCleanUrlWithoutMpReturn,
   buildOrderStatusReturnUrl,
   clearMpRedirecting,
   getMpPendingOrder,
   markMpRedirecting,
+  markMpReturnHandled,
   MP_REDIRECTING_KEY,
   rememberMpPendingOrder,
   shouldRedirectCheckoutToOrderStatus,
+  wasMpReturnAlreadyHandled,
 } from '@/lib/mercadopago-return'
 import { buildMenuPathWithTable } from '@/lib/menu-url'
 import { TableSessionBanner } from '@/components/customer/table-session-banner'
@@ -162,6 +165,7 @@ function CheckoutSection({
 
 export function CheckoutPage() {
   const pathname = usePathname()
+  const router = useRouter()
   const searchParams = useSearchParams()
   const { items, hydrated, updateQuantity, removeItem, clearCart } = useCart()
   const { settings, isLoading: isSettingsLoading } = useBusiness()
@@ -256,9 +260,17 @@ export function CheckoutPage() {
     }
 
     if (searchParams.get('status') === 'failure') {
-      toast.error('El pago con Mercado Pago no se completó. Podés reintentar o elegir otro método.')
+      const orderId = searchParams.get('orderId')
+      const cleanUrl = buildCleanUrlWithoutMpReturn(pathname, searchParams)
+
+      if (!wasMpReturnAlreadyHandled(orderId, 'failure')) {
+        markMpReturnHandled(orderId, 'failure')
+        toast.error('El pago con Mercado Pago no se completó. Podés reintentar o elegir otro método.')
+      }
+
+      router.replace(cleanUrl)
     }
-  }, [searchParams])
+  }, [searchParams, pathname, router])
 
   useEffect(() => {
     if (!mercadoPagoAvailable && paymentMethod === 'mercado_pago') {

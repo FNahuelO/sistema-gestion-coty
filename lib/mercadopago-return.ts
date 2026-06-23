@@ -98,3 +98,45 @@ export function clearMpRedirecting() {
   if (typeof window === 'undefined') return
   window.sessionStorage.removeItem(MP_REDIRECTING_KEY)
 }
+
+const MP_RETURN_QUERY_PARAMS = [
+  'status',
+  'payment_id',
+  'collection_status',
+  'collection_id',
+  'external_reference',
+  'orderId',
+  'preference_id',
+  'merchant_order_id',
+] as const
+
+export const MP_RETURN_HANDLED_PREFIX = 'coty-mp-return-handled'
+
+export function getMpReturnHandledKey(orderId: string | null, status: string) {
+  return `${MP_RETURN_HANDLED_PREFIX}:${orderId ?? 'no-order'}:${status}`
+}
+
+export function wasMpReturnAlreadyHandled(orderId: string | null, status: string) {
+  if (typeof window === 'undefined') return false
+  return window.sessionStorage.getItem(getMpReturnHandledKey(orderId, status)) === '1'
+}
+
+export function markMpReturnHandled(orderId: string | null, status: string) {
+  if (typeof window === 'undefined') return
+  window.sessionStorage.setItem(getMpReturnHandledKey(orderId, status), '1')
+}
+
+export function buildCleanUrlWithoutMpReturn(pathname: string, searchParams: SearchParamsLike & { entries?: () => IterableIterator<[string, string]> }) {
+  const next = new URLSearchParams()
+
+  if (typeof searchParams.entries === 'function') {
+    for (const [key, value] of searchParams.entries()) {
+      if (!(MP_RETURN_QUERY_PARAMS as readonly string[]).includes(key)) {
+        next.set(key, value)
+      }
+    }
+  }
+
+  const query = next.toString()
+  return query ? `${pathname}?${query}` : pathname
+}

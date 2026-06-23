@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   Clock,
@@ -15,7 +15,13 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useCart, useTableSession, useTrackedOrders } from '@/lib/store'
-import { clearMpPendingOrder, clearMpRedirecting } from '@/lib/mercadopago-return'
+import {
+  buildCleanUrlWithoutMpReturn,
+  clearMpPendingOrder,
+  clearMpRedirecting,
+  markMpReturnHandled,
+  wasMpReturnAlreadyHandled,
+} from '@/lib/mercadopago-return'
 import { buildMenuPathWithTable } from '@/lib/menu-url'
 import { ORDER_STATUS_LABELS } from '@/lib/order-labels'
 import { EmptyState } from '@/components/shared/empty-state'
@@ -325,29 +331,47 @@ function OrderCard({ order }: { order: Order }) {
 }
 
 function OrderStatusContent() {
+  const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
-  const paymentStatus = searchParams.get('status')
   const paymentReturnOrderId =
     searchParams.get('external_reference')?.trim() ||
     searchParams.get('orderId')?.trim() ||
     null
   const [searchId, setSearchId] = useState('')
+  const [returnNoticeStatus, setReturnNoticeStatus] = useState<string | null>(null)
   const { tableSession } = useTableSession()
   const { clearCart } = useCart()
   const { orders, isLoading } = useTrackedOrders(searchId, paymentReturnOrderId)
   const menuHref = tableSession ? buildMenuPathWithTable(tableSession.tableId) : '/menu'
 
   useEffect(() => {
+    const status = searchParams.get('status')
+    if (status !== 'approved' && status !== 'pending') return
+
+    const orderId = paymentReturnOrderId
+    const cleanUrl = buildCleanUrlWithoutMpReturn(pathname, searchParams)
+
     clearMpRedirecting()
 
-    if (paymentStatus === 'approved') {
+    if (wasMpReturnAlreadyHandled(orderId, status)) {
+      router.replace(cleanUrl)
+      return
+    }
+
+    markMpReturnHandled(orderId, status)
+    setReturnNoticeStatus(status)
+
+    if (status === 'approved') {
       clearMpPendingOrder()
       clearCart()
       toast.success('¡Pago confirmado! Tu pedido ya está en preparación.')
-    } else if (paymentStatus === 'pending') {
+    } else {
       toast.message('Pago pendiente de confirmación')
     }
-  }, [paymentStatus, clearCart])
+
+    router.replace(cleanUrl)
+  }, [searchParams, pathname, router, paymentReturnOrderId, clearCart])
 
   const visibleOrders = orders
 
@@ -356,7 +380,7 @@ function OrderStatusContent() {
       <OrderStatusHeader searchId={searchId} onSearchChange={setSearchId} />
 
       <main className={cn(PAGE_SHELL, 'py-6')}>
-        <PaymentReturnNotice status={paymentStatus} />
+        <PaymentReturnNotice status={returnNoticeStatus} />
 
         {isLoading && visibleOrders.length === 0 ? (
           <CustomerOrderStatusListSkeleton />
