@@ -326,9 +326,13 @@ function OrderCard({ order }: { order: Order }) {
 function OrderStatusContent() {
   const searchParams = useSearchParams()
   const paymentStatus = searchParams.get('status')
+  const paymentReturnOrderId =
+    searchParams.get('external_reference')?.trim() ||
+    searchParams.get('orderId')?.trim() ||
+    null
   const [searchId, setSearchId] = useState('')
   const { tableSession } = useTableSession()
-  const { orders, isLoading } = useTrackedOrders(searchId)
+  const { orders, isLoading } = useTrackedOrders(searchId, paymentReturnOrderId)
   const menuHref = tableSession ? buildMenuPathWithTable(tableSession.tableId) : '/menu'
 
   useEffect(() => {
@@ -350,6 +354,14 @@ function OrderStatusContent() {
 
         {isLoading && visibleOrders.length === 0 ? (
           <CustomerOrderStatusListSkeleton />
+        ) : visibleOrders.length === 0 && paymentReturnOrderId ? (
+          <div className="rounded-3xl border border-gray-100 bg-white px-4 py-8 text-center shadow-sm">
+            <Clock className="mx-auto mb-3 h-8 w-8 text-[#7EB8B3]" />
+            <p className="font-semibold text-[#053E38]">Confirmando tu pago</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Estamos cargando tu pedido. Si no aparece en unos segundos, buscalo por el código que recibiste.
+            </p>
+          </div>
         ) : visibleOrders.length === 0 ? (
           <div className="rounded-3xl border border-gray-100 bg-white px-4 py-8 shadow-sm">
             <EmptyState

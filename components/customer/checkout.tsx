@@ -23,7 +23,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { SimpleModal } from '@/components/ui/simple-modal'
-import { useCart, useBusiness, useCatalog, useOrders, useTableSession } from '@/lib/store'
+import { useCart, useBusiness, useCatalog, useOrders, useTableSession, rememberOrderTracking } from '@/lib/store'
 import { buildMenuPathWithTable } from '@/lib/menu-url'
 import { TableSessionBanner } from '@/components/customer/table-session-banner'
 import { useCartPricing } from '@/hooks/use-cart-pricing'
@@ -336,6 +336,7 @@ export function CheckoutPage() {
         })
 
         clearCart()
+        rememberOrderTracking(createdOrder.publicTrackingCode, createdOrder.id, createdOrder.displayCode)
         window.location.href = paymentOrder.paymentUrl ?? '/order-status'
         return
       }

@@ -121,6 +121,12 @@ const storeTrackingCode = (value?: string) => {
   window.localStorage.setItem(TRACKING_CODES_KEY, JSON.stringify([...current]))
 }
 
+export function rememberOrderTracking(...values: Array<string | undefined>) {
+  for (const value of values) {
+    storeTrackingCode(value)
+  }
+}
+
 const getStoredTrackingCodes = () => {
   if (typeof window === 'undefined') return [] as string[]
   try {
@@ -621,7 +627,7 @@ export function useOrders() {
   }
 }
 
-export function useTrackedOrders(searchId: string) {
+export function useTrackedOrders(searchId: string, paymentReturnOrderId?: string | null) {
   const [codes, setCodes] = useState<string[]>([])
   const [codesBootstrapped, setCodesBootstrapped] = useState(false)
   const [offlineOrders, setOfflineOrders] = useState<Order[]>([])
@@ -630,6 +636,12 @@ export function useTrackedOrders(searchId: string) {
     setCodes(getStoredTrackingCodes())
     setCodesBootstrapped(true)
   }, [])
+
+  useEffect(() => {
+    if (!paymentReturnOrderId) return
+    storeTrackingCode(paymentReturnOrderId)
+    setCodes(getStoredTrackingCodes())
+  }, [paymentReturnOrderId])
 
   useEffect(() => {
     const refresh = () => {
@@ -644,15 +656,24 @@ export function useTrackedOrders(searchId: string) {
     return () => window.removeEventListener(OFFLINE_QUEUE_CHANGED_EVENT, refresh)
   }, [])
 
+  const trackingCodes = useMemo(() => {
+    const merged = new Set(codes)
+    if (paymentReturnOrderId) merged.add(paymentReturnOrderId)
+    return [...merged]
+  }, [codes, paymentReturnOrderId])
+
   const queryString = useMemo(() => {
     if (searchId.trim()) {
       return `/api/orders/track?query=${encodeURIComponent(searchId.trim())}`
     }
-    if (codes.length > 0) {
-      return `/api/orders/track?codes=${encodeURIComponent(codes.join(','))}`
+    if (trackingCodes.length > 0) {
+      return `/api/orders/track?codes=${encodeURIComponent(trackingCodes.join(','))}`
+    }
+    if (paymentReturnOrderId) {
+      return `/api/orders/track?query=${encodeURIComponent(paymentReturnOrderId)}`
     }
     return null
-  }, [codes, searchId])
+  }, [trackingCodes, searchId, paymentReturnOrderId])
 
   const { data, error, isLoading, mutate } = useSWR<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
     queryString,
@@ -665,11 +686,20 @@ export function useTrackedOrders(searchId: string) {
 
   const serverOrders = useMemo(() => (data ?? []).map(parseOrder), [data])
 
+  useEffect(() => {
+    if (!serverOrders.length) return
+    for (const order of serverOrders) {
+      storeTrackingCode(order.publicTrackingCode ?? order.id)
+      if (order.displayCode) storeTrackingCode(order.displayCode)
+    }
+    setCodes(getStoredTrackingCodes())
+  }, [serverOrders])
+
   const orders = useMemo(() => {
     const query = searchId.trim().toLowerCase()
     const offlineMatches = offlineOrders.filter((order) => {
       if (!query) {
-        return codes.some(
+        return trackingCodes.some(
           (code) =>
             code === order.id ||
             code === order.publicTrackingCode ||
@@ -684,7 +714,7 @@ export function useTrackedOrders(searchId: string) {
     })
     const offlineIds = new Set(offlineMatches.map((order) => order.id))
     return [...offlineMatches, ...serverOrders.filter((order) => !offlineIds.has(order.id))]
-  }, [serverOrders, offlineOrders, codes, searchId])
+  }, [serverOrders, offlineOrders, trackingCodes, searchId])
 
   return {
     orders,
