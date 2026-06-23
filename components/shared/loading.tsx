@@ -152,9 +152,8 @@ export function LandingProductCardSkeleton({
 }) {
   return (
     <div
-      className={`flex h-full w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-black/8 shadow-sm md:rounded-3xl ${
-        variant === 'on-teal' ? 'bg-white/95' : 'bg-white'
-      }`}
+      className={`flex h-full w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-black/8 shadow-sm md:rounded-3xl ${variant === 'on-teal' ? 'bg-white/95' : 'bg-white'
+        }`}
     >
       <LoadingSkeleton className="aspect-4/3 w-full shrink-0 rounded-none" />
       <div className="flex flex-1 flex-col p-3 md:p-4">
@@ -230,13 +229,8 @@ export function CheckoutFormSkeleton() {
 
 export function CheckoutLoadingSkeleton({ itemCount = 2 }: { itemCount?: number }) {
   return (
-    <>
-      <div className="space-y-3">
-        {Array.from({ length: itemCount }).map((_, index) => (
-          <CartItemSkeleton key={index} />
-        ))}
-      </div>
+    <div className="space-y-3">
       <CheckoutFormSkeleton />
-    </>
+    </div>
   )
 }

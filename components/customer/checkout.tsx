@@ -27,12 +27,11 @@ import { useCart, useBusiness, useCatalog, useOrders, useTableSession, rememberO
 import {
   buildCleanUrlWithoutMpReturn,
   buildOrderStatusReturnUrl,
-  clearMpRedirecting,
   getMpPendingOrder,
   markMpRedirecting,
   markMpReturnHandled,
-  MP_REDIRECTING_KEY,
   rememberMpPendingOrder,
+  resetMpCheckoutFlow,
   shouldRedirectCheckoutToOrderStatus,
   wasMpReturnAlreadyHandled,
 } from '@/lib/mercadopago-return'
@@ -199,7 +198,14 @@ export function CheckoutPage() {
   const [pendingMpOrder, setPendingMpOrder] = useState<ReturnType<typeof getMpPendingOrder>>(null)
   const submitLockRef = useRef(false)
 
-  const showingMpRedirect = redirectingToMp || redirectingToMpRef.current
+  const resetMpRedirectState = () => {
+    redirectingToMpRef.current = false
+    setRedirectingToMp(false)
+    submitLockRef.current = false
+    resetMpCheckoutFlow()
+  }
+
+  const showingMpRedirect = redirectingToMp
   const isEmpty = items.length === 0 && !orderComplete && !showingMpRedirect
   const activeOrderType = isTableMode ? 'table' : orderType
   const selectedZone = deliveryZones.find((zone) => zone.id === deliveryZoneId)
@@ -226,11 +232,18 @@ export function CheckoutPage() {
   useEffect(() => {
     const pending = getMpPendingOrder()
     setPendingMpOrder(pending)
+    resetMpRedirectState()
+  }, [])
 
-    if (window.sessionStorage.getItem(MP_REDIRECTING_KEY)) {
-      redirectingToMpRef.current = true
-      setRedirectingToMp(true)
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return
+      resetMpRedirectState()
+      setIsSubmitting(false)
     }
+
+    window.addEventListener('pageshow', handlePageShow)
+    return () => window.removeEventListener('pageshow', handlePageShow)
   }, [])
 
   useEffect(() => {
@@ -262,6 +275,9 @@ export function CheckoutPage() {
     if (searchParams.get('status') === 'failure') {
       const orderId = searchParams.get('orderId')
       const cleanUrl = buildCleanUrlWithoutMpReturn(pathname, searchParams)
+
+      resetMpRedirectState()
+      setIsSubmitting(false)
 
       if (!wasMpReturnAlreadyHandled(orderId, 'failure')) {
         markMpReturnHandled(orderId, 'failure')
@@ -370,7 +386,6 @@ export function CheckoutPage() {
           )
         }
 
-        markMpRedirecting()
         redirectingToMpRef.current = true
         setRedirectingToMp(true)
         setConfirmOpen(false)
@@ -399,6 +414,7 @@ export function CheckoutPage() {
           displayCode: createdOrder.displayCode,
         })
         rememberOrderTracking(createdOrder.publicTrackingCode, createdOrder.id, createdOrder.displayCode)
+        markMpRedirecting()
         window.location.replace(paymentUrl)
         return
       }
@@ -411,10 +427,7 @@ export function CheckoutPage() {
         toast.success('Pedido guardado. Se enviará automáticamente al recuperar conexión.')
       }
     } catch (error) {
-      submitLockRef.current = false
-      redirectingToMpRef.current = false
-      setRedirectingToMp(false)
-      clearMpRedirecting()
+      resetMpRedirectState()
       toast.error(error instanceof Error ? error.message : 'No se pudo procesar el pedido')
     } finally {
       setIsSubmitting(false)

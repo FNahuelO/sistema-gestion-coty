@@ -91,12 +91,16 @@ export function clearMpPendingOrder() {
 
 export function markMpRedirecting() {
   if (typeof window === 'undefined') return
-  window.sessionStorage.setItem(MP_REDIRECTING_KEY, '1')
+  window.sessionStorage.setItem(MP_REDIRECTING_KEY, String(Date.now()))
 }
 
 export function clearMpRedirecting() {
   if (typeof window === 'undefined') return
   window.sessionStorage.removeItem(MP_REDIRECTING_KEY)
+}
+
+export function resetMpCheckoutFlow() {
+  clearMpRedirecting()
 }
 
 const MP_RETURN_QUERY_PARAMS = [
