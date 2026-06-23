@@ -16,6 +16,11 @@ import { getMesaIdFromSearch } from '@/lib/menu-url'
 import { hasPermission, type Permission, type SessionRoleContext } from '@/lib/permissions'
 
 const CART_STORAGE_KEY = 'coty-cafe-cart'
+
+export function clearStoredCart() {
+  if (typeof window === 'undefined') return
+  window.localStorage.removeItem(CART_STORAGE_KEY)
+}
 const TRACKING_CODES_KEY = 'coty-cafe-tracking-codes'
 const TABLE_SESSION_STORAGE_KEY = 'coty-cafe-table-session'
 
@@ -357,6 +362,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const clearCart = useCallback(() => {
+    clearStoredCart()
     setItems([])
   }, [])
 

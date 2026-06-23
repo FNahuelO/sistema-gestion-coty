@@ -17,8 +17,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const sessionUser = await getSessionUser()
     const order = await createOrderFromPayload(body, sessionUser?.id)
-    const response = sessionUser ? order : buildCustomerOrderResponse(order)
-    return NextResponse.json(response, { status: 201 })
+    return NextResponse.json(buildCustomerOrderResponse(order), { status: 201 })
   } catch (error) {
     return handleOrderRouteError(error, 'POST /api/orders')
   }

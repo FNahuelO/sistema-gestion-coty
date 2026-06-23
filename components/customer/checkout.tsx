@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import {
@@ -24,6 +24,15 @@ import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { SimpleModal } from '@/components/ui/simple-modal'
 import { useCart, useBusiness, useCatalog, useOrders, useTableSession, rememberOrderTracking } from '@/lib/store'
+import {
+  buildOrderStatusReturnUrl,
+  clearMpRedirecting,
+  getMpPendingOrder,
+  markMpRedirecting,
+  MP_REDIRECTING_KEY,
+  rememberMpPendingOrder,
+  shouldRedirectCheckoutToOrderStatus,
+} from '@/lib/mercadopago-return'
 import { buildMenuPathWithTable } from '@/lib/menu-url'
 import { TableSessionBanner } from '@/components/customer/table-session-banner'
 import { useCartPricing } from '@/hooks/use-cart-pricing'
@@ -181,8 +190,13 @@ export function CheckoutPage() {
   const [completedTableId, setCompletedTableId] = useState<string | undefined>()
   const [completedOrderStatus, setCompletedOrderStatus] = useState<OrderStatus>('preparing')
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const redirectingToMpRef = useRef(false)
+  const [redirectingToMp, setRedirectingToMp] = useState(false)
+  const [pendingMpOrder, setPendingMpOrder] = useState<ReturnType<typeof getMpPendingOrder>>(null)
+  const submitLockRef = useRef(false)
 
-  const isEmpty = items.length === 0 && !orderComplete
+  const showingMpRedirect = redirectingToMp || redirectingToMpRef.current
+  const isEmpty = items.length === 0 && !orderComplete && !showingMpRedirect
   const activeOrderType = isTableMode ? 'table' : orderType
   const selectedZone = deliveryZones.find((zone) => zone.id === deliveryZoneId)
   const deliveryFee =
@@ -206,6 +220,16 @@ export function CheckoutPage() {
   const menuHref = tableSession ? buildMenuPathWithTable(tableSession.tableId) : '/menu'
 
   useEffect(() => {
+    const pending = getMpPendingOrder()
+    setPendingMpOrder(pending)
+
+    if (window.sessionStorage.getItem(MP_REDIRECTING_KEY)) {
+      redirectingToMpRef.current = true
+      setRedirectingToMp(true)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!tableSessionHydrated) return
     if (tableSession) {
       setOrderType('table')
@@ -226,6 +250,11 @@ export function CheckoutPage() {
   }, [pathname])
 
   useEffect(() => {
+    if (shouldRedirectCheckoutToOrderStatus(searchParams)) {
+      window.location.replace(buildOrderStatusReturnUrl(searchParams))
+      return
+    }
+
     if (searchParams.get('status') === 'failure') {
       toast.error('El pago con Mercado Pago no se completó. Podés reintentar o elegir otro método.')
     }
@@ -258,6 +287,8 @@ export function CheckoutPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (isSubmitting || submitLockRef.current) return
+
     if (isOffline && paymentMethod === 'mercado_pago') {
       toast.error('Mercado Pago requiere conexión a internet.')
       return
@@ -289,6 +320,7 @@ export function CheckoutPage() {
     }
 
     setIsSubmitting(true)
+    submitLockRef.current = true
 
     try {
       const createdOrder = await addOrder({
@@ -320,6 +352,17 @@ export function CheckoutPage() {
       setCompletedOrderStatus(createdOrder.status)
 
       if (paymentMethod === 'mercado_pago') {
+        if (!createdOrder.trackingProof) {
+          throw new Error(
+            'No se pudo iniciar Mercado Pago. Si tenés abierta la sesión del panel de staff, cerrala e intentá de nuevo.'
+          )
+        }
+
+        markMpRedirecting()
+        redirectingToMpRef.current = true
+        setRedirectingToMp(true)
+        setConfirmOpen(false)
+
         const paymentOrder = await fetch('/api/payments/mercadopago/create-preference', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -335,9 +378,16 @@ export function CheckoutPage() {
           return payload as Pick<Order, 'paymentUrl'>
         })
 
-        clearCart()
+        const paymentUrl = paymentOrder.paymentUrl ?? buildOrderStatusReturnUrl(new URLSearchParams(), createdOrder.id)
+
+        rememberMpPendingOrder({
+          orderId: createdOrder.id,
+          trackingProof: createdOrder.trackingProof,
+          publicTrackingCode: createdOrder.publicTrackingCode,
+          displayCode: createdOrder.displayCode,
+        })
         rememberOrderTracking(createdOrder.publicTrackingCode, createdOrder.id, createdOrder.displayCode)
-        window.location.href = paymentOrder.paymentUrl ?? '/order-status'
+        window.location.replace(paymentUrl)
         return
       }
 
@@ -349,6 +399,10 @@ export function CheckoutPage() {
         toast.success('Pedido guardado. Se enviará automáticamente al recuperar conexión.')
       }
     } catch (error) {
+      submitLockRef.current = false
+      redirectingToMpRef.current = false
+      setRedirectingToMp(false)
+      clearMpRedirecting()
       toast.error(error instanceof Error ? error.message : 'No se pudo procesar el pedido')
     } finally {
       setIsSubmitting(false)
@@ -378,6 +432,19 @@ export function CheckoutPage() {
             </div>
           </div>
         </div>
+      ) : showingMpRedirect ? (
+        <div className="coly-landing min-h-screen bg-white pb-24 md:pb-10">
+          <CheckoutHeader {...headerProps} />
+          <CheckoutMain className="py-12 md:py-16">
+            <div className="flex flex-col items-center text-center">
+              <CheckoutLoadingSkeleton />
+              <h2 className="mt-6 text-xl font-bold text-foreground">Redirigiendo a Mercado Pago</h2>
+              <p className="mt-2 max-w-xs text-sm text-muted-foreground">
+                Tu pedido ya fue registrado. Completá el pago en la pantalla de Mercado Pago.
+              </p>
+            </div>
+          </CheckoutMain>
+        </div>
       ) : isEmpty ? (
         <div className="coly-landing min-h-screen bg-white pb-24 md:pb-10">
           <CheckoutHeader {...headerProps} />
@@ -390,18 +457,47 @@ export function CheckoutPage() {
               >
                 <ShoppingBag className="h-10 w-10" style={{ color: COTY_TEAL }} strokeWidth={1.75} />
               </div>
-              <h2 className="text-xl font-bold text-foreground">Carrito vacío</h2>
-              <p className="mt-2 max-w-xs text-sm text-muted-foreground">
-                Todavía no agregaste productos. Explorá el menú y armá tu pedido.
-              </p>
-              <Link href={menuHref} className="mt-8 w-full max-w-xs">
-                <Button
-                  className="w-full rounded-full py-6 text-base font-bold shadow-lg"
-                  style={{ backgroundColor: COTY_TEAL }}
-                >
-                  Ver menú
-                </Button>
-              </Link>
+              {pendingMpOrder ? (
+                <>
+                  <h2 className="text-xl font-bold text-foreground">Pedido pendiente de pago</h2>
+                  <p className="mt-2 max-w-xs text-sm text-muted-foreground">
+                    Ya registramos tu pedido
+                    {pendingMpOrder.displayCode ? ` (${pendingMpOrder.displayCode})` : ''}. Si completaste el pago,
+                    podés ver el estado desde acá.
+                  </p>
+                  <Link
+                    href={buildOrderStatusReturnUrl(new URLSearchParams(), pendingMpOrder.orderId)}
+                    className="mt-8 w-full max-w-xs"
+                  >
+                    <Button
+                      className="w-full rounded-full py-6 text-base font-bold shadow-lg"
+                      style={{ backgroundColor: COTY_TEAL }}
+                    >
+                      Ver estado del pedido
+                    </Button>
+                  </Link>
+                  <Link href={menuHref} className="mt-3 w-full max-w-xs">
+                    <Button variant="outline" className="w-full rounded-full py-6 text-base font-bold">
+                      Volver al menú
+                    </Button>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-xl font-bold text-foreground">Carrito vacío</h2>
+                  <p className="mt-2 max-w-xs text-sm text-muted-foreground">
+                    Todavía no agregaste productos. Explorá el menú y armá tu pedido.
+                  </p>
+                  <Link href={menuHref} className="mt-8 w-full max-w-xs">
+                    <Button
+                      className="w-full rounded-full py-6 text-base font-bold shadow-lg"
+                      style={{ backgroundColor: COTY_TEAL }}
+                    >
+                      Ver menú
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </CheckoutMain>
         </div>
@@ -745,7 +841,6 @@ export function CheckoutPage() {
                 >
                   {[
                     { value: 'cash', label: 'Efectivo', icon: Banknote },
-                    { value: 'card', label: 'Tarjeta (al recibir)', icon: CreditCard },
                     { value: 'transfer', label: 'Transferencia', icon: Building2 },
                     ...(isTableMode || !mercadoPagoAvailable
                       ? []

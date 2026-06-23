@@ -14,7 +14,8 @@ import {
   Armchair,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useTableSession, useTrackedOrders } from '@/lib/store'
+import { useCart, useTableSession, useTrackedOrders } from '@/lib/store'
+import { clearMpPendingOrder, clearMpRedirecting } from '@/lib/mercadopago-return'
 import { buildMenuPathWithTable } from '@/lib/menu-url'
 import { ORDER_STATUS_LABELS } from '@/lib/order-labels'
 import { EmptyState } from '@/components/shared/empty-state'
@@ -332,16 +333,21 @@ function OrderStatusContent() {
     null
   const [searchId, setSearchId] = useState('')
   const { tableSession } = useTableSession()
+  const { clearCart } = useCart()
   const { orders, isLoading } = useTrackedOrders(searchId, paymentReturnOrderId)
   const menuHref = tableSession ? buildMenuPathWithTable(tableSession.tableId) : '/menu'
 
   useEffect(() => {
+    clearMpRedirecting()
+
     if (paymentStatus === 'approved') {
+      clearMpPendingOrder()
+      clearCart()
       toast.success('¡Pago confirmado! Tu pedido ya está en preparación.')
     } else if (paymentStatus === 'pending') {
       toast.message('Pago pendiente de confirmación')
     }
-  }, [paymentStatus])
+  }, [paymentStatus, clearCart])
 
   const visibleOrders = orders
 

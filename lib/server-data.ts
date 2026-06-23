@@ -1225,9 +1225,9 @@ export async function createPreferenceForOrder(orderId: string, baseUrl: string,
       statement_descriptor: settings.name.slice(0, 13),
       auto_return: 'approved',
       back_urls: {
-        success: `${baseUrl}/order-status?status=approved&orderId=${order.id}`,
-        pending: `${baseUrl}/order-status?status=pending&orderId=${order.id}`,
-        failure: `${baseUrl}/checkout?status=failure&orderId=${order.id}`,
+        success: `${baseUrl}/mp/return?orderId=${order.id}`,
+        pending: `${baseUrl}/mp/return?orderId=${order.id}`,
+        failure: `${baseUrl}/mp/return?orderId=${order.id}`,
       },
       payer: {
         name: order.customerName,
