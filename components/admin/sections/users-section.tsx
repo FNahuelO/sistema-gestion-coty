@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { PANEL_CARD, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TOGGLE_ROW } from '@/lib/panel-theme'
+import { PANEL_ACCENT_TEXT, PANEL_BADGE, PANEL_CARD, PANEL_ICON_IDLE, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TOGGLE_ROW } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { useAdminData } from '@/lib/store'
 import type { User } from '@/lib/types'
@@ -191,7 +191,7 @@ export function UsersSection() {
                   <div>
                     <p className="font-medium">{user.name}</p>
                     <p className="text-xs text-muted-foreground">{user.email}</p>
-                    <Badge className={cn('mt-1 border-0', user.active ? 'bg-[#C5DDD9]/60 text-[#2D5A57]' : 'bg-destructive/15 text-destructive')}>
+                    <Badge className={cn('mt-1 border-0', user.active ? PANEL_BADGE : 'bg-destructive/15 text-destructive')}>
                       {user.active ? 'Activo' : 'Inactivo'}
                     </Badge>
                   </div>
@@ -215,7 +215,7 @@ export function UsersSection() {
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button variant="ghost" size="icon" aria-label="Permisos" title="Permisos según rol">
-                      <Shield className="h-4 w-4 text-[#7EB8B3]" />
+                      <Shield className={cn('h-4 w-4', PANEL_ICON_IDLE)} />
                     </Button>
                     {user.active ? (
                       <Button
@@ -243,11 +243,11 @@ export function UsersSection() {
                 <p className="font-medium">{user.name}</p>
                 <p className="truncate text-xs text-muted-foreground">{user.email}</p>
               </div>
-              <Badge className={cn('shrink-0 border-0', user.active ? 'bg-[#C5DDD9]/60 text-[#2D5A57]' : 'bg-destructive/15 text-destructive')}>
+              <Badge className={cn('shrink-0 border-0', user.active ? PANEL_BADGE : 'bg-destructive/15 text-destructive')}>
                 {user.active ? 'Activo' : 'Inactivo'}
               </Badge>
             </div>
-            <p className="text-sm text-[#2D5A57]">{getStaffRoleLabel(user.staffRole, user.role === 'admin' ? 'admin' : 'staff')}</p>
+            <p className={PANEL_ACCENT_TEXT}>{getStaffRoleLabel(user.staffRole, user.role === 'admin' ? 'admin' : 'staff')}</p>
             {user.phone ? (
               <Button variant="outline" size="sm" className={cn('h-11 w-full', PANEL_OUTLINE_BTN)} asChild>
                 <a href={whatsappUrl(user.phone)} target="_blank" rel="noreferrer">

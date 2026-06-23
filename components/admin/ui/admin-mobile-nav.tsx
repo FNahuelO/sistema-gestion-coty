@@ -3,7 +3,7 @@
 import type { ElementType } from 'react'
 import { MoreHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { PANEL_NAV_ACTIVE, PANEL_NAV_IDLE } from '@/lib/panel-theme'
+import { PANEL_BORDER, PANEL_ICON_ACTIVE, PANEL_ICON_IDLE, PANEL_NAV_ACTIVE, PANEL_NAV_IDLE, PANEL_SHELL_BLUR } from '@/lib/panel-theme'
 import { NAV_ITEMS } from '../constants'
 import type { AdminSection } from '../types'
 import { canAccessAdminSection, type SessionRoleContext } from '@/lib/permissions'
@@ -27,7 +27,7 @@ export function AdminMobileNav({
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-100 bg-white/95 backdrop-blur-md lg:hidden"
+      className={cn('fixed inset-x-0 bottom-0 z-50 border-t lg:hidden', PANEL_BORDER, PANEL_SHELL_BLUR)}
       style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
     >
       <div className="mx-auto flex max-w-lg items-stretch justify-around px-1 pt-1">
@@ -46,7 +46,7 @@ export function AdminMobileNav({
                 isActive ? PANEL_NAV_ACTIVE : PANEL_NAV_IDLE
               )}
             >
-              <Icon className={cn('h-5 w-5', isActive ? 'text-[#2D5A57]' : 'text-[#7EB8B3]')} />
+              <Icon className={cn('h-5 w-5', isActive ? PANEL_ICON_ACTIVE : PANEL_ICON_IDLE)} />
               <span className="max-w-full truncate">{item.label}</span>
             </button>
           )
@@ -59,7 +59,7 @@ export function AdminMobileNav({
             isMoreActive ? PANEL_NAV_ACTIVE : PANEL_NAV_IDLE
           )}
         >
-          <MoreHorizontal className={cn('h-5 w-5', isMoreActive ? 'text-[#2D5A57]' : 'text-[#7EB8B3]')} />
+          <MoreHorizontal className={cn('h-5 w-5', isMoreActive ? PANEL_ICON_ACTIVE : PANEL_ICON_IDLE)} />
           <span>Más</span>
         </button>
       </div>

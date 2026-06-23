@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TITLE, PANEL_TOGGLE_ROW } from '@/lib/panel-theme'
+import { PANEL_ACCENT_TEXT, PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TITLE, PANEL_TOGGLE_ROW } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { useAdminData, useAuth } from '@/lib/store'
 import { hasPermission, type SessionRoleContext } from '@/lib/permissions'
@@ -139,7 +139,7 @@ export function SettingsSection() {
               <MetricCard title="Productos activos" value={String(admin.products.filter((product) => product.available).length)} icon={Package} />
             </div>
             <div className={PANEL_LIST_ROW}>
-              <p className="text-sm font-semibold text-[#2D5A57]">Pedidos recientes</p>
+              <p className={PANEL_ACCENT_TEXT}>Pedidos recientes</p>
               <div className="mt-3 space-y-2">
                 {admin.orders.slice(0, 6).map((order) => (
                   <HistoryOrderRow key={order.id} order={order} compact />

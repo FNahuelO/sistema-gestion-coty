@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { NativeDialog } from '@/components/ui/native-dialog'
 import { formatPrice } from '@/lib/coty-theme'
-import { PANEL_CARD, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TOGGLE_ROW } from '@/lib/panel-theme'
+import { PANEL_CARD, PANEL_ICON_ACTIVE, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TOGGLE_ROW } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { useAdminData } from '@/lib/store'
 import type { Table, TableStatus } from '@/lib/types'
@@ -260,7 +260,8 @@ export function TablesSection() {
                   <div
                     key={table.id}
                     className={cn(
-                      'relative overflow-hidden rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all',
+                      'relative overflow-hidden rounded-xl border p-4 shadow-sm transition-all',
+                      PANEL_LIST_ROW,
                       !table.active && 'opacity-60'
                     )}
                   >
@@ -301,7 +302,7 @@ export function TablesSection() {
                     ) : (
                       <>
                         <div className="flex items-center justify-between">
-                          <span className="font-serif text-2xl font-bold text-[#2D5A57]">
+                          <span className={cn('font-serif text-2xl font-bold', PANEL_ICON_ACTIVE)}>
                             {String(table.number).padStart(2, '0')}
                           </span>
                           <div
@@ -385,7 +386,7 @@ export function TablesSection() {
           {admin.tables.map((table) => (
             <div key={table.id} className="rounded-xl border p-3">
               <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <QrCode className="h-4 w-4 text-[#2D5A57]" />
+                <QrCode className={cn('h-4 w-4', PANEL_ICON_ACTIVE)} />
                 Mesa {table.number}
               </div>
               <QrCodeCard

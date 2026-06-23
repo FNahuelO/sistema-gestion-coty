@@ -5,10 +5,17 @@ import QRCode from 'qrcode'
 import { Copy, Download, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import {
+  PANEL_ACCENT_TEXT,
+  PANEL_BORDER,
+  PANEL_LIST_ROW,
+  PANEL_OUTLINE_BTN,
+  PANEL_PRIMARY_BTN,
+  PANEL_PROGRESS_TRACK,
+  PANEL_SHELL,
+  PANEL_SURFACE,
+} from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
-
-const ADMIN_PRIMARY_BTN = 'bg-[#2D5A57] text-white hover:bg-[#053E38]'
-const ADMIN_OUTLINE_BTN = 'border-[#C5DDD9] bg-white text-[#2D5A57] hover:bg-[#C5DDD9]/40'
 
 const QR_SIZE = 256
 const PRINT_QR_SIZE = 1024
@@ -122,39 +129,39 @@ export function QrCodeCard({
   }
 
   return (
-    <div className={cn('rounded-xl border border-gray-100 bg-[#F8FBFA] p-4', className)}>
+    <div className={cn('rounded-xl border p-4', PANEL_BORDER, PANEL_SURFACE, className)}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-        <div className="mx-auto flex h-40 w-40 shrink-0 items-center justify-center rounded-xl bg-white p-3 shadow-sm sm:mx-0">
+        <div className={cn('mx-auto flex h-40 w-40 shrink-0 items-center justify-center rounded-xl p-3 shadow-sm sm:mx-0', PANEL_SHELL)}>
           {dataUrl ? (
             <img src={dataUrl} alt={`QR ${title}`} className="h-full w-full object-contain" />
           ) : (
-            <div className="h-full w-full animate-pulse rounded-lg bg-gray-100" />
+            <div className={cn('h-full w-full animate-pulse rounded-lg', PANEL_PROGRESS_TRACK)} />
           )}
         </div>
 
         <div className="min-w-0 flex-1 space-y-3">
           <div>
-            <p className="text-sm font-semibold text-[#2D5A57]">{title}</p>
+            <p className={PANEL_ACCENT_TEXT}>{title}</p>
             {description ? <p className="mt-1 text-xs text-muted-foreground">{description}</p> : null}
           </div>
 
-          <p className="break-all rounded-lg border border-gray-100 bg-white px-3 py-2 text-xs text-muted-foreground">
+          <p className={cn('break-all rounded-lg border px-3 py-2 text-xs text-muted-foreground', PANEL_LIST_ROW)}>
             {url}
           </p>
 
           <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" className={ADMIN_OUTLINE_BTN} onClick={() => void copyLink()}>
+            <Button type="button" size="sm" variant="outline" className={PANEL_OUTLINE_BTN} onClick={() => void copyLink()}>
               <Copy className="mr-1.5 h-3.5 w-3.5" />
               Copiar link
             </Button>
-            <Button type="button" size="sm" variant="outline" className={ADMIN_OUTLINE_BTN} onClick={() => window.open(url, '_blank')}>
+            <Button type="button" size="sm" variant="outline" className={PANEL_OUTLINE_BTN} onClick={() => window.open(url, '_blank')}>
               <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
               Abrir
             </Button>
             <Button
               type="button"
               size="sm"
-              className={ADMIN_PRIMARY_BTN}
+              className={PANEL_PRIMARY_BTN}
               disabled={isDownloading}
               onClick={() => void downloadQr(false)}
             >
@@ -165,7 +172,7 @@ export function QrCodeCard({
               <Button
                 type="button"
                 size="sm"
-                className={ADMIN_PRIMARY_BTN}
+                className={PANEL_PRIMARY_BTN}
                 disabled={isDownloading}
                 onClick={() => void downloadQr(true)}
               >

@@ -9,6 +9,13 @@ import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { NativeDialog, NATIVE_SCROLL_CLASS } from '@/components/ui/native-dialog'
 import { useIsMobile } from '@/hooks/use-mobile'
+import {
+  PANEL_BORDER_SUBTLE,
+  PANEL_FOCUS_RING,
+  PANEL_INTERACTIVE_HOVER,
+  PANEL_SHELL,
+  PANEL_SURFACE,
+} from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 
 export type MultiSelectOption = {
@@ -36,8 +43,11 @@ function MultiSelectTrigger({
     <button
       type="button"
       className={cn(
-        'flex h-10 w-full items-center justify-between rounded-md border border-gray-200 bg-white px-3 text-sm',
-        'hover:bg-[#F8FBFA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7EB8B3]'
+        'flex h-10 w-full items-center justify-between rounded-md border px-3 text-sm',
+        PANEL_SHELL,
+        PANEL_BORDER_SUBTLE,
+        PANEL_INTERACTIVE_HOVER,
+        PANEL_FOCUS_RING
       )}
       {...props}
     >
@@ -88,8 +98,9 @@ function MultiSelectBody({
                 <label
                   key={option.value}
                   className={cn(
-                    'flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-[#F8FBFA]',
-                    checked && 'bg-[#F8FBFA]'
+                    'flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2 transition-colors',
+                    PANEL_INTERACTIVE_HOVER,
+                    checked && PANEL_SURFACE
                   )}
                 >
                   <Checkbox

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TOGGLE_ROW } from '@/lib/panel-theme'
+import { PANEL_CARD, PANEL_ICON_ACTIVE, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TOGGLE_ROW } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { useAdminData } from '@/lib/store'
 import type { ChannelSchedule } from '@/lib/types'
@@ -137,7 +137,7 @@ export function SchedulesSection() {
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{schedule.label}</p>
                   <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    <span className={schedule.active ? 'text-[#2D5A57]' : 'text-muted-foreground'}>
+                    <span className={schedule.active ? PANEL_ICON_ACTIVE : 'text-muted-foreground'}>
                       {schedule.active ? 'Activo' : 'Inactivo'}
                     </span>
                     {' · '}

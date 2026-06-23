@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { formatPrice } from '@/lib/coty-theme'
-import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TITLE } from '@/lib/panel-theme'
+import { PANEL_CARD, PANEL_INPUT, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_SURFACE_ALT, PANEL_TITLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { useAdminData } from '@/lib/store'
 import { HourlySalesChart } from '@/components/admin/charts/hourly-sales-chart'
@@ -191,7 +191,7 @@ export function DashboardSection() {
                     className="h-10 w-10 shrink-0 rounded-lg object-cover"
                   />
                 ) : (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#F0F7F6] text-xs text-muted-foreground">
+                  <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs text-muted-foreground', PANEL_SURFACE_ALT)}>
                     —
                   </div>
                 )}
@@ -217,7 +217,7 @@ export function DashboardSection() {
               placeholder="Buscar pedido..."
               value={historySearch}
               onChange={(event) => setHistorySearch(event.target.value)}
-              className="h-9 w-full border-gray-200 bg-[#F8FBFA] sm:w-48"
+              className={cn('h-9 w-full sm:w-48', PANEL_INPUT)}
             />
             <Button
               variant="outline"

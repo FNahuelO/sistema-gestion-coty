@@ -10,7 +10,7 @@ import type { DailySales } from '@/lib/types'
 const chartConfig = {
   revenue: {
     label: 'Ventas',
-    color: '#2D5A57',
+    color: 'var(--color-primary)',
   },
 }
 

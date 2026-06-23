@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import type { ProductOption } from '@/lib/types'
+import { PANEL_BORDER, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_SURFACE, PANEL_TOGGLE_ROW } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 
-const OPTION_ROW = 'rounded-xl border border-gray-100 bg-[#F8FBFA] p-3'
-const CHOICE_ROW = 'rounded-lg border border-gray-100 bg-white p-2'
+const OPTION_ROW = cn(PANEL_SURFACE, 'rounded-xl border p-3', PANEL_BORDER)
+const CHOICE_ROW = cn(PANEL_LIST_ROW, 'rounded-lg p-2')
 
 function createOption(): ProductOption {
   return {
@@ -107,14 +108,14 @@ export function ProductOptionsEditor({ value, onChange }: ProductOptionsEditorPr
                 </div>
 
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <div className="flex items-center justify-between rounded-lg border border-gray-100 bg-white px-3 py-2">
+                  <div className={cn(PANEL_TOGGLE_ROW, 'px-3 py-2')}>
                     <Label className="text-sm">Obligatoria</Label>
                     <Switch
                       checked={option.required}
                       onCheckedChange={(checked) => updateOption(option.id, { required: checked })}
                     />
                   </div>
-                  <div className="flex items-center justify-between rounded-lg border border-gray-100 bg-white px-3 py-2">
+                  <div className={cn(PANEL_TOGGLE_ROW, 'px-3 py-2')}>
                     <Label className="text-sm">Múltiple</Label>
                     <Switch
                       checked={option.multiple}
@@ -185,7 +186,7 @@ export function ProductOptionsEditor({ value, onChange }: ProductOptionsEditorPr
                 type="button"
                 variant="outline"
                 size="sm"
-                className="border-[#C5DDD9] text-[#2D5A57] hover:bg-[#C5DDD9]/40"
+                className={PANEL_OUTLINE_BTN}
                 onClick={() => addChoice(option.id)}
               >
                 <Plus className="mr-1 h-4 w-4" />
@@ -199,7 +200,7 @@ export function ProductOptionsEditor({ value, onChange }: ProductOptionsEditorPr
       <Button
         type="button"
         variant="outline"
-        className="w-full border-[#C5DDD9] text-[#2D5A57] hover:bg-[#C5DDD9]/40"
+        className={cn('w-full', PANEL_OUTLINE_BTN)}
         onClick={() => onChange([...value, createOption()])}
       >
         <Plus className="mr-2 h-4 w-4" />

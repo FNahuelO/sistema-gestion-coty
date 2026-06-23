@@ -47,7 +47,7 @@ export function AdminResponsiveActions({
                 key={action.key}
                 variant={action.variant === 'destructive' ? 'destructive' : 'outline'}
                 size="sm"
-                className={cn('h-9', action.variant !== 'destructive' && PANEL_OUTLINE_BTN, action.active && 'border-[#2D5A57] bg-[#F0F7F6]')}
+                className={cn('h-9', action.variant !== 'destructive' && PANEL_OUTLINE_BTN, action.active && 'border-primary bg-[#F0F7F6] dark:bg-primary/10')}
                 onClick={action.onClick}
               >
                 {action.icon}

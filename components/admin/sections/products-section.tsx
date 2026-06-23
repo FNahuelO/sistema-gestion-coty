@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { formatPrice } from '@/lib/coty-theme'
-import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TITLE, PANEL_TOGGLE_ROW } from '@/lib/panel-theme'
+import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TITLE, PANEL_TOGGLE_ROW, PANEL_BADGE, PANEL_BORDER, PANEL_BTN_GHOST, PANEL_ICON_ACTIVE, PANEL_INPUT, PANEL_MUTED_BADGE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { useAdminData } from '@/lib/store'
 import type { Product } from '@/lib/types'
@@ -257,13 +257,13 @@ export function ProductsSection() {
                   placeholder="Buscar por nombre, descripción o categoría..."
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  className="border-gray-200 bg-[#F8FBFA] pl-9"
+                  className={cn(PANEL_INPUT, 'pl-9')}
                 />
               </div>
 
               <div className="grid gap-2 sm:grid-cols-3">
                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="border-gray-200 bg-[#F8FBFA]">
+                  <SelectTrigger className={PANEL_INPUT}>
                     <SelectValue placeholder="Categoría" />
                   </SelectTrigger>
                   <SelectContent>
@@ -280,7 +280,7 @@ export function ProductsSection() {
                   value={availabilityFilter}
                   onValueChange={(value) => setAvailabilityFilter(value as AvailabilityFilter)}
                 >
-                  <SelectTrigger className="border-gray-200 bg-[#F8FBFA]">
+                  <SelectTrigger className={PANEL_INPUT}>
                     <SelectValue placeholder="Disponibilidad" />
                   </SelectTrigger>
                   <SelectContent>
@@ -291,8 +291,8 @@ export function ProductsSection() {
                 </Select>
 
                 <Select value={sortBy} onValueChange={(value) => setSortBy(value as ProductSortKey)}>
-                  <SelectTrigger className="border-gray-200 bg-[#F8FBFA]">
-                    <ArrowUpDown className="mr-2 h-4 w-4 shrink-0 text-[#2D5A57]" />
+                  <SelectTrigger className={PANEL_INPUT}>
+                    <ArrowUpDown className={cn('mr-2 h-4 w-4 shrink-0', PANEL_ICON_ACTIVE)} />
                     <SelectValue placeholder="Ordenar" />
                   </SelectTrigger>
                   <SelectContent>
@@ -310,7 +310,7 @@ export function ProductsSection() {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-8 px-2 text-xs text-[#2D5A57] hover:bg-[#C5DDD9]/40"
+                  className={cn('h-8 px-2 text-xs', PANEL_BTN_GHOST)}
                   onClick={() => {
                     setSearchQuery('')
                     setCategoryFilter('all')
@@ -337,12 +337,12 @@ export function ProductsSection() {
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate font-medium">{product.name}</p>
                       {product.featured ? (
-                        <Badge variant="secondary" className="bg-[#C5DDD9]/60 text-[10px] text-[#2D5A57]">
+                        <Badge variant="secondary" className={cn(PANEL_BADGE, 'text-[10px]')}>
                           Destacado
                         </Badge>
                       ) : null}
                       {!product.available ? (
-                        <Badge variant="secondary" className="bg-gray-100 text-[10px] text-gray-600">
+                        <Badge variant="secondary" className={cn(PANEL_MUTED_BADGE, 'text-[10px]')}>
                           Oculto
                         </Badge>
                       ) : null}
@@ -362,7 +362,7 @@ export function ProductsSection() {
             )}
 
             {filteredProducts.length > PRODUCTS_PAGE_SIZE ? (
-              <div className="flex items-center justify-between border-t border-gray-100 pt-4">
+              <div className={cn('flex items-center justify-between border-t pt-4', PANEL_BORDER)}>
                 <p className="text-xs text-muted-foreground">
                   Página {page + 1} de {pageCount}
                 </p>

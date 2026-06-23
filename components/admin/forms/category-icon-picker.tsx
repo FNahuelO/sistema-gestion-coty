@@ -6,7 +6,15 @@ import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { NativeDialog, NATIVE_SCROLL_CLASS } from '@/components/ui/native-dialog'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { COTY_TEAL } from '@/lib/coty-theme'
+import {
+  PANEL_FOCUS_RING,
+  PANEL_ICON_ACTIVE,
+  PANEL_ICON_PICKER_ACTIVE,
+  PANEL_ICON_PICKER_IDLE,
+  PANEL_INTERACTIVE_HOVER,
+  PANEL_SHELL,
+  PANEL_SURFACE,
+} from '@/lib/panel-theme'
 import { CATEGORY_ICON_OPTIONS } from '@/lib/category-icon-options'
 import { formatCategoryIconLabel } from '@/lib/category-icons'
 import { renderCategoryIcon } from '@/lib/render-category-icon'
@@ -42,9 +50,7 @@ function IconPickerGrid({
             onClick={() => onSelect(option.slug)}
             className={cn(
               'flex h-10 w-full flex-col items-center justify-center rounded-lg transition-colors',
-              isSelected
-                ? 'bg-[#C5DDD9]/60 text-[#2D5A57] ring-1 ring-[#7EB8B3]'
-                : 'text-muted-foreground hover:bg-[#F8FBFA] hover:text-[#2D5A57]'
+              isSelected ? PANEL_ICON_PICKER_ACTIVE : PANEL_ICON_PICKER_IDLE
             )}
           >
             {renderCategoryIcon(option.slug, { className: 'h-4 w-4' })}
@@ -96,14 +102,17 @@ function PickerTrigger({
     <button
       type="button"
       className={cn(
-        'flex h-10 w-full items-center justify-between rounded-md border border-gray-200 bg-white px-3 text-sm',
-        'hover:bg-[#F8FBFA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7EB8B3]'
+        'flex h-10 w-full items-center justify-between rounded-md border px-3 text-sm',
+        PANEL_SHELL,
+        'border-gray-200 dark:border-border',
+        PANEL_INTERACTIVE_HOVER,
+        PANEL_FOCUS_RING
       )}
       {...props}
     >
       <span className="flex min-w-0 items-center gap-2">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#F8FBFA]">
-          {renderCategoryIcon(value, { className: 'h-4 w-4', style: { color: COTY_TEAL } })}
+        <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', PANEL_SURFACE)}>
+          {renderCategoryIcon(value, { className: cn('h-4 w-4', PANEL_ICON_ACTIVE) })}
         </span>
         <span className="truncate text-foreground">
           {value ? formatCategoryIconLabel(value) : 'Elegir icono'}

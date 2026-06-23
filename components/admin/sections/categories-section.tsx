@@ -8,8 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { formatCategoryIconLabel, getCategoryIcon } from '@/lib/category-icons'
-import { COTY_TEAL } from '@/lib/coty-theme'
-import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TITLE, PANEL_TOGGLE_ROW } from '@/lib/panel-theme'
+import { PANEL_CARD, PANEL_ICON_ACTIVE, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_SURFACE, PANEL_TITLE, PANEL_TOGGLE_ROW } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { useAdminData } from '@/lib/store'
 import type { Category } from '@/lib/types'
@@ -107,8 +106,8 @@ export function CategoriesSection() {
               return (
                 <div key={category.id} className={cn(PANEL_LIST_ROW, 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between')}>
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F8FBFA]">
-                      <CategoryIcon className="h-5 w-5" style={{ color: COTY_TEAL }} />
+                    <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', PANEL_SURFACE)}>
+                      <CategoryIcon className={cn('h-5 w-5', PANEL_ICON_ACTIVE)} />
                     </div>
                     <div className="min-w-0">
                       <p className="truncate font-medium">{category.name}</p>

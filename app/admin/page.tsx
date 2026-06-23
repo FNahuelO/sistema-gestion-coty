@@ -3,8 +3,9 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { AdminDashboard } from '@/components/admin/admin-dashboard'
+import { AdminLoadingScreen } from '@/components/admin/ui/admin-loading-screen'
 import { AuthProvider, useAuth } from '@/lib/store'
-import { LoadingScreen } from '@/components/shared/loading'
+import { AdminThemeProvider } from '@/lib/admin-theme'
 import { canAccessAdmin } from '@/lib/permissions'
 
 function AdminContent() {
@@ -23,7 +24,7 @@ function AdminContent() {
   }, [isLoading, router, user])
 
   if (isLoading || !user || !canAccessAdmin({ role: user.role === 'admin' ? 'admin' : 'staff', staffRole: user.staffRole })) {
-    return <LoadingScreen />
+    return <AdminLoadingScreen />
   }
 
   return <AdminDashboard />
@@ -32,7 +33,9 @@ function AdminContent() {
 export default function AdminPage() {
   return (
     <AuthProvider>
-      <AdminContent />
+      <AdminThemeProvider>
+        <AdminContent />
+      </AdminThemeProvider>
     </AuthProvider>
   )
 }

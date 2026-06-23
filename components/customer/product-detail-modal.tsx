@@ -117,39 +117,68 @@ export function ProductDetailModal({ product, promotions = [], onClose, onAddToC
     setNotes('')
   }
 
+  const addToCartFooter = (
+    <div className="mx-auto flex w-full max-w-lg items-center gap-3">
+      <div
+        className="inline-flex shrink-0 items-center overflow-hidden rounded-full"
+        style={{ backgroundColor: COTY_QTY_BG }}
+      >
+        <button
+          type="button"
+          onClick={() => setQuantity(Math.max(1, quantity - 1))}
+          disabled={quantity <= 1}
+          className="flex h-10 w-10 items-center justify-center text-[#2D5A57] disabled:opacity-40"
+          aria-label="Quitar uno"
+        >
+          <Minus className="h-4 w-4" />
+        </button>
+        <span className="min-w-[32px] px-1 text-center text-sm font-semibold text-[#2D5A57]">{quantity}</span>
+        <button
+          type="button"
+          onClick={() => setQuantity(quantity + 1)}
+          className="flex h-10 w-10 items-center justify-center text-[#2D5A57]"
+          aria-label="Agregar uno"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
+
+      <button
+        type="button"
+        disabled={!canAddToCart()}
+        onClick={handleAdd}
+        className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full px-4 text-sm font-bold text-white shadow-md transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+        style={{ backgroundColor: COTY_TEAL }}
+      >
+        Agregar
+        <span>{formatPrice(totalPrice)}</span>
+      </button>
+    </div>
+  )
+
   return (
-    <SimpleModal
-      open
-      onClose={onClose}
-      title={product.name}
-      className="max-w-lg rounded-t-[1.75rem] border-0 bg-white sm:rounded-3xl sm:border sm:border-gray-100"
-    >
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 pt-10 [-webkit-overflow-scrolling:touch]">
-          <div className="relative aspect-4/3 overflow-hidden rounded-2xl bg-[#F8FBFA]">
-            <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
-          </div>
+    <SimpleModal open onClose={onClose} title={product.name} footer={addToCartFooter}>
+      <div className="space-y-5">
+        <div className="relative aspect-4/3 overflow-hidden rounded-2xl bg-[#F8FBFA]">
+          <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+        </div>
 
-          <div className="mt-4 space-y-5">
-            <div className="text-center">
-              <h2 className="text-xl font-bold text-[#053E38]">{product.name}</h2>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{product.description}</p>
-              {discount > 0 ? (
-                <p className="mt-2 text-sm font-semibold text-[#2D5A57]">
-                  {formatPrice(unitPrice)}
-                  <span className="ml-2 font-normal text-muted-foreground line-through">
-                    {formatPrice(product.price)}
-                  </span>
-                  <span className="ml-2 rounded-full bg-[#EAB308] px-2 py-0.5 text-[10px] font-bold text-white">
-                    -{discount}%
-                  </span>
-                </p>
-              ) : (
-                <p className="mt-2 text-sm font-semibold text-[#2D5A57]">{formatPrice(product.price)}</p>
-              )}
-            </div>
+        <div className="text-center">
+          <p className="text-sm leading-relaxed text-muted-foreground">{product.description}</p>
+          {discount > 0 ? (
+            <p className="mt-2 text-sm font-semibold text-[#2D5A57]">
+              {formatPrice(unitPrice)}
+              <span className="ml-2 font-normal text-muted-foreground line-through">{formatPrice(product.price)}</span>
+              <span className="ml-2 rounded-full bg-[#EAB308] px-2 py-0.5 text-[10px] font-bold text-white">
+                -{discount}%
+              </span>
+            </p>
+          ) : (
+            <p className="mt-2 text-sm font-semibold text-[#2D5A57]">{formatPrice(product.price)}</p>
+          )}
+        </div>
 
-            {product.options?.map((option) => (
+        {product.options?.map((option) => (
               <div key={option.id} className="space-y-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <Label className="text-sm font-semibold text-[#053E38]">
@@ -246,52 +275,6 @@ export function ProductDetailModal({ product, promotions = [], onClose, onAddToC
                 className="resize-none rounded-2xl border-gray-100 bg-[#F8FBFA] focus-visible:border-[#2D5A57] focus-visible:ring-[#C5DDD9]/50"
               />
             </div>
-          </div>
-        </div>
-
-        <div
-          className="shrink-0 border-t border-gray-100 bg-white px-4 py-4"
-          style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
-        >
-          <div className="mx-auto flex w-full max-w-lg items-center gap-3">
-            <div
-              className="inline-flex shrink-0 items-center overflow-hidden rounded-full"
-              style={{ backgroundColor: COTY_QTY_BG }}
-            >
-              <button
-                type="button"
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                disabled={quantity <= 1}
-                className="flex h-10 w-10 items-center justify-center text-[#2D5A57] disabled:opacity-40"
-                aria-label="Quitar uno"
-              >
-                <Minus className="h-4 w-4" />
-              </button>
-              <span className="min-w-[32px] px-1 text-center text-sm font-semibold text-[#2D5A57]">
-                {quantity}
-              </span>
-              <button
-                type="button"
-                onClick={() => setQuantity(quantity + 1)}
-                className="flex h-10 w-10 items-center justify-center text-[#2D5A57]"
-                aria-label="Agregar uno"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-
-            <button
-              type="button"
-              disabled={!canAddToCart()}
-              onClick={handleAdd}
-              className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full px-4 text-sm font-bold text-white shadow-md transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ backgroundColor: COTY_TEAL }}
-            >
-              Agregar
-              <span>{formatPrice(totalPrice)}</span>
-            </button>
-          </div>
-        </div>
       </div>
     </SimpleModal>
   )

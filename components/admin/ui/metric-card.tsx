@@ -1,7 +1,8 @@
 'use client'
 
 import type { ElementType } from 'react'
-import { COTY_QTY_BG, COTY_TEAL } from '@/lib/coty-theme'
+import { PANEL_CARD, PANEL_ICON_CIRCLE } from '@/lib/panel-theme'
+import { cn } from '@/lib/utils'
 
 export function MetricCard({
   title,
@@ -15,7 +16,7 @@ export function MetricCard({
   comparison?: number | null
 }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+    <div className={cn('flex items-center justify-between p-4', PANEL_CARD)}>
       <div className="min-w-0">
         <p className="text-xs text-muted-foreground">{title}</p>
         <p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
@@ -27,11 +28,8 @@ export function MetricCard({
           </p>
         )}
       </div>
-      <div
-        className="ml-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
-        style={{ backgroundColor: `${COTY_QTY_BG}99` }}
-      >
-        <Icon className="h-5 w-5" style={{ color: COTY_TEAL }} />
+      <div className={cn('ml-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-full', PANEL_ICON_CIRCLE)}>
+        <Icon className="h-5 w-5" />
       </div>
     </div>
   )

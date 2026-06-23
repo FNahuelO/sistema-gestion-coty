@@ -6,10 +6,13 @@ import { Coffee, LogOut, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { COTY_HEADER } from '@/lib/coty-theme'
+import { PANEL_BG, PANEL_BORDER, PANEL_BTN_GHOST, PANEL_SHELL, PANEL_SHELL_BLUR } from '@/lib/panel-theme'
 import { useAuth } from '@/lib/store'
+import { cn } from '@/lib/utils'
 import { AdminSideNav } from './ui/admin-side-nav'
 import { AdminMobileNav, getAdminSectionLabel } from './ui/admin-mobile-nav'
 import { MobileShellPadding } from './ui/mobile-shell-padding'
+import { AdminThemeToggle } from './ui/theme-toggle'
 import type { AdminSection } from './types'
 import type { SessionRoleContext } from '@/lib/permissions'
 
@@ -41,8 +44,8 @@ export function AdminShell({
   const sectionLabel = getAdminSectionLabel(activeSection)
 
   return (
-    <div className="flex min-h-screen bg-[#FAFAFA]">
-      <aside className="hidden w-72 shrink-0 border-r border-gray-100 bg-white lg:flex lg:flex-col">
+    <div className={cn('flex min-h-screen', PANEL_BG)}>
+      <aside className={cn('hidden w-72 shrink-0 border-r lg:flex lg:flex-col', PANEL_BORDER, PANEL_SHELL)}>
         <AdminSideNav
           activeSection={activeSection}
           onSelect={navigateTo}
@@ -52,7 +55,7 @@ export function AdminShell({
       </aside>
 
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-        <SheetContent side="left" className="w-[85%] max-w-xs gap-0 border-r p-0 [&>button]:hidden">
+        <SheetContent side="left" className={cn('w-[85%] max-w-xs gap-0 border-r p-0 [&>button]:hidden', PANEL_SHELL)}>
           <AdminSideNav
             activeSection={activeSection}
             onSelect={navigateTo}
@@ -64,14 +67,14 @@ export function AdminShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header
-          className="sticky top-0 z-40 border-b border-gray-100 bg-white/95 backdrop-blur-md"
+          className={cn('sticky top-0 z-40 border-b', PANEL_BORDER, PANEL_SHELL_BLUR)}
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
           <div className="flex h-14 items-center justify-between gap-2 px-3 sm:px-4">
             <Button
               variant="ghost"
               size="icon"
-              className="h-11 w-11 shrink-0 text-[#2D5A57] hover:bg-[#C5DDD9]/40 lg:hidden"
+              className={cn('h-11 w-11 shrink-0 lg:hidden', PANEL_BTN_GHOST)}
               onClick={() => setMenuOpen(true)}
               aria-label="Abrir menú"
             >
@@ -95,15 +98,18 @@ export function AdminShell({
               </div>
             </div>
 
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => void handleLogout()}
-              aria-label="Cerrar sesión"
-              className="h-11 w-11 shrink-0 text-[#2D5A57] hover:bg-[#C5DDD9]/40"
-            >
-              <LogOut className="h-5 w-5" />
-            </Button>
+            <div className="flex shrink-0 items-center gap-1">
+              <AdminThemeToggle />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => void handleLogout()}
+                aria-label="Cerrar sesión"
+                className={cn('h-11 w-11', PANEL_BTN_GHOST)}
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
         </header>
 

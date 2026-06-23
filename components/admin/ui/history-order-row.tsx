@@ -2,8 +2,8 @@
 
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
-import { PANEL_LIST_ROW } from '@/lib/panel-theme'
+import { formatPrice } from '@/lib/coty-theme'
+import { PANEL_ICON_ACTIVE, PANEL_ICON_CIRCLE, PANEL_LIST_ROW, PANEL_SURFACE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import type { Order } from '@/lib/types'
 import { StatusBadge } from '@/components/shared/status-badge'
@@ -16,9 +16,9 @@ export function HistoryOrderRow({ order, compact = false }: { order: Order; comp
 
   if (compact) {
     return (
-      <div className="flex items-center justify-between gap-2 rounded-lg bg-[#F8FBFA] px-2.5 py-2 text-sm">
+      <div className={cn('flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm', PANEL_SURFACE)}>
         <div className="flex min-w-0 items-center gap-2">
-          <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: COTY_TEAL }} />
+          <Icon className={cn('h-3.5 w-3.5 shrink-0', PANEL_ICON_ACTIVE)} />
           <span className="truncate text-xs">
             {order.displayCode ?? order.id} · {order.customerName}
           </span>
@@ -37,11 +37,8 @@ export function HistoryOrderRow({ order, compact = false }: { order: Order; comp
       )}
     >
       <div className="flex min-w-0 items-start gap-3">
-        <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-          style={{ backgroundColor: `${COTY_QTY_BG}99` }}
-        >
-          <Icon className="h-4 w-4" style={{ color: COTY_TEAL }} />
+        <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full', PANEL_ICON_CIRCLE)}>
+          <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0">
           <p className="truncate font-semibold text-foreground">{order.displayCode ?? order.id}</p>

@@ -8,7 +8,7 @@ import type { HourlySales } from '@/lib/types'
 const chartConfig = {
   revenue: {
     label: 'Ingresos',
-    color: '#2D5A57',
+    color: 'var(--color-primary)',
   },
 }
 

@@ -808,9 +808,8 @@ export function CheckoutPage() {
       )}
 
       {confirmOpen && !isEmpty && !orderComplete && !isTableMode && (
-        <SimpleModal open onClose={() => setConfirmOpen(false)} title="Datos para confirmar" className="max-w-md rounded-2xl">
-          <div className="overflow-y-auto p-4 pt-10">
-            <form onSubmit={handleSubmit} className="space-y-4">
+        <SimpleModal open onClose={() => setConfirmOpen(false)} title="Datos para confirmar" className="max-w-md">
+          <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name" className="flex items-center gap-2">
                   <User className="h-4 w-4" />
@@ -892,7 +891,6 @@ export function CheckoutPage() {
                 {isSubmitting ? 'Procesando...' : 'Confirmar y enviar'}
               </Button>
             </form>
-          </div>
         </SimpleModal>
       )}
     </>

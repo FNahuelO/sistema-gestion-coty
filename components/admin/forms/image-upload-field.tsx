@@ -5,6 +5,7 @@ import { ImagePlus, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PANEL_BORDER, PANEL_OUTLINE_BTN, PANEL_SURFACE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 
 type UploadFolder = 'products' | 'promotions' | 'settings' | 'users'
@@ -16,7 +17,7 @@ type ImageUploadFieldProps = {
   className?: string
 }
 
-const OUTLINE_BTN = 'border-[#C5DDD9] bg-white text-[#2D5A57] hover:bg-[#C5DDD9]/40'
+const OUTLINE_BTN = PANEL_OUTLINE_BTN
 
 export function ImageUploadField({ value, onChange, folder, className }: ImageUploadFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -59,7 +60,7 @@ export function ImageUploadField({ value, onChange, folder, className }: ImageUp
   return (
     <div className={cn('space-y-3', className)}>
       <div className="flex items-start gap-3">
-        <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-100 bg-[#F8FBFA]">
+        <div className={cn('relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border', PANEL_BORDER, PANEL_SURFACE)}>
           {value ? (
             <>
               <img src={value} alt="" className="h-full w-full object-cover" />

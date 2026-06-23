@@ -4,7 +4,8 @@ import type { ElementType } from 'react'
 import { Coffee, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { COTY_HEADER } from '@/lib/coty-theme'
-import { PANEL_NAV_ACTIVE, PANEL_NAV_IDLE } from '@/lib/panel-theme'
+import { PANEL_BORDER, PANEL_ICON_ACTIVE, PANEL_ICON_IDLE, PANEL_NAV_ACTIVE, PANEL_NAV_IDLE } from '@/lib/panel-theme'
+import { AdminThemeToggle } from './theme-toggle'
 import { cn } from '@/lib/utils'
 import { NAV_ITEMS } from '../constants'
 import type { AdminSection } from '../types'
@@ -24,7 +25,7 @@ export function AdminSideNav({
   const visibleItems = NAV_ITEMS.filter((item) => canAccessAdminSection(roleContext, item.id))
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-start justify-between border-b border-gray-100 p-5">
+      <div className={cn('flex items-start justify-between border-b p-5', PANEL_BORDER)}>
         <div className="flex items-center gap-3">
           <div
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
@@ -56,12 +57,19 @@ export function AdminSideNav({
                 isActive ? PANEL_NAV_ACTIVE : PANEL_NAV_IDLE
               )}
             >
-              <Icon className={cn('h-5 w-5 shrink-0', isActive ? 'text-[#2D5A57]' : 'text-[#7EB8B3]')} />
+              <Icon className={cn('h-5 w-5 shrink-0', isActive ? PANEL_ICON_ACTIVE : PANEL_ICON_IDLE)} />
               {item.label}
             </button>
           )
         })}
       </nav>
+
+      <div className={cn('hidden border-t p-3 lg:block', PANEL_BORDER)}>
+        <div className="flex items-center justify-between rounded-xl px-2 py-1">
+          <span className="text-xs text-muted-foreground">Tema</span>
+          <AdminThemeToggle className="h-9 w-9" />
+        </div>
+      </div>
     </div>
   )
 }
