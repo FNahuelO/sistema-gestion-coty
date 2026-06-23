@@ -6,6 +6,7 @@ import {
   getKitchenOrders,
   getRunnerSettlement,
   listDeliveryAssignments,
+  markKitchenOrderReady,
   updateDeliveryAssignment,
 } from '@/lib/commerce'
 import { handleRouteError } from '@/lib/api-errors'
@@ -51,10 +52,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    await requirePermission('staff:operate')
+    const user = await requirePermission('staff:operate')
     const body = z
       .object({
-        action: z.enum(['assign_runner', 'ack_kitchen']),
+        action: z.enum(['assign_runner', 'ack_kitchen', 'mark_ready']),
         orderId: z.string().min(1),
         runnerId: z.string().optional(),
         deliveryFee: z.number().min(0).optional(),
@@ -62,7 +63,21 @@ export async function POST(request: NextRequest) {
       .parse(await request.json())
 
     if (body.action === 'ack_kitchen') {
-      await ackKitchenOrder(body.orderId)
+      await ackKitchenOrder(body.orderId, user.id)
+      const order = await prisma.order.findUnique({
+        where: { id: body.orderId },
+        include: {
+          items: { include: { selections: true } },
+          payment: true,
+          diningTable: true,
+          createdByUser: true,
+        },
+      })
+      return NextResponse.json(order ? serializeOrder(order) : { ok: true })
+    }
+
+    if (body.action === 'mark_ready') {
+      await markKitchenOrderReady(body.orderId, user.id)
       const order = await prisma.order.findUnique({
         where: { id: body.orderId },
         include: {

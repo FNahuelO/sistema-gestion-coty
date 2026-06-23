@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Search,
   Star,
@@ -25,7 +25,7 @@ import {
   CarouselPrevious,
 } from '@/components/ui/carousel'
 import { getActivePromotions } from '@/lib/promotions'
-import { buildMenuPathWithTable, MESA_QUERY_PARAM } from '@/lib/menu-url'
+import { buildMenuPathWithTable, MESA_QUERY_PARAM, getMesaIdFromSearch } from '@/lib/menu-url'
 import { cn } from '@/lib/utils'
 import { useBusiness, useCart, useCatalog, useTableSession } from '@/lib/store'
 import type { CartItem, Product } from '@/lib/types'
@@ -54,7 +54,9 @@ function getDefaultCartItem(items: CartItem[], productId: string) {
 }
 
 function TablePill() {
+  const searchParams = useSearchParams()
   const { tableSession, isLoading } = useTableSession()
+  const mesaFromUrl = getMesaIdFromSearch(searchParams)
 
   if (isLoading) {
     return (
@@ -65,7 +67,7 @@ function TablePill() {
     )
   }
 
-  if (!tableSession) return null
+  if (!mesaFromUrl || !tableSession) return null
 
   return (
     <div
@@ -323,13 +325,16 @@ function ProductCarousel({
 
 export function CustomerLanding() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { settings, isLoading: isSettingsLoading } = useBusiness()
   const { items, itemCount, addItem, updateQuantity } = useCart()
   const { products, categories, promotions, channelAvailability, isLoading: isCatalogLoading } =
     useCatalog()
   const { tableSession } = useTableSession()
   const [searchQuery, setSearchQuery] = useState('')
-  const menuHref = tableSession ? buildMenuPathWithTable(tableSession.tableId) : '/menu'
+  const mesaFromUrl = getMesaIdFromSearch(searchParams)
+  const menuHref = mesaFromUrl ? buildMenuPathWithTable(mesaFromUrl) : '/menu'
+  const tableContextId = mesaFromUrl ?? undefined
 
   const landingCategories = [
     ...categories
@@ -338,10 +343,10 @@ export function CustomerLanding() {
       .slice(0, 7)
       .map((category) => ({
         name: category.name,
-        href: buildLandingMenuHref(tableSession?.tableId, { category: category.id }),
+        href: buildLandingMenuHref(tableContextId, { category: category.id }),
         icon: getCategoryIcon(category.icon),
       })),
-    { name: 'Promos', href: buildLandingMenuHref(tableSession?.tableId, { promo: '1' }), icon: Star },
+    { name: 'Promos', href: buildLandingMenuHref(tableContextId, { promo: '1' }), icon: Star },
   ]
 
   const featuredProducts = products.filter((product) => product.featured && product.available)
@@ -352,18 +357,18 @@ export function CustomerLanding() {
   )
   const activePromo = getActivePromotions(promotions)[0]
 
-  const heroSubtitle = tableSession
+  const heroSubtitle = tableContextId
     ? 'Explorá nuestro menú y pedí en tu mesa.'
     : 'Explorá nuestro menú y pedí para retirar o delivery.'
 
-  const infoCardDescription = tableSession
+  const infoCardDescription = tableContextId
     ? 'Elegí lo que más te guste, nosotros lo llevamos a tu mesa.'
     : 'Elegí lo que más te guste, retiralo en el local o pedí delivery.'
 
   const handleSearch = (event: React.FormEvent) => {
     event.preventDefault()
     if (searchQuery.trim()) {
-      router.push(buildLandingMenuHref(tableSession?.tableId, { search: searchQuery.trim() }))
+      router.push(buildLandingMenuHref(tableContextId, { search: searchQuery.trim() }))
       return
     }
     router.push(menuHref)

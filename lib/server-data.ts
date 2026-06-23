@@ -1109,12 +1109,7 @@ export async function createOrderFromPayload(payload: z.input<typeof createOrder
               : input.paymentMethod === 'mercado_pago'
                 ? 'MERCADO_PAGO'
                 : 'CASH',
-        status:
-          input.paymentMethod === 'mercado_pago'
-            ? 'PENDING'
-            : input.type === 'table'
-              ? 'PENDING'
-              : 'APPROVED',
+        status: 'PENDING',
         amount: total,
       },
     },
@@ -1361,20 +1356,45 @@ export async function updateOrderStatus(orderId: string, status: Order['status']
                 ? PrismaOrderStatus.COMPLETED
                 : PrismaOrderStatus.CANCELLED
 
-  const order = await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      status: prismaStatus,
-      statusHistory: {
-        create: {
-          status: prismaStatus,
-          changedByUserId: userId,
-          note,
+  const shouldApproveManualPayment = status === 'delivered' || status === 'completed'
+
+  const order = await prisma.$transaction(async (tx) => {
+    const updated = await tx.order.update({
+      where: { id: orderId },
+      data: {
+        status: prismaStatus,
+        statusHistory: {
+          create: {
+            status: prismaStatus,
+            changedByUserId: userId,
+            note,
+          },
         },
       },
-    },
-    include: orderInclude,
+      include: orderInclude,
+    })
+
+    if (shouldApproveManualPayment) {
+      await tx.payment.updateMany({
+        where: {
+          orderId,
+          status: 'PENDING',
+          method: { in: ['CASH', 'CARD', 'TRANSFER'] },
+        },
+        data: { status: 'APPROVED' },
+      })
+    }
+
+    return updated
   })
+
+  if (shouldApproveManualPayment) {
+    const withPayment = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: orderInclude,
+    })
+    return serializeOrder(withPayment ?? order)
+  }
 
   return serializeOrder(order)
 }

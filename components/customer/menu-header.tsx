@@ -7,6 +7,7 @@ import { MenuCategoryNav, MenuCategoryNavSkeleton } from '@/components/customer/
 import { TableSessionBanner } from '@/components/customer/table-session-banner'
 import { COTY_HEADER, COTY_TEAL, LOGO_SRC_SVG, formatPrice } from '@/lib/coty-theme'
 import { useTableSession } from '@/lib/store'
+import { buildCustomerPath } from '@/lib/menu-url'
 import type { Category } from '@/lib/types'
 import type { MenuCategoryId } from '@/lib/menu-categories'
 import { cn } from '@/lib/utils'
@@ -119,11 +120,14 @@ interface MenuCartBarProps {
 }
 
 export function MenuCartBar({ itemCount, total }: MenuCartBarProps) {
+  const { tableSession } = useTableSession()
+  const checkoutHref = buildCustomerPath('/checkout', { tableId: tableSession?.tableId })
+
   if (itemCount === 0) return null
 
   return (
     <div className="fixed bottom-[72px] left-1/2 z-30 w-full max-w-[390px] -translate-x-1/2 px-4 md:bottom-8 md:left-auto md:right-8 md:max-w-md md:translate-x-0 lg:right-12">
-      <Link href="/checkout" prefetch={false}>
+      <Link href={checkoutHref} prefetch={false}>
         <Button
           className="w-full gap-2 rounded-full py-6 shadow-lg md:py-5"
           style={{ backgroundColor: COTY_TEAL }}

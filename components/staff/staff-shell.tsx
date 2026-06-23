@@ -34,10 +34,12 @@ export function StaffShell({
   activeSection,
   onSectionChange,
   children,
+  sectionAlerts,
 }: {
   activeSection: StaffSection
   onSectionChange: (section: StaffSection) => void
   children: ReactNode
+  sectionAlerts?: Partial<Record<StaffSection, boolean>>
 }) {
   const router = useRouter()
   const { user, logout } = useAuth()
@@ -55,6 +57,7 @@ export function StaffShell({
           onSelect={onSectionChange}
           onLogout={() => void handleLogout()}
           userName={user?.name}
+          sectionAlerts={sectionAlerts}
         />
       </aside>
 
@@ -104,6 +107,7 @@ export function StaffShell({
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon
               const isActive = activeSection === item.id
+              const hasAlert = sectionAlerts?.[item.id]
               return (
                 <button
                   key={item.id}
@@ -113,8 +117,12 @@ export function StaffShell({
                     'flex min-h-[52px] min-w-[72px] shrink-0 flex-col items-center justify-center gap-0.5 px-2 py-1.5 text-[10px] font-medium',
                     isActive ? PANEL_NAV_ACTIVE : PANEL_NAV_IDLE
                   )}
+                  aria-label={hasAlert ? `${item.label}, comandas nuevas` : item.label}
                 >
-                  <Icon className={cn('h-5 w-5', isActive ? 'text-[#2D5A57]' : 'text-[#7EB8B3]')} />
+                  <span className="relative">
+                    <Icon className={cn('h-5 w-5', isActive ? 'text-[#2D5A57]' : 'text-[#7EB8B3]')} />
+                    {hasAlert ? <StaffNavAlertDot className="ring-white" /> : null}
+                  </span>
                   {item.label}
                 </button>
               )
@@ -126,16 +134,30 @@ export function StaffShell({
   )
 }
 
+function StaffNavAlertDot({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        'absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2',
+        className
+      )}
+      aria-hidden
+    />
+  )
+}
+
 function StaffSideNav({
   activeSection,
   onSelect,
   onLogout,
   userName,
+  sectionAlerts,
 }: {
   activeSection: StaffSection
   onSelect: (section: StaffSection) => void
   onLogout: () => void
   userName?: string
+  sectionAlerts?: Partial<Record<StaffSection, boolean>>
 }) {
   return (
     <div className="flex h-full flex-col">
@@ -162,6 +184,7 @@ function StaffSideNav({
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon
           const isActive = activeSection === item.id
+          const hasAlert = sectionAlerts?.[item.id]
           return (
             <button
               key={item.id}
@@ -171,9 +194,16 @@ function StaffSideNav({
                 'flex w-full min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors',
                 isActive ? PANEL_NAV_ACTIVE : PANEL_NAV_IDLE
               )}
+              aria-label={hasAlert ? `${item.label}, comandas nuevas` : item.label}
             >
-              <Icon className={cn('h-5 w-5 shrink-0', isActive ? 'text-[#2D5A57]' : 'text-[#7EB8B3]')} />
-              {item.label}
+              <span className="relative shrink-0">
+                <Icon className={cn('h-5 w-5', isActive ? 'text-[#2D5A57]' : 'text-[#7EB8B3]')} />
+                {hasAlert ? <StaffNavAlertDot className="ring-white" /> : null}
+              </span>
+              <span className="flex-1">{item.label}</span>
+              {hasAlert ? (
+                <span className="text-[10px] font-semibold text-emerald-600">Nuevo</span>
+              ) : null}
             </button>
           )
         })}

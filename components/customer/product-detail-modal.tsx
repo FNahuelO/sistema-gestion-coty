@@ -124,8 +124,8 @@ export function ProductDetailModal({ product, promotions = [], onClose, onAddToC
       title={product.name}
       className="max-w-lg rounded-t-[1.75rem] border-0 bg-white sm:rounded-3xl sm:border sm:border-gray-100"
     >
-      <div className="flex max-h-[min(90vh,720px)] flex-col">
-        <div className="overflow-y-auto px-4 pb-4 pt-10">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 pt-10 [-webkit-overflow-scrolling:touch]">
           <div className="relative aspect-4/3 overflow-hidden rounded-2xl bg-[#F8FBFA]">
             <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
           </div>

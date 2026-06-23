@@ -25,7 +25,7 @@ import { OrderDetailSheet } from '@/components/staff/order-detail-sheet'
 import { StaffNotificationsButton } from '@/components/staff/staff-notifications-button'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
-import { formatOrderStatus } from '@/lib/order-labels'
+import { formatOrderStatus, isDisplayableCustomerPhone } from '@/lib/order-labels'
 import { ORDER_SORT_OPTIONS, sortOrders, type OrderSortKey } from '@/lib/order-sort'
 import type { Order, OrderStatus, OrderType } from '@/lib/types'
 import { formatDistanceToNow } from 'date-fns'
@@ -354,7 +354,7 @@ export function OrdersSection({
 
                           <div className="mt-3 space-y-1 pl-12 text-sm">
                             <p className="font-medium">{order.customerName}</p>
-                            {order.customerPhone && (
+                            {isDisplayableCustomerPhone(order.customerPhone) && (
                               <p className="text-muted-foreground">{order.customerPhone}</p>
                             )}
                             <div className="text-xs text-muted-foreground">

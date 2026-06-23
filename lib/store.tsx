@@ -12,6 +12,7 @@ import {
   queuedEntryToOrder,
   type CreateOrderPayload,
 } from '@/lib/offline-order-queue'
+import { getMesaIdFromSearch } from '@/lib/menu-url'
 import { hasPermission, type Permission, type SessionRoleContext } from '@/lib/permissions'
 
 const CART_STORAGE_KEY = 'coty-cafe-cart'
@@ -191,7 +192,23 @@ export function TablesProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      const stored = window.localStorage.getItem(TABLE_SESSION_STORAGE_KEY)
+      // Sesiones guardadas en localStorage (versión anterior) podían quedar fijadas a una mesa.
+      window.localStorage.removeItem(TABLE_SESSION_STORAGE_KEY)
+
+      const mesaFromUrl = getMesaIdFromSearch(window.location.search)
+      const path = window.location.pathname
+
+      if (path === '/' && !mesaFromUrl) {
+        window.sessionStorage.removeItem(TABLE_SESSION_STORAGE_KEY)
+        setTableSession(null)
+        return
+      }
+
+      if (mesaFromUrl) {
+        return
+      }
+
+      const stored = window.sessionStorage.getItem(TABLE_SESSION_STORAGE_KEY)
       if (stored) {
         setTableSession(JSON.parse(stored) as TableSession)
       }
@@ -205,9 +222,9 @@ export function TablesProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated) return
     if (tableSession) {
-      window.localStorage.setItem(TABLE_SESSION_STORAGE_KEY, JSON.stringify(tableSession))
+      window.sessionStorage.setItem(TABLE_SESSION_STORAGE_KEY, JSON.stringify(tableSession))
     } else {
-      window.localStorage.removeItem(TABLE_SESSION_STORAGE_KEY)
+      window.sessionStorage.removeItem(TABLE_SESSION_STORAGE_KEY)
     }
   }, [tableSession, hydrated])
 
@@ -716,7 +733,7 @@ export function useTables() {
         type: 'table',
         paymentMethod: 'cash',
         customerName: tableNumber ? `Mesa ${tableNumber}` : 'Mesa',
-        customerPhone: 'staff',
+        customerPhone: '',
         tableId,
         notes: payload.notes,
         items: payload.items,
@@ -797,6 +814,10 @@ export function useAdminData(): AdminData {
 
   const { data: usersData, mutate: mutateUsers } = useSWR<User[]>(can('staff:manage') ? '/api/admin/users' : null, fetchJson)
   const { data: productsData, mutate: mutateProducts } = useSWR<Product[]>(can('settings:write') ? '/api/admin/products' : null, fetchJson)
+  const { data: catalogData, mutate: mutateCatalog } = useSWR<{ products: Product[] }>(
+    can('tables:manage') && !can('settings:write') ? '/api/catalog' : null,
+    fetchJson
+  )
   const { data: categoriesData, mutate: mutateCategories } = useSWR<Category[]>(can('settings:write') ? '/api/admin/categories' : null, fetchJson)
   const { data: promotionsData, mutate: mutatePromotions } = useSWR<Array<Promotion & { validFrom: string | Date; validTo: string | Date }>>(
     can('settings:write') ? '/api/admin/promotions' : null,
@@ -831,6 +852,7 @@ export function useAdminData(): AdminData {
   const refreshAll = useCallback(async () => {
     await Promise.all([
       can('settings:write') ? mutateProducts() : Promise.resolve(),
+      can('tables:manage') && !can('settings:write') ? mutateCatalog() : Promise.resolve(),
       can('staff:manage') ? mutateUsers() : Promise.resolve(),
       can('settings:write') ? mutateCategories() : Promise.resolve(),
       can('settings:write') ? mutatePromotions() : Promise.resolve(),
@@ -847,6 +869,7 @@ export function useAdminData(): AdminData {
     mutateCategories,
     mutateHistory,
     mutateOrders,
+    mutateCatalog,
     mutateProducts,
     mutatePromotions,
     mutateSchedules,
@@ -857,7 +880,7 @@ export function useAdminData(): AdminData {
 
   return {
     users: usersData ?? [],
-    products: productsData ?? [],
+    products: can('settings:write') ? (productsData ?? []) : (catalogData?.products ?? []),
     categories: categoriesData ?? [],
     promotions: (promotionsData ?? []).map(parsePromotion),
     tables: tablesData ?? [],

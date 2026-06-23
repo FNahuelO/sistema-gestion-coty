@@ -1,8 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { ArrowUpDown, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -23,15 +25,86 @@ import { AdminFormPanel } from '../ui/admin-form-panel'
 import { AdminPageHeader } from '../ui/admin-page-header'
 import { Field } from '../ui/field'
 
+const PRODUCTS_PAGE_SIZE = 20
+
+type ProductSortKey = 'name' | 'price-asc' | 'price-desc'
+type AvailabilityFilter = 'all' | 'available' | 'unavailable'
+
+const SORT_OPTIONS: { value: ProductSortKey; label: string }[] = [
+  { value: 'name', label: 'Nombre A-Z' },
+  { value: 'price-asc', label: 'Precio menor' },
+  { value: 'price-desc', label: 'Precio mayor' },
+]
+
+function sortProducts(products: Product[], sortBy: ProductSortKey) {
+  const sorted = [...products]
+  switch (sortBy) {
+    case 'price-asc':
+      return sorted.sort((left, right) => left.price - right.price)
+    case 'price-desc':
+      return sorted.sort((left, right) => right.price - left.price)
+    default:
+      return sorted.sort((left, right) => left.name.localeCompare(right.name, 'es'))
+  }
+}
+
 export function ProductsSection() {
   const admin = useAdminData()
   const { open, setOpen, openPanel } = useFormPanel('products')
   const [productForm, setProductForm] = useState<ProductFormState>(emptyProductForm)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityFilter>('all')
+  const [sortBy, setSortBy] = useState<ProductSortKey>('name')
+  const [page, setPage] = useState(0)
 
   const productCategoryOptions = useMemo(
     () => admin.categories.map((category) => ({ value: category.id, label: category.name })),
     [admin.categories]
   )
+
+  const categoryNameById = useMemo(
+    () => Object.fromEntries(admin.categories.map((category) => [category.id, category.name])),
+    [admin.categories]
+  )
+
+  const filteredProducts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+
+    const matches = admin.products.filter((product) => {
+      if (categoryFilter !== 'all' && product.categoryId !== categoryFilter) return false
+      if (availabilityFilter === 'available' && !product.available) return false
+      if (availabilityFilter === 'unavailable' && product.available) return false
+      if (!query) return true
+
+      return (
+        product.name.toLowerCase().includes(query) ||
+        product.description.toLowerCase().includes(query) ||
+        (categoryNameById[product.categoryId]?.toLowerCase().includes(query) ?? false)
+      )
+    })
+
+    return sortProducts(matches, sortBy)
+  }, [admin.products, availabilityFilter, categoryFilter, categoryNameById, searchQuery, sortBy])
+
+  const pageCount = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PAGE_SIZE))
+  const paginatedProducts = filteredProducts.slice(
+    page * PRODUCTS_PAGE_SIZE,
+    (page + 1) * PRODUCTS_PAGE_SIZE
+  )
+
+  const hasActiveFilters =
+    searchQuery.trim().length > 0 || categoryFilter !== 'all' || availabilityFilter !== 'all'
+
+  useEffect(() => {
+    setPage(0)
+  }, [searchQuery, categoryFilter, availabilityFilter, sortBy])
+
+  useEffect(() => {
+    if (page > pageCount - 1) {
+      setPage(Math.max(0, pageCount - 1))
+    }
+  }, [page, pageCount])
 
   const loadProduct = (product: Product) => {
     setProductForm({
@@ -167,17 +240,117 @@ export function ProductsSection() {
         </AdminFormPanel>
 
         <Card className={PANEL_CARD}>
-          <CardHeader>
-            <CardTitle className={PANEL_TITLE}>Listado</CardTitle>
+          <CardHeader className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle className={PANEL_TITLE}>Listado</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                {filteredProducts.length === admin.products.length
+                  ? `${admin.products.length} productos`
+                  : `${filteredProducts.length} de ${admin.products.length} productos`}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nombre, descripción o categoría..."
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  className="border-gray-200 bg-[#F8FBFA] pl-9"
+                />
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-3">
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="border-gray-200 bg-[#F8FBFA]">
+                    <SelectValue placeholder="Categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las categorías</SelectItem>
+                    {productCategoryOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={availabilityFilter}
+                  onValueChange={(value) => setAvailabilityFilter(value as AvailabilityFilter)}
+                >
+                  <SelectTrigger className="border-gray-200 bg-[#F8FBFA]">
+                    <SelectValue placeholder="Disponibilidad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los estados</SelectItem>
+                    <SelectItem value="available">Disponibles</SelectItem>
+                    <SelectItem value="unavailable">No disponibles</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={sortBy} onValueChange={(value) => setSortBy(value as ProductSortKey)}>
+                  <SelectTrigger className="border-gray-200 bg-[#F8FBFA]">
+                    <ArrowUpDown className="mr-2 h-4 w-4 shrink-0 text-[#2D5A57]" />
+                    <SelectValue placeholder="Ordenar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SORT_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {hasActiveFilters ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-xs text-[#2D5A57] hover:bg-[#C5DDD9]/40"
+                  onClick={() => {
+                    setSearchQuery('')
+                    setCategoryFilter('all')
+                    setAvailabilityFilter('all')
+                    setSortBy('name')
+                  }}
+                >
+                  Limpiar filtros
+                </Button>
+              ) : null}
+            </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            {admin.products.map((product) => (
-              <div key={product.id} className={cn(PANEL_LIST_ROW, 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between')}>
+            {paginatedProducts.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                {hasActiveFilters ? 'No hay productos que coincidan con los filtros' : 'No hay productos cargados'}
+              </p>
+            ) : (
+              paginatedProducts.map((product) => (
+              <div key={product.id} className={cn(PANEL_LIST_ROW, 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between', !product.available && 'opacity-80')}>
                 <div className="flex min-w-0 items-center gap-3">
                   <img src={product.image} alt={product.name} className="h-14 w-14 shrink-0 rounded-xl object-cover ring-1 ring-gray-100" />
                   <div className="min-w-0">
-                    <p className="truncate font-medium">{product.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">{formatPrice(product.price)} · {product.preparationTime} min</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate font-medium">{product.name}</p>
+                      {product.featured ? (
+                        <Badge variant="secondary" className="bg-[#C5DDD9]/60 text-[10px] text-[#2D5A57]">
+                          Destacado
+                        </Badge>
+                      ) : null}
+                      {!product.available ? (
+                        <Badge variant="secondary" className="bg-gray-100 text-[10px] text-gray-600">
+                          Oculto
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {categoryNameById[product.categoryId] ?? 'Sin categoría'} · {formatPrice(product.price)} ·{' '}
+                      {product.preparationTime} min
+                    </p>
                   </div>
                 </div>
                 <div className="flex shrink-0 gap-2 self-end sm:self-auto">
@@ -185,7 +358,38 @@ export function ProductsSection() {
                   <Button variant="destructive" size="sm" onClick={() => void admin.deleteProduct(product.id).then(() => toast.success('Producto eliminado'))}>Eliminar</Button>
                 </div>
               </div>
-            ))}
+              ))
+            )}
+
+            {filteredProducts.length > PRODUCTS_PAGE_SIZE ? (
+              <div className="flex items-center justify-between border-t border-gray-100 pt-4">
+                <p className="text-xs text-muted-foreground">
+                  Página {page + 1} de {pageCount}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={PANEL_OUTLINE_BTN}
+                    disabled={page === 0}
+                    onClick={() => setPage((current) => Math.max(0, current - 1))}
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={PANEL_OUTLINE_BTN}
+                    disabled={page >= pageCount - 1}
+                    onClick={() => setPage((current) => Math.min(pageCount - 1, current + 1))}
+                  >
+                    Siguiente
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </div>

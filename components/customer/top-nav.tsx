@@ -13,26 +13,28 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { COTY_HEADER, LOGO_SRC_SVG } from '@/lib/coty-theme'
-import { useCart, useCatalog } from '@/lib/store'
+import { useCart, useCatalog, useTableSession } from '@/lib/store'
+import { buildCustomerPath } from '@/lib/menu-url'
 import { buildFacebookUrl, buildInstagramUrl } from '@/lib/social-links'
 import Image from 'next/image'
 
 const NAV_ITEMS = [
-  { href: '/', label: 'Inicio', icon: '/icons/inicio.svg', match: (path: string) => path === '/' },
+  { path: '/', label: 'Inicio', icon: '/icons/inicio.svg', match: (path: string) => path === '/' },
   {
-    href: '/menu',
+    path: '/menu',
     label: 'Menú',
     icon: '/icons/menu.svg',
     match: (path: string, search: URLSearchParams) => path.startsWith('/menu') && !search.has('promo'),
   },
-  { href: '/checkout', label: 'Pedidos', icon: '/icons/pedidos.svg', match: (path: string) => path.startsWith('/checkout') },
+  { path: '/checkout', label: 'Pedidos', icon: '/icons/pedidos.svg', match: (path: string) => path.startsWith('/checkout') },
   {
-    href: '/menu?promo=1',
+    path: '/menu',
     label: 'Promos',
     icon: '/icons/promo.svg',
+    params: { promo: '1' },
     match: (path: string, search: URLSearchParams) => path.startsWith('/menu') && search.has('promo'),
   },
-  { href: '/order-status', label: 'Perfil', icon: '/icons/perfil.svg', match: (path: string) => path.startsWith('/order-status') },
+  { path: '/order-status', label: 'Perfil', icon: '/icons/perfil.svg', match: (path: string) => path.startsWith('/order-status') },
 ] as const
 
 function HomeSearchBar() {
@@ -69,6 +71,9 @@ export function CustomerTopNav() {
   const searchParams = useSearchParams()
   const { itemCount } = useCart()
   const { settings } = useCatalog()
+  const { tableSession } = useTableSession()
+  const tableId = tableSession?.tableId
+  const checkoutHref = buildCustomerPath('/checkout', { tableId })
   const isHome = pathname === '/'
   const instagramUrl = buildInstagramUrl(settings?.instagram)
   const facebookUrl = buildFacebookUrl(settings?.facebook)
@@ -96,7 +101,10 @@ export function CustomerTopNav() {
             aria-label="Navegación principal"
             className="flex flex-1 items-center justify-center gap-1 lg:gap-2"
           >
-            {NAV_ITEMS.map(({ href, label, icon: Icon, match }) => {
+            {NAV_ITEMS.map((item) => {
+              const { path, label, icon: Icon, match } = item
+              const params = 'params' in item ? item.params : undefined
+              const href = buildCustomerPath(path, { tableId, params })
               const isActive =
                 match.length > 1
                   ? (match as (path: string, search: URLSearchParams) => boolean)(pathname, searchParams)
@@ -104,7 +112,7 @@ export function CustomerTopNav() {
 
               return (
                 <Link
-                  key={`${href}-${label}`}
+                  key={`${path}-${label}`}
                   href={href}
                   className={cn(
                     'flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors lg:px-5',
@@ -160,7 +168,7 @@ export function CustomerTopNav() {
             )}
 
             <Link
-              href="/checkout"
+              href={checkoutHref}
               className="relative flex shrink-0 items-center gap-2 rounded-full bg-white/15 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/25"
             >
               <ShoppingBag className="h-4 w-4" />

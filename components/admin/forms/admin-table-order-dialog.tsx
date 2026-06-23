@@ -8,8 +8,10 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Spinner } from '@/components/ui/spinner'
 import { formatPrice } from '@/lib/coty-theme'
 import { PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
+import { useCatalog } from '@/lib/store'
 import type { CartItem, Product, SelectedOption, Table } from '@/lib/types'
 import { ProductDetailModal } from '@/components/customer/product-detail-modal'
 import { cn } from '@/lib/utils'
@@ -34,18 +36,27 @@ export function AdminTableOrderDialog({
   const [orderItems, setOrderItems] = useState<CartItem[]>([])
   const [productPicker, setProductPicker] = useState<Product | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const { products: catalogProducts, isLoading: catalogLoading } = useCatalog()
+
+  const sourceProducts = products.length > 0 ? products : catalogProducts
 
   const availableTables = useMemo(
     () => tables.filter((table) => table.active !== false && table.status !== 'finished'),
     [tables]
   )
 
-  const filteredProducts = products.filter(
-    (product) =>
-      product.available &&
-      (product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
+  const filteredProducts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    const available = sourceProducts.filter((product) => product.available !== false)
+
+    if (!query) return []
+
+    return available.filter(
+      (product) =>
+        product.name.toLowerCase().includes(query) ||
+        (product.description?.toLowerCase().includes(query) ?? false)
+    )
+  }, [sourceProducts, searchQuery])
 
   const reset = () => {
     setTableId('')
@@ -144,23 +155,37 @@ export function AdminTableOrderDialog({
 
             <ScrollArea className="h-40 rounded-lg border">
               <div className="space-y-1 p-2">
-                {filteredProducts.map((product) => (
-                  <button
-                    key={product.id}
-                    type="button"
-                    className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm hover:bg-[#F0F7F6]"
-                    onClick={() => {
-                      if (product.options?.length) {
-                        setProductPicker(product)
-                        return
-                      }
-                      handleAddProduct(product, 1, [])
-                    }}
-                  >
-                    <span>{product.name}</span>
-                    <span className="text-xs text-muted-foreground">{formatPrice(product.price)}</span>
-                  </button>
-                ))}
+                {catalogLoading && sourceProducts.length === 0 ? (
+                  <div className="flex justify-center py-6">
+                    <Spinner />
+                  </div>
+                ) : searchQuery.trim().length === 0 ? (
+                  <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                    Escribí el nombre del producto para buscar
+                  </p>
+                ) : filteredProducts.length === 0 ? (
+                  <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                    Sin resultados para &ldquo;{searchQuery.trim()}&rdquo;
+                  </p>
+                ) : (
+                  filteredProducts.map((product) => (
+                    <button
+                      key={product.id}
+                      type="button"
+                      className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm hover:bg-[#F0F7F6]"
+                      onClick={() => {
+                        if (product.options?.length) {
+                          setProductPicker(product)
+                          return
+                        }
+                        handleAddProduct(product, 1, [])
+                      }}
+                    >
+                      <span>{product.name}</span>
+                      <span className="text-xs text-muted-foreground">{formatPrice(product.price)}</span>
+                    </button>
+                  ))
+                )}
               </div>
             </ScrollArea>
 

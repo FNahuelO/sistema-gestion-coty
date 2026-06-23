@@ -32,7 +32,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ta
         type: 'table',
         paymentMethod: 'cash',
         customerName: 'Mesa',
-        customerPhone: user.id,
+        customerPhone: '',
         tableId,
         notes: body.notes,
         items: body.items,

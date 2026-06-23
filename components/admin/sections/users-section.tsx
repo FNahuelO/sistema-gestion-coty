@@ -174,7 +174,7 @@ export function UsersSection() {
         </div>
       </AdminFormPanel>
 
-      <div className={cn(PANEL_CARD, 'hidden overflow-x-auto p-0 md:block')}>
+      <div className={cn(PANEL_CARD, 'hidden overflow-x-auto p-2 md:block')}>
         <Table>
           <TableHeader>
             <TableRow>

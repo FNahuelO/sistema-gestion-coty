@@ -390,7 +390,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
       <Dialog open={!!selectedTable} onOpenChange={(open) => !open && setSelectedTable(null)}>
         <DialogContent className="max-h-[90vh] overflow-hidden border-gray-100 sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between text-[#2D5A57]">
+            <DialogTitle className="flex items-center justify-between text-[#2D5A57] mt-4">
               <span>Mesa {selectedTable?.number}</span>
               {selectedTable && <StatusBadge status={selectedTable.status} />}
             </DialogTitle>
@@ -609,7 +609,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
           <div className="space-y-4">
             <div className={cn(PANEL_CARD, 'bg-[#F0FAF8] p-4 text-center')}>
               <p className="text-sm text-muted-foreground">Total a cobrar</p>
-              <p className="font-serif text-3xl font-bold text-[#2D5A57]">
+              <p className="text-3xl font-bold text-[#2D5A57]">
                 {formatPrice(accumulatedTotal)}
               </p>
             </div>

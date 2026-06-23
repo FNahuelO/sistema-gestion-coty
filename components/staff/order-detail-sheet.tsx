@@ -21,7 +21,7 @@ import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN } from
 import type { Order, OrderStatus, OrderType } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS } from '@/lib/order-labels'
+import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS, getPaymentStatusLabel, isDisplayableCustomerPhone } from '@/lib/order-labels'
 
 const ORDER_TYPE_META: Record<
   OrderType,
@@ -119,7 +119,7 @@ export function OrderDetailSheet({
               </div>
               <div className="space-y-2 px-4 py-3">
                 <p className="font-semibold text-foreground">{order.customerName}</p>
-                {order.customerPhone ? (
+                {isDisplayableCustomerPhone(order.customerPhone) ? (
                   <p className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Phone className="h-3.5 w-3.5 shrink-0 text-[#7EB8B3]" />
                     {order.customerPhone}
@@ -201,7 +201,7 @@ export function OrderDetailSheet({
               {order.paymentStatus ? (
                 <div className="mt-2 flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Estado del pago</span>
-                  <span className="font-medium">{PAYMENT_STATUS_LABELS[order.paymentStatus]}</span>
+                  <span className="font-medium">{getPaymentStatusLabel(order)}</span>
                 </div>
               ) : null}
             </section>

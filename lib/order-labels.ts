@@ -39,6 +39,30 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   refunded: 'Reembolsado',
 }
 
+const COLLECT_ON_DELIVERY_METHODS: Order['paymentMethod'][] = ['cash', 'card', 'transfer']
+
+export function getPaymentStatusLabel(order: Pick<Order, 'paymentMethod' | 'paymentStatus'>): string {
+  if (!order.paymentStatus) return ''
+  if (
+    order.paymentStatus === 'pending' &&
+    COLLECT_ON_DELIVERY_METHODS.includes(order.paymentMethod)
+  ) {
+    return 'Pendiente de cobro'
+  }
+  return PAYMENT_STATUS_LABELS[order.paymentStatus]
+}
+
+const INTERNAL_CUSTOMER_PHONES = new Set(['mesa', 'staff'])
+
+export function isDisplayableCustomerPhone(phone?: string | null): boolean {
+  const value = phone?.trim()
+  if (!value) return false
+  if (INTERNAL_CUSTOMER_PHONES.has(value.toLowerCase())) return false
+
+  const digits = value.replace(/\D/g, '')
+  return digits.length >= 7
+}
+
 export function formatOrderStatus(status: OrderStatus) {
   return ORDER_STATUS_LABELS[status]
 }

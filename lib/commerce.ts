@@ -466,10 +466,36 @@ export async function getKitchenOrders() {
   })
 }
 
-export async function ackKitchenOrder(orderId: string) {
+export async function ackKitchenOrder(orderId: string, userId?: string) {
   return prisma.order.update({
     where: { id: orderId },
-    data: { kitchenAckAt: new Date(), status: 'PREPARING' },
+    data: {
+      kitchenAckAt: new Date(),
+      status: 'PREPARING',
+      statusHistory: {
+        create: {
+          status: 'PREPARING',
+          changedByUserId: userId,
+          note: 'Comanda tomada por cocina',
+        },
+      },
+    },
+  })
+}
+
+export async function markKitchenOrderReady(orderId: string, userId?: string) {
+  return prisma.order.update({
+    where: { id: orderId },
+    data: {
+      status: 'READY',
+      statusHistory: {
+        create: {
+          status: 'READY',
+          changedByUserId: userId,
+          note: 'Marcado listo por cocina',
+        },
+      },
+    },
   })
 }
 

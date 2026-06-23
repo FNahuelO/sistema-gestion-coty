@@ -3,30 +3,35 @@
 import { usePathname, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { COTY_HEADER } from '@/lib/coty-theme'
+import { buildCustomerPath } from '@/lib/menu-url'
+import { useTableSession } from '@/lib/store'
 
 const NAV_ITEMS = [
-  { href: '/', label: 'Inicio', icon: '/icons/inicio.svg', match: (path: string) => path === '/' },
+  { path: '/', label: 'Inicio', icon: '/icons/inicio.svg', match: (path: string) => path === '/' },
   {
-    href: '/menu',
+    path: '/menu',
     label: 'Menú',
     icon: '/icons/menu.svg',
     match: (path: string, search: URLSearchParams) =>
       path.startsWith('/menu') && !search.has('promo'),
   },
-  { href: '/checkout', label: 'Pedidos', icon: '/icons/pedidos.svg', match: (path: string) => path.startsWith('/checkout') },
+  { path: '/checkout', label: 'Pedidos', icon: '/icons/pedidos.svg', match: (path: string) => path.startsWith('/checkout') },
   {
-    href: '/menu?promo=1',
+    path: '/menu',
     label: 'Promos',
     icon: '/icons/promo.svg',
+    params: { promo: '1' },
     match: (path: string, search: URLSearchParams) =>
       path.startsWith('/menu') && search.has('promo'),
   },
-  { href: '/order-status', label: 'Perfil', icon: '/icons/perfil.svg', match: (path: string) => path.startsWith('/order-status') },
+  { path: '/order-status', label: 'Perfil', icon: '/icons/perfil.svg', match: (path: string) => path.startsWith('/order-status') },
 ] as const
 
 export function CustomerBottomNav() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const { tableSession } = useTableSession()
+  const tableId = tableSession?.tableId
 
   return (
     <nav
@@ -34,12 +39,17 @@ export function CustomerBottomNav() {
       className="fixed bottom-0 left-0 right-0 z-50 border-t border-black/6 bg-white safe-area-inset-bottom md:hidden"
     >
       <div className="mx-auto flex max-w-lg items-end justify-around px-2 pb-2 pt-2">
-        {NAV_ITEMS.map(({ href, label, icon, match }) => {
-          const isActive = match(pathname, searchParams)
+        {NAV_ITEMS.map((item) => {
+          const { path, label, icon, match } = item
+          const params = 'params' in item ? item.params : undefined
+          const href = buildCustomerPath(path, { tableId, params })
+          const isActive = match.length > 1
+            ? (match as (path: string, search: URLSearchParams) => boolean)(pathname, searchParams)
+            : (match as (path: string) => boolean)(pathname)
 
           return (
             <a
-              key={href}
+              key={`${path}-${label}`}
               href={href}
               className="flex flex-1 flex-col items-center gap-1 py-1 no-underline relative"
             >

@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -13,6 +14,12 @@ interface SimpleModalProps {
 }
 
 export function SimpleModal({ open, onClose, children, className, title }: SimpleModalProps) {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   useEffect(() => {
     if (!open) return
     const previousOverflow = document.body.style.overflow
@@ -31,9 +38,9 @@ export function SimpleModal({ open, onClose, children, className, title }: Simpl
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [open, onClose])
 
-  if (!open) return null
+  if (!open || !mounted) return null
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex items-end justify-center p-3 sm:items-center sm:p-4">
       <button
         type="button"
@@ -46,7 +53,7 @@ export function SimpleModal({ open, onClose, children, className, title }: Simpl
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'relative z-10 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-2xl',
+          'relative z-10 flex max-h-[min(90vh,720px)] w-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-2xl',
           className,
         )}
       >
@@ -60,6 +67,7 @@ export function SimpleModal({ open, onClose, children, className, title }: Simpl
         </button>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
