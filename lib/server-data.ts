@@ -176,6 +176,7 @@ const orderInclude = {
   items: {
     include: {
       selections: true,
+      product: true,
     },
   },
   payment: true,
@@ -561,7 +562,7 @@ export function serializeOrder(order: Prisma.OrderGetPayload<{ include: typeof o
           categoryId: '',
           featured: false,
           available: true,
-          preparationTime: 0,
+          preparationTime: item.product?.preparationTime ?? 0,
         },
         quantity: item.quantity,
         notes: item.notes ?? undefined,

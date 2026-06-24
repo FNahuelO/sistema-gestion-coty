@@ -69,13 +69,42 @@ export function CartProductCard({
               {description}
             </p>
           ) : null}
+          <p className="mt-1 text-sm font-bold text-foreground">{formatPrice(lineTotal)}</p>
         </div>
 
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <span className="rounded-md bg-[#F0F0F0] px-2 py-0.5 text-[11px] font-medium text-foreground">
-            x{item.quantity}
-          </span>
-          <p className="text-sm font-bold text-foreground">{formatPrice(lineTotal)}</p>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <div
+            className="inline-flex items-center overflow-hidden rounded-full"
+            style={{ backgroundColor: COTY_QTY_BG }}
+          >
+            <button
+              type="button"
+              onClick={onDecrease}
+              className="flex h-8 w-8 items-center justify-center text-[#2D5A57]"
+              aria-label="Quitar"
+            >
+              <Minus className="h-3.5 w-3.5" />
+            </button>
+            <span className="min-w-[24px] px-1 text-center text-xs font-medium text-[#2D5A57]">
+              {item.quantity}
+            </span>
+            <button
+              type="button"
+              onClick={onIncrease}
+              className="flex h-8 w-8 items-center justify-center text-[#2D5A57]"
+              aria-label="Agregar"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="p-1 text-gray-400 transition-colors hover:text-red-500"
+            aria-label="Eliminar del carrito"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
         </div>
       </article>
     )

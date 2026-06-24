@@ -44,7 +44,7 @@ import { CheckoutFormSkeleton, CheckoutLoadingSkeleton, LoadingSkeleton } from '
 import { COTY_HEADER, COTY_MINT, COTY_QTY_BG, COTY_TEAL, formatPrice, LOGO_SRC_SVG } from '@/lib/coty-theme'
 import { useOnlineStatus } from '@/hooks/use-online-status'
 import { cn } from '@/lib/utils'
-import type { OrderType, PaymentMethod, Order, OrderStatus } from '@/lib/types'
+import type { OrderType, PaymentMethod, Order } from '@/lib/types'
 import { toast } from 'sonner'
 import Image from 'next/image'
 
@@ -186,12 +186,8 @@ export function CheckoutPage() {
   const [tip, setTip] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [orderComplete, setOrderComplete] = useState(false)
-  const [orderId, setOrderId] = useState('')
-  const [completedOrderType, setCompletedOrderType] = useState<OrderType>('pickup')
-  const [completedEstimatedMinutes, setCompletedEstimatedMinutes] = useState(20)
-  const [completedTableNumber, setCompletedTableNumber] = useState<number | undefined>()
+  const [completedOrderId, setCompletedOrderId] = useState('')
   const [completedTableId, setCompletedTableId] = useState<string | undefined>()
-  const [completedOrderStatus, setCompletedOrderStatus] = useState<OrderStatus>('preparing')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const redirectingToMpRef = useRef(false)
   const [redirectingToMp, setRedirectingToMp] = useState(false)
@@ -370,14 +366,8 @@ export function CheckoutPage() {
         })),
       })
 
-      setOrderId(createdOrder.displayCode ?? createdOrder.id)
-      setCompletedOrderType(activeOrderType)
-      setCompletedEstimatedMinutes(
-        Math.max(15, ...items.map((item) => item.product.preparationTime || 0), 20)
-      )
-      setCompletedTableNumber(tableSession?.tableNumber)
+      setCompletedOrderId(createdOrder.id)
       setCompletedTableId(tableSession?.tableId)
-      setCompletedOrderStatus(createdOrder.status)
 
       if (paymentMethod === 'mercado_pago') {
         if (!createdOrder.trackingProof) {
@@ -528,13 +518,9 @@ export function CheckoutPage() {
         </div>
       ) : orderComplete ? (
         <OrderConfirmationView
-          orderId={orderId}
-          orderType={completedOrderType}
-          tableNumber={completedTableNumber}
+          orderId={completedOrderId}
           tableId={completedTableId}
           menuHref={menuHref}
-          estimatedMinutes={completedEstimatedMinutes}
-          status={completedOrderStatus}
         />
       ) : (
         <div className="coly-landing min-h-screen bg-white pb-36 md:pb-24">
