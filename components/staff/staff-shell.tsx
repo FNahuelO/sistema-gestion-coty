@@ -201,9 +201,6 @@ function StaffSideNav({
                 {hasAlert ? <StaffNavAlertDot className="ring-white" /> : null}
               </span>
               <span className="flex-1">{item.label}</span>
-              {hasAlert ? (
-                <span className="text-[10px] font-semibold text-emerald-600">Nuevo</span>
-              ) : null}
             </button>
           )
         })}

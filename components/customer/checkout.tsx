@@ -188,6 +188,7 @@ export function CheckoutPage() {
   const [orderComplete, setOrderComplete] = useState(false)
   const [completedOrderId, setCompletedOrderId] = useState('')
   const [completedTableId, setCompletedTableId] = useState<string | undefined>()
+  const [completedTableNumber, setCompletedTableNumber] = useState<number | undefined>()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const redirectingToMpRef = useRef(false)
   const [redirectingToMp, setRedirectingToMp] = useState(false)
@@ -368,6 +369,7 @@ export function CheckoutPage() {
 
       setCompletedOrderId(createdOrder.id)
       setCompletedTableId(tableSession?.tableId)
+      setCompletedTableNumber(tableSession?.tableNumber)
 
       if (paymentMethod === 'mercado_pago') {
         if (!createdOrder.trackingProof) {
@@ -520,6 +522,7 @@ export function CheckoutPage() {
         <OrderConfirmationView
           orderId={completedOrderId}
           tableId={completedTableId}
+          tableNumber={completedTableNumber}
           menuHref={menuHref}
         />
       ) : (

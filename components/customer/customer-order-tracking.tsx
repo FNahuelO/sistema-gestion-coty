@@ -77,7 +77,7 @@ function OrderTypeIcon({ order }: { order: Order }) {
   return <ShoppingBag className="h-4 w-4 shrink-0 text-[#7EB8B3]" />
 }
 
-function OrderProgress({ order }: { order: Order }) {
+export function CustomerOrderProgress({ order }: { order: Order }) {
   const currentStep = getStepIndex(order.status)
   const isComplete = order.status === 'completed' || order.status === 'delivered'
   const progressRatio = isComplete ? 1 : Math.max(0, currentStep / (statusSteps.length - 1))
@@ -246,7 +246,7 @@ export function CustomerOrderCard({ order }: { order: Order }) {
       </div>
 
       <div className="space-y-5 px-4 py-5">
-        {!isCancelled ? <OrderProgress order={order} /> : null}
+        {!isCancelled ? <CustomerOrderProgress order={order} /> : null}
 
         {isCancelled ? (
           <div className="flex items-center justify-center gap-2 rounded-2xl bg-red-50 px-4 py-3 text-red-700">
