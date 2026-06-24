@@ -47,7 +47,7 @@ export function PromotionBanner({
       >
         <p
           className={cn(
-            'coly-promo-outline font-black uppercase leading-none',
+            'coly-promo-outline uppercase leading-none',
             isHero
               ? 'text-center text-3xl md:text-5xl lg:text-6xl'
               : 'text-2xl md:text-4xl'

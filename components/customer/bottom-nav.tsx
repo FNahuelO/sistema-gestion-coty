@@ -15,7 +15,7 @@ const NAV_ITEMS = [
     match: (path: string, search: URLSearchParams) =>
       path.startsWith('/menu') && !search.has('promo'),
   },
-  { path: '/checkout', label: 'Pedidos', icon: '/icons/pedidos.svg', match: (path: string) => path.startsWith('/checkout') },
+  { path: '/checkout', label: 'Carrito', icon: '/icons/pedidos.svg', match: (path: string) => path.startsWith('/checkout') },
   {
     path: '/menu',
     label: 'Promos',
@@ -24,7 +24,7 @@ const NAV_ITEMS = [
     match: (path: string, search: URLSearchParams) =>
       path.startsWith('/menu') && search.has('promo'),
   },
-  { path: '/order-status', label: 'Perfil', icon: '/icons/perfil.svg', match: (path: string) => path.startsWith('/order-status') },
+  { path: '/order-status', label: 'Pedidos', icon: '/icons/perfil.svg', match: (path: string) => path.startsWith('/order-status') },
 ] as const
 
 export function CustomerBottomNav() {

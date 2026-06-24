@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, Playfair_Display } from 'next/font/google'
+import { Inter, Playfair_Display, Bebas_Neue } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
 import { AppProviders } from '@/components/providers/app-providers'
@@ -7,6 +7,7 @@ import './globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair' })
+const bebasNeue = Bebas_Neue({ weight: '400', subsets: ['latin'], variable: '--font-bebas' })
 
 export const metadata: Metadata = {
   title: 'Coty Café - Tu Cafetería Favorita',
@@ -44,7 +45,7 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning className="light bg-background">
       <body
         suppressHydrationWarning
-        className={`${inter.variable} ${playfair.variable} font-sans antialiased`}
+        className={`${inter.variable} ${playfair.variable} ${bebasNeue.variable} font-sans antialiased`}
       >
         {children}
         <AppProviders />
