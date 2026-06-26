@@ -131,7 +131,7 @@ export function KitchenSection() {
                       size="sm"
                       className="bg-emerald-600 text-white hover:bg-emerald-700"
                       disabled={pendingAction !== null}
-                      onClick={() => void runKitchenAction(order.id, 'mark_ready', 'Pedido marcado como listo')}
+                      onClick={() => runKitchenAction(order.id, 'mark_ready', 'Pedido marcado como listo')}
                     >
                       {isPending ? (
                         <>
@@ -150,7 +150,7 @@ export function KitchenSection() {
                       size="sm"
                       className={PANEL_PRIMARY_BTN}
                       disabled={pendingAction !== null}
-                      onClick={() => void runKitchenAction(order.id, 'ack_kitchen', 'Comanda tomada')}
+                      onClick={() => runKitchenAction(order.id, 'ack_kitchen', 'Comanda tomada')}
                     >
                       {isPending ? (
                         <>

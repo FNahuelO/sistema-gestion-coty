@@ -141,7 +141,7 @@ export function PromotionsSection() {
             <Switch checked={promotionForm.active} onCheckedChange={(checked) => setPromotionForm((previous) => ({ ...previous, active: checked }))} />
           </div>
           <div className="flex gap-2">
-            <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => void submitPromotion()}>Guardar</Button>
+            <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => submitPromotion()}>Guardar</Button>
             <Button variant="outline" className={PANEL_OUTLINE_BTN} onClick={() => setPromotionForm(emptyPromotionForm())}>Limpiar</Button>
           </div>
         </AdminFormPanel>
@@ -157,7 +157,7 @@ export function PromotionsSection() {
                 </div>
                 <div className="flex shrink-0 gap-2 self-end sm:self-auto">
                   <Button variant="outline" size="sm" className={PANEL_OUTLINE_BTN} onClick={() => loadPromotion(promotion)}>Editar</Button>
-                  <Button variant="destructive" size="sm" onClick={() => void admin.deletePromotion(promotion.id).then(() => toast.success('Promoción eliminada'))}>Eliminar</Button>
+                  <Button variant="destructive" size="sm" onClick={() => admin.deletePromotion(promotion.id).then(() => toast.success('Promoción eliminada'))}>Eliminar</Button>
                 </div>
               </div>
             ))}

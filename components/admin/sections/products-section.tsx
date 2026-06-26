@@ -234,7 +234,7 @@ export function ProductsSection() {
             <Switch checked={productForm.available} onCheckedChange={(checked) => setProductForm((previous) => ({ ...previous, available: checked }))} />
           </div>
           <div className="flex gap-2">
-            <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => void submitProduct()}>Guardar</Button>
+            <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => submitProduct()}>Guardar</Button>
             <Button variant="outline" className={PANEL_OUTLINE_BTN} onClick={() => setProductForm(emptyProductForm())}>Limpiar</Button>
           </div>
         </AdminFormPanel>
@@ -355,7 +355,7 @@ export function ProductsSection() {
                 </div>
                 <div className="flex shrink-0 gap-2 self-end sm:self-auto">
                   <Button variant="outline" size="sm" className={PANEL_OUTLINE_BTN} onClick={() => loadProduct(product)}>Editar</Button>
-                  <Button variant="destructive" size="sm" onClick={() => void admin.deleteProduct(product.id).then(() => toast.success('Producto eliminado'))}>Eliminar</Button>
+                  <Button variant="destructive" size="sm" onClick={() => admin.deleteProduct(product.id).then(() => toast.success('Producto eliminado'))}>Eliminar</Button>
                 </div>
               </div>
               ))

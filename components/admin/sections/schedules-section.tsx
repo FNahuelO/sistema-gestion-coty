@@ -158,7 +158,7 @@ export function SchedulesSection() {
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => void admin.deleteSchedule(schedule.id).then(() => toast.success('Turno eliminado'))}
+                    onClick={() => admin.deleteSchedule(schedule.id).then(() => toast.success('Turno eliminado'))}
                   >
                     Eliminar
                   </Button>
@@ -201,7 +201,7 @@ export function SchedulesSection() {
             <Switch checked={scheduleForm.active} onCheckedChange={(checked) => setScheduleForm((previous) => ({ ...previous, active: checked }))} />
           </div>
           <div className="flex gap-2">
-            <Button className={PANEL_PRIMARY_BTN} onClick={() => void submitSchedule()}>Guardar turno</Button>
+            <Button className={PANEL_PRIMARY_BTN} onClick={() => submitSchedule()}>Guardar turno</Button>
             <Button variant="outline" className={PANEL_OUTLINE_BTN} onClick={() => { setEditing(false); setScheduleForm(emptyScheduleForm()) }}>Cancelar</Button>
           </div>
         </div>

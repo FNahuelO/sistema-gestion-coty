@@ -11,7 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp'
 import { Field } from '@/components/admin/ui/field'
 import { useAuth } from '@/lib/store'
+import { RATE_LIMITED_ERROR } from '@/lib/auth-errors'
 import { canAccessAdmin } from '@/lib/permissions'
+import type { User } from '@/lib/types'
 import { COTY_HEADER } from '@/lib/coty-theme'
 import { PANEL_CARD, PANEL_PRIMARY_BTN, PANEL_TITLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
@@ -20,6 +22,13 @@ import { toast } from 'sonner'
 const INPUT_CLASS =
   'h-11 border-gray-100 bg-white focus-visible:border-[#2D5A57] focus-visible:ring-[#C5DDD9]/50'
 
+function getLoginErrorMessage(error: string | undefined, fallback: string): string {
+  if (error === RATE_LIMITED_ERROR) {
+    return 'Demasiados intentos fallidos. Esperá unos minutos antes de volver a intentar.'
+  }
+  return fallback
+}
+
 export function LoginPage() {
   const router = useRouter()
   const { login, loginWithPin, isLoading } = useAuth()
@@ -27,8 +36,11 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [pin, setPin] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const redirectAfterLogin = (authenticatedUser: NonNullable<Awaited<ReturnType<typeof login>>>) => {
+  const isBusy = isSubmitting || isLoading
+
+  const redirectAfterLogin = (authenticatedUser: User) => {
     toast.success('Inicio de sesión exitoso')
     if (canAccessAdmin({ role: authenticatedUser.role, staffRole: authenticatedUser.staffRole })) {
       router.push('/admin')
@@ -39,25 +51,37 @@ export function LoginPage() {
 
   const handlePasswordSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
-    const authenticatedUser = await login(email, password)
-    if (authenticatedUser) {
-      redirectAfterLogin(authenticatedUser)
-    } else {
-      toast.error('Credenciales inválidas')
+    if (isSubmitting) return
+    setIsSubmitting(true)
+    try {
+      const result = await login(email, password)
+      if (result.ok) {
+        redirectAfterLogin(result.user)
+      } else {
+        toast.error(getLoginErrorMessage(result.error, 'Credenciales inválidas'))
+      }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   const handlePinSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+    if (isSubmitting) return
     if (pin.length < 4) {
       toast.error('Ingresá un PIN válido')
       return
     }
-    const authenticatedUser = await loginWithPin(pin)
-    if (authenticatedUser) {
-      redirectAfterLogin(authenticatedUser)
-    } else {
-      toast.error('PIN inválido')
+    setIsSubmitting(true)
+    try {
+      const result = await loginWithPin(pin)
+      if (result.ok) {
+        redirectAfterLogin(result.user)
+      } else {
+        toast.error(getLoginErrorMessage(result.error, 'PIN inválido'))
+      }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -147,8 +171,8 @@ export function LoginPage() {
                       </Button>
                     </div>
                   </Field>
-                  <Button type="submit" className={cn('h-11 w-full', PANEL_PRIMARY_BTN)} disabled={isLoading}>
-                    {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
+                  <Button type="submit" className={cn('h-11 w-full', PANEL_PRIMARY_BTN)} disabled={isBusy}>
+                    {isBusy ? 'Iniciando sesión...' : 'Iniciar sesión'}
                   </Button>
                 </form>
               </TabsContent>
@@ -172,9 +196,9 @@ export function LoginPage() {
                   <Button
                     type="submit"
                     className={cn('h-11 w-full', PANEL_PRIMARY_BTN)}
-                    disabled={isLoading || pin.length < 4}
+                    disabled={isBusy || pin.length < 4}
                   >
-                    {isLoading ? 'Verificando PIN...' : 'Entrar con PIN'}
+                    {isBusy ? 'Verificando PIN...' : 'Entrar con PIN'}
                   </Button>
                 </form>
               </TabsContent>

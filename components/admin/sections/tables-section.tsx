@@ -235,7 +235,7 @@ export function TablesSection() {
             />
           </div>
           <div className="flex gap-2">
-            <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => void submitTable()}>
+            <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => submitTable()}>
               Guardar
             </Button>
             <Button variant="outline" className={PANEL_OUTLINE_BTN} onClick={() => setTableForm(emptyTableForm())}>
@@ -328,7 +328,7 @@ export function TablesSection() {
                           variant="outline"
                           size="sm"
                           className="h-7 px-2 text-xs"
-                          onClick={() => void handleRestore(table.id)}
+                          onClick={() => handleRestore(table.id)}
                         >
                           <RotateCcw className="mr-1 h-3 w-3" />
                           Restaurar

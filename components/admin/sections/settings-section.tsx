@@ -102,7 +102,7 @@ export function SettingsSection() {
               }
             />
           </div>
-          <Button className={cn('w-full', PANEL_PRIMARY_BTN)} onClick={() => void saveSettings()}>Guardar configuración</Button>
+          <Button className={cn('w-full', PANEL_PRIMARY_BTN)} onClick={() => saveSettings()}>Guardar configuración</Button>
         </AdminFormPanel>
         ) : (
           <Card className={PANEL_CARD}>
@@ -150,10 +150,10 @@ export function SettingsSection() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className={cn('flex-1', PANEL_OUTLINE_BTN)} onClick={() => window.open(admin.exportSalesUrl('csv'), '_blank')}>
+              <Button variant="outline" className={cn('flex-1', PANEL_OUTLINE_BTN)} onClick={() => { window.open(admin.exportSalesUrl('csv'), '_blank') }}>
                 Exportar CSV
               </Button>
-              <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => window.open(admin.exportSalesUrl('xlsx'), '_blank')}>
+              <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => { window.open(admin.exportSalesUrl('xlsx'), '_blank') }}>
                 Exportar XLSX
               </Button>
             </div>

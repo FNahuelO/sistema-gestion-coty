@@ -93,7 +93,7 @@ export function CategoriesSection() {
             <Switch checked={categoryForm.active} onCheckedChange={(checked) => setCategoryForm((previous) => ({ ...previous, active: checked }))} />
           </div>
           <div className="flex gap-2">
-            <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => void submitCategory()}>Guardar</Button>
+            <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => submitCategory()}>Guardar</Button>
             <Button variant="outline" className={PANEL_OUTLINE_BTN} onClick={() => setCategoryForm(emptyCategoryForm())}>Limpiar</Button>
           </div>
         </AdminFormPanel>
@@ -118,7 +118,7 @@ export function CategoriesSection() {
                   </div>
                   <div className="flex shrink-0 gap-2 self-end sm:self-auto">
                     <Button variant="outline" size="sm" className={PANEL_OUTLINE_BTN} onClick={() => loadCategory(category)}>Editar</Button>
-                    <Button variant="destructive" size="sm" onClick={() => void admin.deleteCategory(category.id).then(() => toast.success('Categoría eliminada'))}>Eliminar</Button>
+                    <Button variant="destructive" size="sm" onClick={() => admin.deleteCategory(category.id).then(() => toast.success('Categoría eliminada'))}>Eliminar</Button>
                   </div>
                 </div>
               )

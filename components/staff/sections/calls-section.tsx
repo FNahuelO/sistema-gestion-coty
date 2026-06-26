@@ -67,10 +67,10 @@ export function CallsSection() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button size="sm" className={PANEL_PRIMARY_BTN} onClick={() => void patch(call.id, 'acknowledge')}>
+                <Button size="sm" className={PANEL_PRIMARY_BTN} onClick={() => patch(call.id, 'acknowledge')}>
                   Atender
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => void patch(call.id, 'resolve')}>
+                <Button size="sm" variant="outline" onClick={() => patch(call.id, 'resolve')}>
                   Listo
                 </Button>
               </div>

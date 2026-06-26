@@ -124,7 +124,7 @@ function DeliveryQueueCard({
             <Button
               size="sm"
               className={cn('w-full sm:w-auto', PANEL_PRIMARY_BTN)}
-              onClick={() => void updateStatus('picked_up')}
+              onClick={() => updateStatus('picked_up')}
             >
               Retirado
             </Button>
@@ -133,7 +133,7 @@ function DeliveryQueueCard({
             <Button
               size="sm"
               className={cn('w-full sm:w-auto', PANEL_PRIMARY_BTN)}
-              onClick={() => void updateStatus('delivered')}
+              onClick={() => updateStatus('delivered')}
             >
               Entregado
             </Button>

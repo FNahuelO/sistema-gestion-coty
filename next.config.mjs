@@ -40,6 +40,42 @@ const allowedDevOrigins = Array.from(
   )
 )
 
+const securityHeaders = [
+  // Fuerza HTTPS en navegadores durante 2 años (incluye subdominios).
+  {
+    key: 'Strict-Transport-Security',
+    value: 'max-age=63072000; includeSubDomains; preload',
+  },
+  // Evita que el navegador "adivine" el tipo MIME (anti sniffing).
+  {
+    key: 'X-Content-Type-Options',
+    value: 'nosniff',
+  },
+  // Impide que la app se cargue dentro de un iframe (anti clickjacking).
+  {
+    key: 'X-Frame-Options',
+    value: 'DENY',
+  },
+  {
+    key: 'Content-Security-Policy',
+    value: "frame-ancestors 'none'",
+  },
+  // No filtrar la URL completa (con datos sensibles) a sitios externos.
+  {
+    key: 'Referrer-Policy',
+    value: 'strict-origin-when-cross-origin',
+  },
+  // Desactiva APIs sensibles del navegador que la app no usa.
+  {
+    key: 'Permissions-Policy',
+    value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+  },
+  {
+    key: 'X-DNS-Prefetch-Control',
+    value: 'off',
+  },
+]
+
 const nextConfig = {
   devIndicators: false,
   reactStrictMode: false,
@@ -54,6 +90,14 @@ const nextConfig = {
         hostname: 'res.cloudinary.com',
       },
     ],
+  },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: securityHeaders,
+      },
+    ]
   },
   ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
 }

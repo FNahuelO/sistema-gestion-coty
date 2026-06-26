@@ -169,7 +169,7 @@ export function UsersSection() {
           <Switch checked={userForm.active} onCheckedChange={(checked) => setUserForm((previous) => ({ ...previous, active: checked }))} />
         </div>
         <div className="flex gap-2">
-          <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => void submitUser()}>Guardar</Button>
+          <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => submitUser()}>Guardar</Button>
           <Button variant="outline" className={PANEL_OUTLINE_BTN} onClick={() => setUserForm(emptyUserForm())}>Limpiar</Button>
         </div>
       </AdminFormPanel>
@@ -222,7 +222,7 @@ export function UsersSection() {
                         variant="ghost"
                         size="icon"
                         aria-label="Desactivar"
-                        onClick={() => void admin.deleteUser(user.id).then(() => toast.success('Personal desactivado'))}
+                        onClick={() => admin.deleteUser(user.id).then(() => toast.success('Personal desactivado'))}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -265,7 +265,7 @@ export function UsersSection() {
                 <Button
                   variant="destructive"
                   className="h-11 flex-1"
-                  onClick={() => void admin.deleteUser(user.id).then(() => toast.success('Personal desactivado'))}
+                  onClick={() => admin.deleteUser(user.id).then(() => toast.success('Personal desactivado'))}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Desactivar

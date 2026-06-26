@@ -1,3 +1,5 @@
+'use client'
+
 import * as React from 'react'
 import { Slot } from '@radix-ui/react-slot'
 import { cva, type VariantProps } from 'class-variance-authority'
@@ -36,22 +38,73 @@ const buttonVariants = cva(
   },
 )
 
+type ButtonProps = Omit<React.ComponentProps<'button'>, 'onClick'> &
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean
+    /**
+     * Permite handlers asíncronos. Si el handler devuelve una promesa, el botón
+     * se deshabilita automáticamente hasta que se resuelva, evitando dobles
+     * clicks que disparen la misma petición varias veces.
+     */
+    onClick?: (event: React.MouseEvent<HTMLButtonElement>) => unknown
+  }
+
 function Button({
   className,
   variant,
   size,
   asChild = false,
+  onClick,
+  disabled,
   ...props
-}: React.ComponentProps<'button'> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean
-  }) {
-  const Comp = asChild ? Slot : 'button'
+}: ButtonProps) {
+  const [pending, setPending] = React.useState(false)
+  const mountedRef = React.useRef(true)
+  const inFlightRef = React.useRef(false)
+
+  React.useEffect(() => {
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  if (asChild) {
+    return (
+      <Slot
+        data-slot="button"
+        className={cn(buttonVariants({ variant, size, className }))}
+        {...props}
+      />
+    )
+  }
+
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (inFlightRef.current) {
+      event.preventDefault()
+      return
+    }
+
+    const result = onClick?.(event)
+
+    if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
+      inFlightRef.current = true
+      setPending(true)
+      Promise.resolve(result).finally(() => {
+        inFlightRef.current = false
+        if (mountedRef.current) {
+          setPending(false)
+        }
+      })
+    }
+  }
 
   return (
-    <Comp
+    <button
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
+      onClick={handleClick}
+      disabled={disabled || pending}
+      aria-busy={pending || undefined}
       {...props}
     />
   )

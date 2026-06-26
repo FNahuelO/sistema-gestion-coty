@@ -401,6 +401,10 @@ export function useCart() {
   return context
 }
 
+export type LoginResult =
+  | { ok: true; user: User }
+  | { ok: false; error: string }
+
 export function useAuth() {
   const { data, status } = useSession()
 
@@ -416,27 +420,34 @@ export function useAuth() {
     }
   }, [data])
 
-  const loginWithCredentials = useCallback(async (credentials: Record<string, string>) => {
+  const loginWithCredentials = useCallback(async (credentials: Record<string, string>): Promise<LoginResult> => {
     const result = await signIn('credentials', {
       ...credentials,
       redirect: false,
     })
 
-    if (result?.error) return null
+    if (result?.error) {
+      return { ok: false, error: result.error }
+    }
 
     const sessionResponse = await fetch('/api/auth/session')
     const session = await sessionResponse.json()
 
-    if (!session?.user) return null
+    if (!session?.user) {
+      return { ok: false, error: 'CredentialsSignin' }
+    }
 
     return {
-      id: session.user.id,
-      name: session.user.name ?? '',
-      email: session.user.email ?? '',
-      role: session.user.role,
-      staffRole: session.user.staffRole ?? undefined,
-      avatar: session.user.avatar ?? undefined,
-    } satisfies User
+      ok: true,
+      user: {
+        id: session.user.id,
+        name: session.user.name ?? '',
+        email: session.user.email ?? '',
+        role: session.user.role,
+        staffRole: session.user.staffRole ?? undefined,
+        avatar: session.user.avatar ?? undefined,
+      } satisfies User,
+    }
   }, [])
 
   const login = useCallback(

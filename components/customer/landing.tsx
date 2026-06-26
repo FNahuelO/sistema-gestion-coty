@@ -15,6 +15,7 @@ import {
   Minus,
   ArrowRight,
   ShoppingBag,
+  Lock,
 } from 'lucide-react'
 import { getCategoryIcon } from '@/lib/category-icons'
 import {
@@ -666,6 +667,13 @@ export function CustomerLanding() {
         <p className="mt-4 text-center text-[10px] text-muted-foreground md:text-xs">
           Coty Café - Resto Bar. Todos los derechos reservados.
         </p>
+        <Link
+          href="/login"
+          className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 text-[10px] font-medium text-muted-foreground/70 transition-colors hover:text-[#2D5A57] md:text-xs"
+        >
+          <Lock className="h-3 w-3" />
+          Acceso personal
+        </Link>
       </footer>
 
       {itemCount > 0 && (

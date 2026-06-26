@@ -193,7 +193,7 @@ export function CommerceSection() {
               />
             </Field>
             <div className="flex gap-2">
-              <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => void saveZone()}>
+              <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => saveZone()}>
                 Guardar
               </Button>
               <Button variant="outline" className={PANEL_OUTLINE_BTN} onClick={() => setZoneForm(emptyZoneForm())}>
@@ -241,7 +241,7 @@ export function CommerceSection() {
               />
             </div>
             <div className="flex gap-2">
-              <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => void saveCode()}>
+              <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => saveCode()}>
                 Guardar
               </Button>
               <Button variant="outline" className={PANEL_OUTLINE_BTN} onClick={() => setCodeForm(emptyCodeForm())}>
@@ -281,7 +281,7 @@ export function CommerceSection() {
               />
             </Field>
             <div className="flex gap-2">
-              <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => void saveReservation()}>
+              <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => saveReservation()}>
                 Guardar
               </Button>
               <Button variant="outline" className={PANEL_OUTLINE_BTN} onClick={() => setReservationForm(emptyReservationForm())}>
@@ -301,7 +301,7 @@ export function CommerceSection() {
               />
             </Field>
             <div className="flex gap-2">
-              <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => void createInvoice()}>
+              <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => createInvoice()}>
                 Generar
               </Button>
               <Button variant="outline" className={PANEL_OUTLINE_BTN} onClick={() => setInvoiceOrderId('')}>
