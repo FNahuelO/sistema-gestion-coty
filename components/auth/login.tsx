@@ -12,7 +12,6 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp
 import { Field } from '@/components/admin/ui/field'
 import { useAuth } from '@/lib/store'
 import { RATE_LIMITED_ERROR } from '@/lib/auth-errors'
-import { canAccessAdmin } from '@/lib/permissions'
 import type { User } from '@/lib/types'
 import { COTY_HEADER } from '@/lib/coty-theme'
 import { PANEL_CARD, PANEL_PRIMARY_BTN, PANEL_TITLE } from '@/lib/panel-theme'
@@ -42,7 +41,9 @@ export function LoginPage() {
 
   const redirectAfterLogin = (authenticatedUser: User) => {
     toast.success('Inicio de sesión exitoso')
-    if (canAccessAdmin({ role: authenticatedUser.role, staffRole: authenticatedUser.staffRole })) {
+    // El admin va al panel de gestión; el personal operativo (cajero, mesero,
+    // cadete, cocina) va al panel de operaciones donde se aceptan los pedidos.
+    if (authenticatedUser.role === 'admin') {
       router.push('/admin')
       return
     }
