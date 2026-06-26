@@ -20,6 +20,8 @@ export type CreateOrderPayload = {
   customerName: string
   customerPhone: string
   customerAddress?: string
+  deliveryLat?: number
+  deliveryLng?: number
   tableId?: string
   deliveryZoneId?: string
   discountCode?: string

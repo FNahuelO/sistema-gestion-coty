@@ -40,6 +40,10 @@ export function MobileBottomSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
+        // Evita que el teclado del celular se abra solo al abrir el panel:
+        // el foco automático en el primer input se cancela; el teclado sólo
+        // aparece cuando el usuario toca un input manualmente.
+        onOpenAutoFocus={(event) => event.preventDefault()}
         className={cn(
           hasFooter
             ? 'flex max-h-[92vh] flex-col gap-0 overflow-hidden rounded-t-2xl border-t p-0'

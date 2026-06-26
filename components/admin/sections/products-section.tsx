@@ -160,7 +160,7 @@ export function ProductsSection() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-6xl space-y-6">
       <AdminPageHeader
         title="Productos"
         description="Gestioná el menú y sus opciones"
@@ -169,8 +169,7 @@ export function ProductsSection() {
           openPanel()
         }}
       />
-      <div className="space-y-6">
-        <AdminFormPanel
+      <AdminFormPanel
           panelId="products"
           title={productForm.id ? 'Editar producto' : 'Nuevo producto'}
           open={open}
@@ -239,7 +238,7 @@ export function ProductsSection() {
           </div>
         </AdminFormPanel>
 
-        <Card className={PANEL_CARD}>
+      <Card className={PANEL_CARD}>
           <CardHeader className="space-y-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className={PANEL_TITLE}>Listado</CardTitle>
@@ -392,7 +391,6 @@ export function ProductsSection() {
             ) : null}
           </CardContent>
         </Card>
-      </div>
     </div>
   )
 }

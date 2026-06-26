@@ -8,7 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { MapPin, Crosshair, Pencil, Trash2 } from 'lucide-react'
 import { formatPrice } from '@/lib/coty-theme'
 import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TITLE, PANEL_TOGGLE_ROW } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
@@ -38,7 +41,77 @@ async function postJson(url: string, body: unknown) {
   return payload
 }
 
-const emptyZoneForm = () => ({ name: '', deliveryFee: 0, minOrderAmount: 0, active: true })
+type ZoneGeoType = 'RADIUS' | 'POLYGON'
+
+type ZoneForm = {
+  id?: string
+  name: string
+  deliveryFee: number
+  minOrderAmount: number
+  active: boolean
+  geoType: ZoneGeoType
+  centerAddress: string
+  centerLat: string
+  centerLng: string
+  radiusKm: string
+  polygonText: string
+}
+
+const emptyZoneForm = (): ZoneForm => ({
+  name: '',
+  deliveryFee: 0,
+  minOrderAmount: 0,
+  active: true,
+  geoType: 'RADIUS',
+  centerAddress: '',
+  centerLat: '',
+  centerLng: '',
+  radiusKm: '3',
+  polygonText: '',
+})
+
+type ZoneRow = {
+  id: string
+  name: string
+  deliveryFee: number
+  minOrderAmount: number
+  active: boolean
+  geoType: ZoneGeoType
+  centerLat: number | null
+  centerLng: number | null
+  radiusKm: number | null
+  polygon: Array<{ lat: number; lng: number }> | null
+}
+
+function zoneRowToForm(zone: ZoneRow): ZoneForm {
+  return {
+    id: zone.id,
+    name: zone.name,
+    deliveryFee: Number(zone.deliveryFee),
+    minOrderAmount: Number(zone.minOrderAmount),
+    active: zone.active,
+    geoType: zone.geoType,
+    centerAddress: '',
+    centerLat: zone.centerLat != null ? String(zone.centerLat) : '',
+    centerLng: zone.centerLng != null ? String(zone.centerLng) : '',
+    radiusKm: zone.radiusKm != null ? String(zone.radiusKm) : '3',
+    polygonText: zone.polygon?.length
+      ? zone.polygon.map((point) => `${point.lat}, ${point.lng}`).join('\n')
+      : '',
+  }
+}
+
+function parsePolygonText(text: string): Array<{ lat: number; lng: number }> {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [lat, lng] = line.split(',').map((value) => Number(value.trim()))
+      return { lat, lng }
+    })
+    .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
+}
 
 const emptyCodeForm = () => ({
   code: '',
@@ -118,13 +191,99 @@ export function CommerceSection() {
     if (mode) openForm(mode)
   }
 
+  const geocodeCenter = async () => {
+    const address = zoneForm.centerAddress.trim()
+    if (address.length < 4) {
+      toast.error('Escribí una dirección para buscar')
+      return
+    }
+    try {
+      const result = await postJson('/api/admin/geocode', { address })
+      setZoneForm((c) => ({ ...c, centerLat: String(result.lat), centerLng: String(result.lng) }))
+      toast.success('Coordenadas encontradas')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se encontró la dirección')
+    }
+  }
+
+  const useMyLocationForCenter = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      toast.error('Tu navegador no permite geolocalización')
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setZoneForm((c) => ({
+          ...c,
+          centerLat: String(position.coords.latitude),
+          centerLng: String(position.coords.longitude),
+        }))
+        toast.success('Ubicación tomada del dispositivo')
+      },
+      () => toast.error('No se pudo obtener tu ubicación')
+    )
+  }
+
+  const buildZonePayload = () => {
+    const base = {
+      id: zoneForm.id,
+      name: zoneForm.name.trim(),
+      deliveryFee: Number(zoneForm.deliveryFee),
+      minOrderAmount: Number(zoneForm.minOrderAmount),
+      active: zoneForm.active,
+      geoType: zoneForm.geoType,
+    }
+
+    if (zoneForm.geoType === 'RADIUS') {
+      const centerLat = Number(zoneForm.centerLat)
+      const centerLng = Number(zoneForm.centerLng)
+      const radiusKm = Number(zoneForm.radiusKm)
+      if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng)) {
+        throw new Error('Definí el centro de la zona (lat/lng)')
+      }
+      if (!Number.isFinite(radiusKm) || radiusKm <= 0) {
+        throw new Error('El radio debe ser mayor a 0')
+      }
+      return { ...base, centerLat, centerLng, radiusKm }
+    }
+
+    const polygon = parsePolygonText(zoneForm.polygonText)
+    if (polygon.length < 3) {
+      throw new Error('El polígono necesita al menos 3 puntos (lat, lng por línea)')
+    }
+    return { ...base, polygon }
+  }
+
   const saveZone = async () => {
     try {
-      await postJson('/api/admin/delivery-zones', zoneForm)
+      const payload = buildZonePayload()
+      await postJson('/api/admin/delivery-zones', payload)
       await zones.mutate()
       toast.success('Zona guardada')
       setZoneForm(emptyZoneForm())
       setOpen(false)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error')
+    }
+  }
+
+  const editZone = (zone: ZoneRow) => {
+    setFormMode('zone')
+    setZoneForm(zoneRowToForm(zone))
+    openPanel()
+  }
+
+  const deleteZone = async (id: string) => {
+    try {
+      const res = await fetch('/api/admin/delivery-zones', {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      if (!res.ok) throw new Error('No se pudo eliminar')
+      await zones.mutate()
+      toast.success('Zona eliminada')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error')
     }
@@ -174,6 +333,91 @@ export function CommerceSection() {
             <Field label="Nombre">
               <Input value={zoneForm.name} onChange={(e) => setZoneForm((c) => ({ ...c, name: e.target.value }))} />
             </Field>
+            <Field label="Tipo de área">
+              <Select
+                value={zoneForm.geoType}
+                onValueChange={(value) => setZoneForm((c) => ({ ...c, geoType: value as ZoneGeoType }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="RADIUS">Radio (centro + distancia)</SelectItem>
+                  <SelectItem value="POLYGON">Polígono (puntos)</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+
+            {zoneForm.geoType === 'RADIUS' ? (
+              <>
+                <Field label="Buscar centro por dirección">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Ej: Av. Siempre Viva 123, Ciudad"
+                      value={zoneForm.centerAddress}
+                      onChange={(e) => setZoneForm((c) => ({ ...c, centerAddress: e.target.value }))}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={PANEL_OUTLINE_BTN}
+                      onClick={() => geocodeCenter()}
+                    >
+                      <MapPin className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </Field>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={cn('w-full', PANEL_OUTLINE_BTN)}
+                  onClick={useMyLocationForCenter}
+                >
+                  <Crosshair className="mr-2 h-4 w-4" />
+                  Usar mi ubicación actual
+                </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Latitud">
+                    <Input
+                      type="number"
+                      step="any"
+                      placeholder="-34.6037"
+                      value={zoneForm.centerLat}
+                      onChange={(e) => setZoneForm((c) => ({ ...c, centerLat: e.target.value }))}
+                    />
+                  </Field>
+                  <Field label="Longitud">
+                    <Input
+                      type="number"
+                      step="any"
+                      placeholder="-58.3816"
+                      value={zoneForm.centerLng}
+                      onChange={(e) => setZoneForm((c) => ({ ...c, centerLng: e.target.value }))}
+                    />
+                  </Field>
+                </div>
+                <Field label="Radio de cobertura (km)">
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    value={zoneForm.radiusKm}
+                    onChange={(e) => setZoneForm((c) => ({ ...c, radiusKm: e.target.value }))}
+                  />
+                </Field>
+              </>
+            ) : (
+              <Field label="Puntos del polígono (lat, lng — uno por línea)">
+                <Textarea
+                  rows={5}
+                  placeholder={'-34.60, -58.38\n-34.61, -58.37\n-34.62, -58.39'}
+                  value={zoneForm.polygonText}
+                  onChange={(e) => setZoneForm((c) => ({ ...c, polygonText: e.target.value }))}
+                />
+              </Field>
+            )}
+
             <Field label="Costo de envío">
               <Input
                 type="number"
@@ -192,6 +436,13 @@ export function CommerceSection() {
                 onChange={(e) => setZoneForm((c) => ({ ...c, minOrderAmount: Number(e.target.value) }))}
               />
             </Field>
+            <div className={PANEL_TOGGLE_ROW}>
+              <Label>Zona activa</Label>
+              <Switch
+                checked={zoneForm.active}
+                onCheckedChange={(checked) => setZoneForm((c) => ({ ...c, active: checked }))}
+              />
+            </div>
             <div className="flex gap-2">
               <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => saveZone()}>
                 Guardar
@@ -350,15 +601,58 @@ export function CommerceSection() {
               <CardContent className="space-y-2">
                 {zones.isLoading ? (
                   <Spinner />
-                ) : (zones.data as Array<{ id: string; name: string; deliveryFee: number; minOrderAmount: number }>)?.length ? (
-                  (zones.data as Array<{ id: string; name: string; deliveryFee: number; minOrderAmount: number }>).map((zone) => (
-                    <div key={zone.id} className={PANEL_LIST_ROW}>
-                      <p className="font-medium">{zone.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Envío {formatPrice(Number(zone.deliveryFee))} · Mínimo {formatPrice(Number(zone.minOrderAmount))}
-                      </p>
-                    </div>
-                  ))
+                ) : (zones.data as ZoneRow[])?.length ? (
+                  (zones.data as ZoneRow[]).map((zone) => {
+                    const hasGeo =
+                      zone.geoType === 'RADIUS'
+                        ? zone.centerLat != null && zone.centerLng != null && zone.radiusKm != null
+                        : (zone.polygon?.length ?? 0) >= 3
+                    return (
+                      <div key={zone.id} className={cn(PANEL_LIST_ROW, 'flex items-center justify-between gap-3')}>
+                        <div className="min-w-0">
+                          <p className="flex items-center gap-2 font-medium">
+                            {zone.name}
+                            {!zone.active ? (
+                              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">Inactiva</span>
+                            ) : null}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Envío {formatPrice(Number(zone.deliveryFee))} · Mínimo {formatPrice(Number(zone.minOrderAmount))}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {zone.geoType === 'RADIUS'
+                              ? hasGeo
+                                ? `Radio ${zone.radiusKm} km`
+                                : 'Radio sin configurar'
+                              : hasGeo
+                                ? `Polígono (${zone.polygon?.length} puntos)`
+                                : 'Polígono sin configurar'}
+                            {!hasGeo ? ' · ⚠ no detecta ubicación' : ''}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => editZone(zone)}
+                            aria-label="Editar zona"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteZone(zone.id)}
+                            aria-label="Eliminar zona"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })
                 ) : (
                   <p className="text-sm text-muted-foreground">Sin zonas configuradas</p>
                 )}

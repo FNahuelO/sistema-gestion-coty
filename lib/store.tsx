@@ -521,7 +521,7 @@ export function useCatalog() {
     products: Product[]
     promotions: Array<Promotion & { validFrom: string | Date; validTo: string | Date }>
     channelAvailability?: Record<'delivery' | 'local' | 'pickup', { open: boolean; reason?: string }> | null
-    deliveryZones?: Array<{ id: string; name: string; deliveryFee: number; minOrderAmount: number }>
+    deliveryZones?: Array<{ id: string; name: string; deliveryFee: number; minOrderAmount: number; geoType?: 'RADIUS' | 'POLYGON'; hasGeo?: boolean }>
     mercadoPagoAvailable?: boolean
   }
 

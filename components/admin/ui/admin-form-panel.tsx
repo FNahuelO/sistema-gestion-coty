@@ -28,7 +28,7 @@ export function AdminFormPanel({
   if (isMobile) {
     return (
       <MobileBottomSheet open={open} onOpenChange={onOpenChange} title={title}>
-        <div id={`admin-form-panel-${panelId}`}>{children}</div>
+        <div id={`admin-form-panel-${panelId}`} className="space-y-3">{children}</div>
       </MobileBottomSheet>
     )
   }

@@ -346,6 +346,8 @@ model Order {
   customerName           String
   customerPhone          String
   customerAddress        String?
+  deliveryLat            Float?
+  deliveryLng            Float?
   notes                  String?
   subtotal               Decimal              @db.Decimal(10, 2)
   tax                    Decimal              @db.Decimal(10, 2)
@@ -476,15 +478,25 @@ model CashMovement {
   createdByUser   User             @relation("CashMovementBy", fields: [createdByUserId], references: [id])
 }
 
+enum DeliveryZoneGeoType {
+  RADIUS
+  POLYGON
+}
+
 model DeliveryZone {
-  id             String   @id @default(cuid())
+  id             String              @id @default(cuid())
   name           String
-  deliveryFee    Decimal  @db.Decimal(10, 2)
-  minOrderAmount Decimal  @default(0) @db.Decimal(10, 2)
-  active         Boolean  @default(true)
-  sortOrder      Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  deliveryFee    Decimal             @db.Decimal(10, 2)
+  minOrderAmount Decimal             @default(0) @db.Decimal(10, 2)
+  active         Boolean             @default(true)
+  sortOrder      Int                 @default(0)
+  geoType        DeliveryZoneGeoType @default(RADIUS)
+  centerLat      Float?
+  centerLng      Float?
+  radiusKm       Float?
+  polygon        Json?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
   orders         Order[]
 }
 

@@ -16,6 +16,10 @@ import {
   Users,
   Armchair,
   Info,
+  Crosshair,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -190,6 +194,11 @@ export function CheckoutPage() {
   const [completedTableId, setCompletedTableId] = useState<string | undefined>()
   const [completedTableNumber, setCompletedTableNumber] = useState<number | undefined>()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [deliveryCoords, setDeliveryCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [coverageStatus, setCoverageStatus] = useState<
+    'idle' | 'checking' | 'covered' | 'out_of_range' | 'not_found' | 'error'
+  >('idle')
+  const [coverageZoneName, setCoverageZoneName] = useState('')
   const redirectingToMpRef = useRef(false)
   const [redirectingToMp, setRedirectingToMp] = useState(false)
   const [pendingMpOrder, setPendingMpOrder] = useState<ReturnType<typeof getMpPendingOrder>>(null)
@@ -206,6 +215,9 @@ export function CheckoutPage() {
   const isEmpty = items.length === 0 && !orderComplete && !showingMpRedirect
   const activeOrderType = isTableMode ? 'table' : orderType
   const selectedZone = deliveryZones.find((zone) => zone.id === deliveryZoneId)
+  const geoEnabled = deliveryZones.some((zone) => zone.hasGeo)
+  const deliveryNeedsCoverage = orderType === 'delivery' && !isTableMode && geoEnabled
+  const coverageBlocked = deliveryNeedsCoverage && coverageStatus !== 'covered'
   const deliveryFee =
     activeOrderType === 'delivery'
       ? selectedZone?.deliveryFee ?? settings.deliveryFee
@@ -309,6 +321,69 @@ export function CheckoutPage() {
     }
   }
 
+  const resetCoverage = () => {
+    setCoverageStatus('idle')
+    setCoverageZoneName('')
+    setDeliveryCoords(null)
+    setDeliveryZoneId('')
+  }
+
+  const verifyCoverage = async (coords?: { lat: number; lng: number }) => {
+    if (!coords && customerAddress.trim().length < 4) {
+      toast.error('Ingresá tu dirección para verificar la cobertura')
+      return
+    }
+    setCoverageStatus('checking')
+    try {
+      const response = await fetch('/api/delivery/check-coverage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(coords ? coords : { address: customerAddress }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error ?? 'Error')
+
+      if (data.covered && data.zone) {
+        setDeliveryZoneId(data.zone.id)
+        setCoverageZoneName(data.zone.name)
+        setDeliveryCoords(data.coordinates ?? coords ?? null)
+        setCoverageStatus('covered')
+        toast.success(`¡Llegamos a tu zona: ${data.zone.name}!`)
+      } else if (data.reason === 'NOT_FOUND') {
+        setDeliveryZoneId('')
+        setDeliveryCoords(null)
+        setCoverageStatus('not_found')
+      } else if (data.reason === 'NO_ZONES') {
+        resetCoverage()
+      } else {
+        setDeliveryZoneId('')
+        setDeliveryCoords(data.coordinates ?? coords ?? null)
+        setCoverageStatus('out_of_range')
+      }
+    } catch (error) {
+      setCoverageStatus('error')
+      toast.error(error instanceof Error ? error.message : 'No se pudo verificar la cobertura')
+    }
+  }
+
+  const useMyLocation = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      toast.error('Tu navegador no permite geolocalización')
+      return
+    }
+    setCoverageStatus('checking')
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        void verifyCoverage({ lat: position.coords.latitude, lng: position.coords.longitude })
+      },
+      () => {
+        setCoverageStatus('idle')
+        toast.error('No se pudo obtener tu ubicación. Revisá los permisos del navegador.')
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -334,6 +409,11 @@ export function CheckoutPage() {
       return
     }
 
+    if (deliveryNeedsCoverage && coverageStatus !== 'covered') {
+      toast.error('Verificá que tu dirección esté dentro del área de cobertura antes de continuar')
+      return
+    }
+
     if (isTableMode && !tableSession) {
       toast.error('No se pudo identificar la mesa')
       return
@@ -354,6 +434,8 @@ export function CheckoutPage() {
         customerName: isTableMode ? `Mesa ${tableSession?.tableNumber}` : customerName,
         customerPhone: isTableMode ? 'mesa' : customerPhone,
         customerAddress: activeOrderType === 'delivery' ? customerAddress : undefined,
+        deliveryLat: activeOrderType === 'delivery' && deliveryCoords ? deliveryCoords.lat : undefined,
+        deliveryLng: activeOrderType === 'delivery' && deliveryCoords ? deliveryCoords.lng : undefined,
         tableId: isTableMode ? tableSession?.tableId : undefined,
         deliveryZoneId: activeOrderType === 'delivery' && deliveryZoneId ? deliveryZoneId : undefined,
         discountCode: couponDiscount > 0 ? couponCode : undefined,
@@ -630,7 +712,7 @@ export function CheckoutPage() {
                               )}
                             </label>
                           </RadioGroup>
-                          {orderType === 'delivery' && deliveryZones.length > 0 ? (
+                          {orderType === 'delivery' && !geoEnabled && deliveryZones.length > 0 ? (
                             <div className="mt-3 space-y-2">
                               <Label className="text-xs">Zona de entrega</Label>
                               <RadioGroup
@@ -836,10 +918,83 @@ export function CheckoutPage() {
                     id="address"
                     placeholder="Calle, número, referencias..."
                     value={customerAddress}
-                    onChange={(e) => setCustomerAddress(e.target.value)}
+                    onChange={(e) => {
+                      setCustomerAddress(e.target.value)
+                      if (geoEnabled && coverageStatus !== 'idle') resetCoverage()
+                    }}
                     rows={2}
                     required
                   />
+
+                  {geoEnabled && (
+                    <div className="space-y-2">
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="flex-1 rounded-full"
+                          onClick={() => verifyCoverage()}
+                          disabled={coverageStatus === 'checking'}
+                        >
+                          {coverageStatus === 'checking' ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <MapPin className="mr-2 h-4 w-4" />
+                          )}
+                          Verificar cobertura
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="flex-1 rounded-full"
+                          onClick={useMyLocation}
+                          disabled={coverageStatus === 'checking'}
+                        >
+                          <Crosshair className="mr-2 h-4 w-4" />
+                          Usar mi ubicación
+                        </Button>
+                      </div>
+
+                      {coverageStatus === 'covered' && (
+                        <div className="flex items-start gap-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">
+                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                          <span>
+                            ¡Hacemos delivery a tu ubicación! Zona <strong>{coverageZoneName}</strong>
+                            {selectedZone ? ` · Envío ${formatPrice(selectedZone.deliveryFee)}` : ''}.
+                          </span>
+                        </div>
+                      )}
+                      {coverageStatus === 'out_of_range' && (
+                        <div className="flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                          <span>
+                            Tu dirección está fuera de nuestra área de delivery. Podés elegir{' '}
+                            <strong>Retiro en el local</strong> para completar el pedido.
+                          </span>
+                        </div>
+                      )}
+                      {coverageStatus === 'not_found' && (
+                        <div className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                          <span>
+                            No pudimos ubicar esa dirección. Agregá calle, número y ciudad, o usá{' '}
+                            <strong>Usar mi ubicación</strong>.
+                          </span>
+                        </div>
+                      )}
+                      {coverageStatus === 'error' && (
+                        <div className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                          <span>No se pudo verificar la cobertura. Intentá de nuevo en unos segundos.</span>
+                        </div>
+                      )}
+                      {coverageStatus === 'idle' && (
+                        <p className="text-xs text-muted-foreground">
+                          Verificá tu dirección para confirmar que llegamos con el delivery.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               <div className="space-y-2">
@@ -875,9 +1030,13 @@ export function CheckoutPage() {
                 type="submit"
                 className="w-full rounded-full py-5 font-bold"
                 style={{ backgroundColor: COTY_TEAL }}
-                disabled={isSubmitting}
+                disabled={isSubmitting || coverageBlocked}
               >
-                {isSubmitting ? 'Procesando...' : 'Confirmar y enviar'}
+                {isSubmitting
+                  ? 'Procesando...'
+                  : coverageBlocked
+                    ? 'Verificá tu cobertura'
+                    : 'Confirmar y enviar'}
               </Button>
             </form>
         </SimpleModal>

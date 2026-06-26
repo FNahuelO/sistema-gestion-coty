@@ -5,6 +5,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { XIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/use-mobile'
 
 function Dialog({
   ...props
@@ -50,10 +51,18 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onOpenAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  const isMobile = useIsMobile()
+  // En celular evitamos el foco automático para que el teclado no se abra solo
+  // al abrir el diálogo. En escritorio se mantiene el foco automático.
+  const handleOpenAutoFocus =
+    onOpenAutoFocus ??
+    (isMobile ? (event: Event) => event.preventDefault() : undefined)
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -63,6 +72,7 @@ function DialogContent({
           'bg-background data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg',
           className,
         )}
+        onOpenAutoFocus={handleOpenAutoFocus}
         {...props}
       >
         {children}

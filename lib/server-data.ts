@@ -52,6 +52,8 @@ export const createOrderSchema = z
     customerName: z.string().trim().max(120).default(''),
     customerPhone: z.string().trim().max(40).default(''),
     customerAddress: z.string().trim().max(200).optional(),
+    deliveryLat: z.number().min(-90).max(90).optional(),
+    deliveryLng: z.number().min(-180).max(180).optional(),
     notes: z.string().trim().max(500).optional(),
     tableId: z.string().trim().optional(),
     deliveryZoneId: z.string().trim().optional(),
@@ -739,12 +741,20 @@ export async function getPublicCatalog() {
     channelAvailability,
     deliveryZones: deliveryZones
       .filter((zone) => zone.active)
-      .map((zone) => ({
-        id: zone.id,
-        name: zone.name,
-        deliveryFee: decimalToNumber(zone.deliveryFee),
-        minOrderAmount: decimalToNumber(zone.minOrderAmount),
-      })),
+      .map((zone) => {
+        const hasGeo =
+          zone.geoType === 'RADIUS'
+            ? zone.centerLat != null && zone.centerLng != null && zone.radiusKm != null
+            : Array.isArray(zone.polygon) && (zone.polygon as unknown[]).length >= 3
+        return {
+          id: zone.id,
+          name: zone.name,
+          deliveryFee: decimalToNumber(zone.deliveryFee),
+          minOrderAmount: decimalToNumber(zone.minOrderAmount),
+          geoType: zone.geoType as 'RADIUS' | 'POLYGON',
+          hasGeo,
+        }
+      }),
     mercadoPagoAvailable: isMercadoPagoAvailable(settings),
   }
 }
@@ -1071,6 +1081,8 @@ export async function createOrderFromPayload(payload: z.input<typeof createOrder
         : input.customerName,
     customerPhone: input.type === 'table' ? input.customerPhone || 'mesa' : input.customerPhone,
     customerAddress: input.type === 'delivery' ? input.customerAddress : undefined,
+    deliveryLat: input.type === 'delivery' ? input.deliveryLat : undefined,
+    deliveryLng: input.type === 'delivery' ? input.deliveryLng : undefined,
     notes: input.notes,
     subtotal,
     tax,

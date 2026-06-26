@@ -14,6 +14,7 @@ import {
 } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { findMatchingZone, type LatLng, type ZoneGeometry } from '@/lib/geo'
 import type { DeliveryAssignmentStatus as DeliveryAssignmentStatusUi, DeliveryQueueEntry } from '@/lib/types'
 
 function dec(value: number | string | { toString(): string }) {
@@ -119,14 +120,44 @@ export async function listCashSessions(limit = 30) {
 
 // ─── Delivery zones ──────────────────────────────────────────────────────────
 
-export const deliveryZoneSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().trim().min(1).max(80),
-  deliveryFee: z.number().min(0),
-  minOrderAmount: z.number().min(0).default(0),
-  active: z.boolean().default(true),
-  sortOrder: z.number().int().default(0),
+const latLngSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
 })
+
+export const deliveryZoneSchema = z
+  .object({
+    id: z.string().optional(),
+    name: z.string().trim().min(1).max(80),
+    deliveryFee: z.number().min(0),
+    minOrderAmount: z.number().min(0).default(0),
+    active: z.boolean().default(true),
+    sortOrder: z.number().int().default(0),
+    geoType: z.enum(['RADIUS', 'POLYGON']).default('RADIUS'),
+    centerLat: z.number().min(-90).max(90).nullish(),
+    centerLng: z.number().min(-180).max(180).nullish(),
+    radiusKm: z.number().positive().max(100).nullish(),
+    polygon: z.array(latLngSchema).min(3).nullish(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.geoType === 'RADIUS') {
+      if (data.centerLat == null || data.centerLng == null || data.radiusKm == null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Una zona por radio requiere centro (lat/lng) y radio en km',
+          path: ['radiusKm'],
+        })
+      }
+    } else if (data.geoType === 'POLYGON') {
+      if (!data.polygon || data.polygon.length < 3) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Una zona por polígono requiere al menos 3 puntos',
+          path: ['polygon'],
+        })
+      }
+    }
+  })
 
 export async function listDeliveryZones() {
   return prisma.deliveryZone.findMany({ orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] })
@@ -134,17 +165,63 @@ export async function listDeliveryZones() {
 
 export async function upsertDeliveryZone(payload: z.infer<typeof deliveryZoneSchema>) {
   const input = deliveryZoneSchema.parse(payload)
-  if (input.id) {
-    return prisma.deliveryZone.update({
-      where: { id: input.id },
-      data: { name: input.name, deliveryFee: input.deliveryFee, minOrderAmount: input.minOrderAmount, active: input.active, sortOrder: input.sortOrder },
-    })
+  const data = {
+    name: input.name,
+    deliveryFee: input.deliveryFee,
+    minOrderAmount: input.minOrderAmount,
+    active: input.active,
+    sortOrder: input.sortOrder,
+    geoType: input.geoType,
+    centerLat: input.geoType === 'RADIUS' ? input.centerLat ?? null : null,
+    centerLng: input.geoType === 'RADIUS' ? input.centerLng ?? null : null,
+    radiusKm: input.geoType === 'RADIUS' ? input.radiusKm ?? null : null,
+    polygon: input.geoType === 'POLYGON' ? (input.polygon ?? null) : null,
   }
-  return prisma.deliveryZone.create({ data: input })
+  if (input.id) {
+    return prisma.deliveryZone.update({ where: { id: input.id }, data })
+  }
+  return prisma.deliveryZone.create({ data })
 }
 
 export async function deleteDeliveryZone(id: string) {
   await prisma.deliveryZone.delete({ where: { id } })
+}
+
+/** Zonas activas con su geometría, listas para evaluar cobertura. */
+export async function listActiveZoneGeometries(): Promise<ZoneGeometry[]> {
+  const zones = await prisma.deliveryZone.findMany({
+    where: { active: true },
+    orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+  })
+  return zones.map((zone) => ({
+    id: zone.id,
+    name: zone.name,
+    deliveryFee: dec(zone.deliveryFee),
+    minOrderAmount: dec(zone.minOrderAmount),
+    geoType: zone.geoType,
+    centerLat: zone.centerLat,
+    centerLng: zone.centerLng,
+    radiusKm: zone.radiusKm,
+    polygon: (zone.polygon as LatLng[] | null) ?? null,
+  }))
+}
+
+/**
+ * Resuelve la cobertura de delivery para un punto: devuelve la zona que lo
+ * cubre (o null) entre las zonas activas con geometría configurada.
+ */
+export async function resolveCoverageForPoint(point: LatLng) {
+  const zones = await listActiveZoneGeometries()
+  const configured = zones.filter(
+    (zone) =>
+      (zone.geoType === 'RADIUS' &&
+        zone.centerLat != null &&
+        zone.centerLng != null &&
+        zone.radiusKm != null) ||
+      (zone.geoType === 'POLYGON' && (zone.polygon?.length ?? 0) >= 3)
+  )
+  const zone = findMatchingZone(point, configured)
+  return { zone, hasConfiguredZones: configured.length > 0 }
 }
 
 // ─── Discount codes ──────────────────────────────────────────────────────────
