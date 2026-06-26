@@ -13,6 +13,7 @@ enum UserRole {
 
 enum StaffRole {
   CASHIER
+  WAITRESS
   RUNNER
   KITCHEN
 }

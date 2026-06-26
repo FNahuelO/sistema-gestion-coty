@@ -9,7 +9,7 @@ export type Permission =
   | 'staff:operate'
   | 'cashier:close'
 
-export type StaffRoleType = 'cashier' | 'runner' | 'kitchen'
+export type StaffRoleType = 'cashier' | 'waitress' | 'runner' | 'kitchen'
 
 export type SessionRoleContext = {
   role: 'admin' | 'staff'
@@ -45,6 +45,9 @@ export function mapStaffRole(value?: string | null): StaffRoleType | null {
     case 'CASHIER':
     case 'cashier':
       return 'cashier'
+    case 'WAITRESS':
+    case 'waitress':
+      return 'waitress'
     case 'RUNNER':
     case 'runner':
       return 'runner'
@@ -58,7 +61,7 @@ export function mapStaffRole(value?: string | null): StaffRoleType | null {
 
 export function getPermissions(context: SessionRoleContext): Permission[] {
   if (context.role === 'admin') return ADMIN_PERMISSIONS
-  if (context.staffRole === 'cashier') return CASHIER_PERMISSIONS
+  if (context.staffRole === 'cashier' || context.staffRole === 'waitress') return CASHIER_PERMISSIONS
   if (context.staffRole === 'kitchen') return KITCHEN_PERMISSIONS
   return RUNNER_PERMISSIONS
 }
@@ -97,6 +100,7 @@ export function canAccessAdminSection(context: SessionRoleContext, section: stri
 export function getStaffRoleLabel(staffRole?: StaffRoleType | null, role?: 'admin' | 'staff'): string {
   if (role === 'admin') return 'Admin'
   if (staffRole === 'cashier') return 'Cajero/a'
+  if (staffRole === 'waitress') return 'Mesera/o'
   if (staffRole === 'runner') return 'Cadete'
   if (staffRole === 'kitchen') return 'Cocina'
   return 'Personal'

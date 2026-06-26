@@ -136,6 +136,7 @@ export function UsersSection() {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="cashier">Cajero/a</SelectItem>
+                <SelectItem value="waitress">Mesera/o</SelectItem>
                 <SelectItem value="runner">Cadete</SelectItem>
                 <SelectItem value="kitchen">Cocina</SelectItem>
               </SelectContent>
