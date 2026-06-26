@@ -66,9 +66,11 @@ const securityHeaders = [
     value: 'strict-origin-when-cross-origin',
   },
   // Desactiva APIs sensibles del navegador que la app no usa.
+  // geolocation=(self) la habilita sólo en nuestro propio dominio (lo usa el
+  // checkout para detectar la cobertura de delivery por ubicación).
   {
     key: 'Permissions-Policy',
-    value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+    value: 'camera=(), microphone=(), geolocation=(self), interest-cohort=()',
   },
   {
     key: 'X-DNS-Prefetch-Control',
