@@ -660,12 +660,12 @@ export function CustomerLanding() {
       {/* Footer final */}
       <footer className="mx-auto flex max-w-6xl flex-col items-center px-4 pb-10 pt-6 md:px-8 md:pb-14 md:pt-10">
         <img
-          src={LOGO_SRC_SVG_NEGRO}
-          alt="Coty Café"
+          src={settings.logo?.trim() ? settings.logo : LOGO_SRC_SVG_NEGRO}
+          alt={settings.name}
           className="h-16 w-auto object-contain md:h-24"
         />
         <p className="mt-4 text-center text-[10px] text-muted-foreground md:text-xs">
-          Coty Café - Resto Bar. Todos los derechos reservados.
+          {settings.name} © {new Date().getFullYear()}. Todos los derechos reservados.
         </p>
         <Link
           href="/login"
