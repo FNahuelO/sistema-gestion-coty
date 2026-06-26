@@ -90,6 +90,24 @@ export interface Order {
   trackingProof?: string
 }
 
+export type DeliveryAssignmentStatus = 'unassigned' | 'assigned' | 'picked_up' | 'delivered'
+
+export interface DeliveryQueueEntry {
+  orderId: string
+  assignmentStatus: DeliveryAssignmentStatus
+  orderStatus: OrderStatus
+  runner?: { id: string; name: string } | null
+  order: {
+    displayCode?: string | null
+    customerName: string
+    customerPhone?: string | null
+    customerAddress?: string | null
+    total: number
+    deliveryFee?: number
+    createdAt: string
+  }
+}
+
 // Table types
 export type TableStatus = 'free' | 'occupied' | 'waiting' | 'finished'
 

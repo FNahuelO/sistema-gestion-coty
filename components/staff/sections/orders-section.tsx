@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef, type ElementType } from 'react'
+import useSWR from 'swr'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Truck,
@@ -27,14 +28,21 @@ import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
 import { formatOrderStatus, isDisplayableCustomerPhone } from '@/lib/order-labels'
 import { ORDER_SORT_OPTIONS, sortOrders, type OrderSortKey } from '@/lib/order-sort'
-import type { Order, OrderStatus, OrderType } from '@/lib/types'
+import type { DeliveryQueueEntry, Order, OrderStatus, OrderType } from '@/lib/types'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { toast } from 'sonner'
 import { COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
 import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
 import { Spinner } from '@/components/ui/spinner'
+import { formatDeliveryAssignmentStatus } from '@/lib/delivery-labels'
 import { cn } from '@/lib/utils'
+
+const fetchJson = async (url: string) => {
+  const res = await fetch(url, { credentials: 'include' })
+  if (!res.ok) throw new Error('Error al cargar')
+  return res.json()
+}
 
 const orderTypeIcons: Record<OrderType, ElementType> = {
   delivery: Truck,
@@ -93,6 +101,15 @@ export function OrdersSection({
   onNavigateToCalls?: () => void
 }) {
   const { orders, updateOrderStatus, closeOrder } = useOrders()
+  const { data: deliveryQueue = [], mutate: mutateDeliveryQueue } = useSWR<DeliveryQueueEntry[]>(
+    '/api/staff/operations?view=delivery',
+    fetchJson,
+    { refreshInterval: 12000 }
+  )
+  const deliveryByOrderId = useMemo(
+    () => new Map(deliveryQueue.map((entry) => [entry.orderId, entry])),
+    [deliveryQueue]
+  )
   const { isPending, isBusy, run } = usePendingAction()
   const previousPendingCount = useRef<number | null>(null)
   const [selectedTab, setSelectedTab] = useState('all')
@@ -306,6 +323,8 @@ export function OrdersSection({
                   {sortedOrders.map((order, index) => {
                     const TypeIcon = orderTypeIcons[order.type]
                     const action = order.offlinePending ? null : statusActions[order.status]
+                    const deliveryEntry =
+                      order.type === 'delivery' ? deliveryByOrderId.get(order.id) : undefined
 
                     return (
                       <motion.div
@@ -348,6 +367,20 @@ export function OrdersSection({
                                   Sin enviar
                                 </Badge>
                               )}
+                              {deliveryEntry ? (
+                                <Badge
+                                  className={cn(
+                                    'border-0 text-[10px] hover:bg-inherit',
+                                    deliveryEntry.assignmentStatus === 'unassigned'
+                                      ? 'bg-amber-100 text-amber-900'
+                                      : deliveryEntry.assignmentStatus === 'picked_up'
+                                        ? 'bg-sky-100 text-sky-800'
+                                        : 'bg-[#C5DDD9]/70 text-[#2D5A57]'
+                                  )}
+                                >
+                                  {formatDeliveryAssignmentStatus(deliveryEntry.assignmentStatus)}
+                                </Badge>
+                              ) : null}
                               <StatusBadge status={order.status} />
                             </div>
                           </div>
@@ -422,6 +455,7 @@ export function OrdersSection({
         onAdvanceStatus={handleStatusChange}
         onCancel={handleCancelOrder}
         onArchive={handleCloseOrder}
+        onDeliveryUpdated={() => void mutateDeliveryQueue()}
         isPending={isPending}
         isBusy={isBusy}
       />

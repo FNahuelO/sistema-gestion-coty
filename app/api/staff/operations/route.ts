@@ -3,9 +3,10 @@ import { z } from 'zod'
 import {
   ackKitchenOrder,
   assignOrderToRunner,
+  getDeliveryQueueEntry,
   getKitchenOrders,
   getRunnerSettlement,
-  listDeliveryAssignments,
+  listDeliveryQueue,
   markKitchenOrderReady,
   updateDeliveryAssignment,
 } from '@/lib/commerce'
@@ -13,14 +14,42 @@ import { handleRouteError } from '@/lib/api-errors'
 import { requirePermission, serializeOrder } from '@/lib/server-data'
 import { prisma } from '@/lib/prisma'
 
+function mapAssignmentError(error: unknown) {
+  if (!(error instanceof Error)) return null
+
+  switch (error.message) {
+    case 'ORDER_NOT_FOUND':
+      return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 })
+    case 'ORDER_NOT_DELIVERY':
+      return NextResponse.json({ error: 'El pedido no es de delivery' }, { status: 400 })
+    case 'ORDER_NOT_ASSIGNABLE':
+      return NextResponse.json({ error: 'El pedido no admite asignación' }, { status: 400 })
+    case 'RUNNER_NOT_FOUND':
+      return NextResponse.json({ error: 'Cadete no encontrado o inactivo' }, { status: 400 })
+    case 'ASSIGNMENT_NOT_FOUND':
+      return NextResponse.json({ error: 'La entrega no está asignada' }, { status: 404 })
+    case 'ASSIGNMENT_IN_PROGRESS':
+      return NextResponse.json({ error: 'No se puede cambiar el cadete con el pedido en camino' }, { status: 400 })
+    case 'INVALID_ASSIGNMENT_STATUS':
+      return NextResponse.json({ error: 'Transición de estado inválida' }, { status: 400 })
+    default:
+      return null
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     await requirePermission('staff:operate')
     const view = request.nextUrl.searchParams.get('view')
 
     if (view === 'delivery') {
-      const assignments = await listDeliveryAssignments(true)
-      return NextResponse.json(assignments)
+      const orderId = request.nextUrl.searchParams.get('orderId')
+      if (orderId) {
+        const entry = await getDeliveryQueueEntry(orderId)
+        return NextResponse.json(entry)
+      }
+      const queue = await listDeliveryQueue()
+      return NextResponse.json(queue)
     }
 
     if (view === 'runners') {
@@ -94,25 +123,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cadete requerido' }, { status: 400 })
     }
 
-    const assignment = await assignOrderToRunner(body.orderId, body.runnerId, body.deliveryFee ?? 0)
+    const assignment = await assignOrderToRunner(body.orderId, body.runnerId, body.deliveryFee)
     return NextResponse.json(assignment)
   } catch (error) {
+    const mapped = mapAssignmentError(error)
+    if (mapped) return mapped
     return handleRouteError(error, 'POST /api/staff/operations')
   }
 }
 
 export async function PATCH(request: NextRequest) {
   try {
-    await requirePermission('staff:operate')
+    const user = await requirePermission('staff:operate')
     const body = z
       .object({
         orderId: z.string().min(1),
         status: z.enum(['assigned', 'picked_up', 'delivered']),
       })
       .parse(await request.json())
-    const assignment = await updateDeliveryAssignment(body.orderId, body.status)
+    const assignment = await updateDeliveryAssignment(body.orderId, body.status, user.id)
     return NextResponse.json(assignment)
   } catch (error) {
+    const mapped = mapAssignmentError(error)
+    if (mapped) return mapped
     return handleRouteError(error, 'PATCH /api/staff/operations')
   }
 }

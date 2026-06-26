@@ -22,6 +22,7 @@ import type { Order, OrderStatus, OrderType } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS, getPaymentStatusLabel, isDisplayableCustomerPhone } from '@/lib/order-labels'
+import { DeliveryAssignmentPanel } from '@/components/staff/delivery-assignment-panel'
 
 const ORDER_TYPE_META: Record<
   OrderType,
@@ -56,6 +57,7 @@ type OrderDetailSheetProps = {
   onAdvanceStatus: (orderId: string, status: OrderStatus) => Promise<void>
   onCancel: (orderId: string) => Promise<void>
   onArchive: (orderId: string) => Promise<void>
+  onDeliveryUpdated?: () => void
   isPending: (key: string) => boolean
   isBusy: boolean
 }
@@ -68,6 +70,7 @@ export function OrderDetailSheet({
   onAdvanceStatus,
   onCancel,
   onArchive,
+  onDeliveryUpdated,
   isPending,
   isBusy,
 }: OrderDetailSheetProps) {
@@ -133,6 +136,10 @@ export function OrderDetailSheet({
                 ) : null}
               </div>
             </section>
+
+            {order.type === 'delivery' ? (
+              <DeliveryAssignmentPanel order={order} onUpdated={onDeliveryUpdated} />
+            ) : null}
 
             <section>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">

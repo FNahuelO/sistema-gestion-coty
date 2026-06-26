@@ -5,12 +5,16 @@ import {
   DeliveryAssignmentStatus,
   DiscountType,
   InvoiceStatus,
+  OrderStatus,
+  OrderType,
   PaymentMethod as PrismaPaymentMethod,
   ReservationStatus,
   TableCallStatus,
+  type Prisma,
 } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import type { DeliveryAssignmentStatus as DeliveryAssignmentStatusUi, DeliveryQueueEntry } from '@/lib/types'
 
 function dec(value: number | string | { toString(): string }) {
   return Number(value.toString())
@@ -359,38 +363,235 @@ export async function upsertReservation(payload: z.infer<typeof reservationSchem
 
 // ─── Delivery assignments ────────────────────────────────────────────────────
 
-export async function assignOrderToRunner(orderId: string, runnerId: string, deliveryFee = 0) {
-  return prisma.deliveryAssignment.upsert({
-    where: { orderId },
-    create: { orderId, runnerId, deliveryFee, status: DeliveryAssignmentStatus.ASSIGNED },
-    update: { runnerId, deliveryFee, status: DeliveryAssignmentStatus.ASSIGNED, assignedAt: new Date() },
-    include: { runner: { select: { id: true, name: true } }, order: true },
+const DELIVERY_QUEUE_ORDER_STATUSES: OrderStatus[] = [
+  OrderStatus.CONFIRMED,
+  OrderStatus.PREPARING,
+  OrderStatus.READY,
+  OrderStatus.DELIVERED,
+]
+
+const deliveryQueueInclude = {
+  deliveryAssignment: {
+    include: { runner: { select: { id: true, name: true } } },
+  },
+} satisfies Prisma.OrderInclude
+
+type DeliveryQueueOrder = Prisma.OrderGetPayload<{ include: typeof deliveryQueueInclude }>
+
+function mapAssignmentStatus(
+  status?: DeliveryAssignmentStatus | null
+): DeliveryAssignmentStatusUi {
+  switch (status) {
+    case DeliveryAssignmentStatus.ASSIGNED:
+      return 'assigned'
+    case DeliveryAssignmentStatus.PICKED_UP:
+      return 'picked_up'
+    case DeliveryAssignmentStatus.DELIVERED:
+      return 'delivered'
+    default:
+      return 'unassigned'
+  }
+}
+
+function mapOrderStatusForQueue(status: OrderStatus): DeliveryQueueEntry['orderStatus'] {
+  switch (status) {
+    case OrderStatus.PENDING:
+      return 'pending'
+    case OrderStatus.CONFIRMED:
+      return 'confirmed'
+    case OrderStatus.PREPARING:
+      return 'preparing'
+    case OrderStatus.READY:
+      return 'ready'
+    case OrderStatus.DELIVERED:
+      return 'delivered'
+    case OrderStatus.COMPLETED:
+      return 'completed'
+    default:
+      return 'cancelled'
+  }
+}
+
+export function serializeDeliveryQueueEntry(order: DeliveryQueueOrder): DeliveryQueueEntry {
+  const assignment = order.deliveryAssignment
+  return {
+    orderId: order.id,
+    assignmentStatus: mapAssignmentStatus(assignment?.status),
+    orderStatus: mapOrderStatusForQueue(order.status),
+    runner: assignment?.runner ?? null,
+    order: {
+      displayCode: order.displayCode,
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      customerAddress: order.customerAddress,
+      total: dec(order.total),
+      deliveryFee: order.deliveryFee != null ? dec(order.deliveryFee) : undefined,
+      createdAt: order.createdAt.toISOString(),
+    },
+  }
+}
+
+function deliveryQueuePriority(entry: DeliveryQueueEntry) {
+  if (entry.assignmentStatus === 'picked_up') return 0
+  if (entry.orderStatus === 'ready') return 1
+  if (entry.orderStatus === 'preparing') return 2
+  if (entry.orderStatus === 'confirmed') return 3
+  return 4
+}
+
+export function sortDeliveryQueue(entries: DeliveryQueueEntry[]) {
+  return [...entries].sort((a, b) => {
+    const priorityDiff = deliveryQueuePriority(a) - deliveryQueuePriority(b)
+    if (priorityDiff !== 0) return priorityDiff
+    return new Date(a.order.createdAt).getTime() - new Date(b.order.createdAt).getTime()
   })
+}
+
+export async function listDeliveryQueue() {
+  const orders = await prisma.order.findMany({
+    where: {
+      type: OrderType.DELIVERY,
+      deletedFromOperationsAt: null,
+      status: { in: DELIVERY_QUEUE_ORDER_STATUSES },
+      OR: [
+        { deliveryAssignment: null },
+        { deliveryAssignment: { status: { not: DeliveryAssignmentStatus.DELIVERED } } },
+      ],
+    },
+    include: deliveryQueueInclude,
+    orderBy: { createdAt: 'asc' },
+  })
+
+  return sortDeliveryQueue(orders.map(serializeDeliveryQueueEntry))
+}
+
+export async function getDeliveryQueueEntry(orderId: string) {
+  const order = await prisma.order.findFirst({
+    where: {
+      id: orderId,
+      type: OrderType.DELIVERY,
+      deletedFromOperationsAt: null,
+      status: { in: DELIVERY_QUEUE_ORDER_STATUSES },
+      OR: [
+        { deliveryAssignment: null },
+        { deliveryAssignment: { status: { not: DeliveryAssignmentStatus.DELIVERED } } },
+      ],
+    },
+    include: deliveryQueueInclude,
+  })
+
+  return order ? serializeDeliveryQueueEntry(order) : null
+}
+
+export async function assignOrderToRunner(orderId: string, runnerId: string, deliveryFee?: number) {
+  const [order, runner] = await Promise.all([
+    prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        type: true,
+        status: true,
+        deliveryFee: true,
+        deletedFromOperationsAt: true,
+      },
+    }),
+    prisma.user.findFirst({
+      where: { id: runnerId, role: 'STAFF', staffRole: 'RUNNER', active: true },
+      select: { id: true },
+    }),
+  ])
+
+  if (!order || order.deletedFromOperationsAt) throw new Error('ORDER_NOT_FOUND')
+  if (order.type !== OrderType.DELIVERY) throw new Error('ORDER_NOT_DELIVERY')
+  if (order.status === OrderStatus.CANCELLED || order.status === OrderStatus.COMPLETED) {
+    throw new Error('ORDER_NOT_ASSIGNABLE')
+  }
+  if (!runner) throw new Error('RUNNER_NOT_FOUND')
+
+  const existing = await prisma.deliveryAssignment.findUnique({ where: { orderId } })
+  if (existing?.status === DeliveryAssignmentStatus.PICKED_UP) {
+    throw new Error('ASSIGNMENT_IN_PROGRESS')
+  }
+
+  const fee = deliveryFee ?? dec(order.deliveryFee ?? 0)
+
+  await prisma.deliveryAssignment.upsert({
+    where: { orderId },
+    create: { orderId, runnerId, deliveryFee: fee, status: DeliveryAssignmentStatus.ASSIGNED },
+    update: { runnerId, deliveryFee: fee, status: DeliveryAssignmentStatus.ASSIGNED, assignedAt: new Date() },
+  })
+
+  const entry = await getDeliveryQueueEntry(orderId)
+  if (!entry) throw new Error('ORDER_NOT_FOUND')
+  return entry
 }
 
 export async function updateDeliveryAssignment(
   orderId: string,
-  status: 'assigned' | 'picked_up' | 'delivered'
+  status: 'assigned' | 'picked_up' | 'delivered',
+  userId?: string
 ) {
+  const existing = await prisma.deliveryAssignment.findUnique({ where: { orderId } })
+  if (!existing) throw new Error('ASSIGNMENT_NOT_FOUND')
+
+  if (status === 'picked_up' && existing.status !== DeliveryAssignmentStatus.ASSIGNED) {
+    throw new Error('INVALID_ASSIGNMENT_STATUS')
+  }
+  if (status === 'delivered' && existing.status !== DeliveryAssignmentStatus.PICKED_UP) {
+    throw new Error('INVALID_ASSIGNMENT_STATUS')
+  }
+
   const statusMap = {
     assigned: DeliveryAssignmentStatus.ASSIGNED,
     picked_up: DeliveryAssignmentStatus.PICKED_UP,
     delivered: DeliveryAssignmentStatus.DELIVERED,
   }
-  return prisma.deliveryAssignment.update({
+
+  await prisma.deliveryAssignment.update({
     where: { orderId },
     data: {
       status: statusMap[status],
       ...(status === 'picked_up' ? { pickedUpAt: new Date() } : {}),
       ...(status === 'delivered' ? { deliveredAt: new Date() } : {}),
     },
-    include: { runner: { select: { id: true, name: true } }, order: true },
   })
+
+  if (status === 'delivered') {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { status: true },
+    })
+    if (order && (order.status === OrderStatus.READY || order.status === OrderStatus.PREPARING)) {
+      await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          status: OrderStatus.DELIVERED,
+          statusHistory: {
+            create: {
+              status: OrderStatus.DELIVERED,
+              changedByUserId: userId,
+              note: 'Entregado por cadete',
+            },
+          },
+        },
+      })
+    }
+
+    const updatedOrder = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: deliveryQueueInclude,
+    })
+    if (!updatedOrder) throw new Error('ORDER_NOT_FOUND')
+    return serializeDeliveryQueueEntry(updatedOrder)
+  }
+
+  const entry = await getDeliveryQueueEntry(orderId)
+  if (!entry) throw new Error('ASSIGNMENT_NOT_FOUND')
+  return entry
 }
 
 export async function listDeliveryAssignments(activeOnly = true) {
+  if (activeOnly) return listDeliveryQueue()
   return prisma.deliveryAssignment.findMany({
-    where: activeOnly ? { status: { not: DeliveryAssignmentStatus.DELIVERED } } : undefined,
     include: {
       runner: { select: { id: true, name: true } },
       order: { include: { items: true } },

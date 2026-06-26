@@ -120,5 +120,79 @@ test.describe('Flujo delivery E2E', () => {
     expect(found).toBeTruthy()
     expect(found.type).toBe('delivery')
     expect(found.customerAddress).toBe('Av. Corrientes 1234, CABA')
+
+    const queueResponse = await request.get('/api/staff/operations?view=delivery')
+    expect(queueResponse.ok()).toBeTruthy()
+    const queue = await queueResponse.json()
+    const queued = queue.find((entry: { orderId: string }) => entry.orderId === order.id)
+    expect(queued).toBeTruthy()
+    expect(queued.assignmentStatus).toBe('unassigned')
+
+    const runnersResponse = await request.get('/api/staff/operations?view=runners')
+    expect(runnersResponse.ok()).toBeTruthy()
+    const runners = await runnersResponse.json()
+    expect(runners.length).toBeGreaterThan(0)
+
+    const assignResponse = await request.post('/api/staff/operations', {
+      data: {
+        action: 'assign_runner',
+        orderId: order.id,
+        runnerId: runners[0].id,
+      },
+    })
+    expect(assignResponse.ok()).toBeTruthy()
+    const assigned = await assignResponse.json()
+    expect(assigned.assignmentStatus).toBe('assigned')
+    expect(assigned.runner?.id).toBe(runners[0].id)
+
+    const pickedUpResponse = await request.patch('/api/staff/operations', {
+      data: { orderId: order.id, status: 'picked_up' },
+    })
+    expect(pickedUpResponse.ok()).toBeTruthy()
+    const pickedUp = await pickedUpResponse.json()
+    expect(pickedUp.assignmentStatus).toBe('picked_up')
+
+    const deliveredResponse = await request.patch('/api/staff/operations', {
+      data: { orderId: order.id, status: 'delivered' },
+    })
+    expect(deliveredResponse.ok()).toBeTruthy()
+    const delivered = await deliveredResponse.json()
+    expect(delivered.assignmentStatus).toBe('delivered')
+    expect(delivered.orderStatus).toBe('delivered')
+
+    const queueAfterResponse = await request.get('/api/staff/operations?view=delivery')
+    expect(queueAfterResponse.ok()).toBeTruthy()
+    const queueAfter = await queueAfterResponse.json()
+    expect(queueAfter.find((entry: { orderId: string }) => entry.orderId === order.id)).toBeFalsy()
+  })
+
+  test('asignar cadete desde la UI en staff', async ({ page, request }) => {
+    test.setTimeout(120_000)
+
+    const { product, quantity } = await getOrderQuantity(request)
+
+    const createResponse = await request.post('/api/orders', {
+      data: {
+        type: 'delivery',
+        paymentMethod: 'cash',
+        customerName: 'Cliente UI Cadete',
+        customerPhone: '+5491199887766',
+        customerAddress: 'Av. Santa Fe 2000, CABA',
+        items: [{ productId: product.id, quantity, selectedOptions: [] }],
+      },
+    })
+    expect(createResponse.status()).toBe(201)
+    const order = await createResponse.json()
+
+    await loginWithEmail(page, 'admin@cotycafe.com')
+    await page.getByRole('button', { name: 'Cadetes' }).click()
+    await expect(page.getByText(order.displayCode ?? order.id)).toBeVisible({ timeout: 15_000 })
+    await page.getByRole('combobox').first().click()
+    await page.getByRole('option').first().click()
+    await expect(page.getByText('Cadete asignado')).toBeVisible({ timeout: 10_000 })
+    await page.getByRole('button', { name: 'Retirado' }).click()
+    await expect(page.getByText('Pedido retirado')).toBeVisible({ timeout: 10_000 })
+    await page.getByRole('button', { name: 'Entregado' }).click()
+    await expect(page.getByText('Pedido entregado')).toBeVisible({ timeout: 10_000 })
   })
 })
