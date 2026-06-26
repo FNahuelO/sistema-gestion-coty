@@ -166,7 +166,7 @@ export const userInputSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(160),
   role: z.enum(['admin', 'staff']),
-  staffRole: z.enum(['cashier', 'runner']).optional().nullable(),
+  staffRole: z.enum(['cashier', 'runner', 'kitchen']).optional().nullable(),
   phone: z.string().trim().max(30).optional().or(z.literal('')),
   pin: z.string().regex(/^\d{4,6}$/).optional().or(z.literal('')),
   avatar: z.string().trim().url().optional().or(z.literal('')),
@@ -283,7 +283,9 @@ function toPrismaUserRole(role: User['role']): PrismaUserRole {
 
 function toPrismaStaffRole(staffRole?: User['staffRole'] | null): PrismaStaffRole | null {
   if (!staffRole) return null
-  return staffRole === 'cashier' ? PrismaStaffRole.CASHIER : PrismaStaffRole.RUNNER
+  if (staffRole === 'cashier') return PrismaStaffRole.CASHIER
+  if (staffRole === 'kitchen') return PrismaStaffRole.KITCHEN
+  return PrismaStaffRole.RUNNER
 }
 
 function mapPrismaStaffRole(value?: string | null): User['staffRole'] | undefined {
@@ -292,6 +294,8 @@ function mapPrismaStaffRole(value?: string | null): User['staffRole'] | undefine
       return 'cashier'
     case 'RUNNER':
       return 'runner'
+    case 'KITCHEN':
+      return 'kitchen'
     default:
       return undefined
   }

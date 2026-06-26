@@ -125,7 +125,7 @@ export interface Table {
 
 // User types
 export type UserRole = 'admin' | 'staff' | 'customer'
-export type StaffRole = 'cashier' | 'runner'
+export type StaffRole = 'cashier' | 'runner' | 'kitchen'
 
 export function isStaffRole(role?: string | null): role is 'staff' {
   return role === 'staff' || role === 'cashier' || role === 'waitress'

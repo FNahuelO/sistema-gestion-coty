@@ -72,6 +72,7 @@ export function UsersSection() {
       }
 
       setUserForm(emptyUserForm())
+      setOpen(false)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo guardar el personal')
     }
@@ -136,6 +137,7 @@ export function UsersSection() {
               <SelectContent>
                 <SelectItem value="cashier">Cajero/a</SelectItem>
                 <SelectItem value="runner">Cadete</SelectItem>
+                <SelectItem value="kitchen">Cocina</SelectItem>
               </SelectContent>
             </Select>
           </Field>

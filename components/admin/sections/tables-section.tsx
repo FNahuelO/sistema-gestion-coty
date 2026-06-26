@@ -117,6 +117,7 @@ export function TablesSection() {
       }
 
       setTableForm(emptyTableForm())
+      setOpen(false)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo guardar la mesa')
     }

@@ -12,6 +12,8 @@ import { cn } from '@/lib/utils'
 import { useAdminData } from '@/lib/store'
 import type { ChannelSchedule } from '@/lib/types'
 import { channelLabel, formatDaysOfWeek } from '@/lib/channel-hours'
+import { useFormPanel } from '../hooks/use-form-panel'
+import { AdminFormPanel } from '../ui/admin-form-panel'
 import { AdminPageHeader } from '../ui/admin-page-header'
 import { Field } from '../ui/field'
 
@@ -38,8 +40,8 @@ const emptyScheduleForm = (): ScheduleFormState => ({
 
 export function SchedulesSection() {
   const admin = useAdminData()
+  const { open, setOpen, openPanel } = useFormPanel('schedules')
   const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>(emptyScheduleForm())
-  const [editing, setEditing] = useState(false)
 
   const channelSettingsMap = useMemo(() => {
     const map = new Map(admin.channelSettings.map((entry) => [entry.channel, entry.enabled]))
@@ -66,7 +68,7 @@ export function SchedulesSection() {
       })
       toast.success(scheduleForm.id ? 'Turno actualizado' : 'Turno creado')
       setScheduleForm(emptyScheduleForm())
-      setEditing(false)
+      setOpen(false)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo guardar el turno')
     }
@@ -82,7 +84,7 @@ export function SchedulesSection() {
       daysOfWeek: schedule.daysOfWeek,
       active: schedule.active,
     })
-    setEditing(true)
+    openPanel()
   }
 
   return (
@@ -92,10 +94,47 @@ export function SchedulesSection() {
         description="Activá canales y configurá franjas horarias por día"
         onNew={() => {
           setScheduleForm(emptyScheduleForm())
-          setEditing(true)
+          openPanel()
         }}
         newLabel="Agregar nuevo turno"
       />
+
+      <AdminFormPanel
+        panelId="schedules"
+        title={scheduleForm.id ? 'Editar turno' : 'Nuevo turno'}
+        open={open}
+        onOpenChange={setOpen}
+      >
+        <Field label="Canal">
+          <Select value={scheduleForm.channel} onValueChange={(value) => setScheduleForm((previous) => ({ ...previous, channel: value as ScheduleFormState['channel'] }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="delivery">Delivery</SelectItem>
+              <SelectItem value="local">Local</SelectItem>
+              <SelectItem value="pickup">Retiros</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Nombre del turno">
+          <Input value={scheduleForm.label} onChange={(event) => setScheduleForm((previous) => ({ ...previous, label: event.target.value }))} placeholder="Turno mañana" />
+        </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Desde">
+            <Input type="time" value={scheduleForm.startTime} onChange={(event) => setScheduleForm((previous) => ({ ...previous, startTime: event.target.value }))} />
+          </Field>
+          <Field label="Hasta">
+            <Input type="time" value={scheduleForm.endTime} onChange={(event) => setScheduleForm((previous) => ({ ...previous, endTime: event.target.value }))} />
+          </Field>
+        </div>
+        <div className={PANEL_TOGGLE_ROW}>
+          <Label>Activo</Label>
+          <Switch checked={scheduleForm.active} onCheckedChange={(checked) => setScheduleForm((previous) => ({ ...previous, active: checked }))} />
+        </div>
+        <div className="flex gap-2">
+          <Button className={cn('flex-1', PANEL_PRIMARY_BTN)} onClick={() => submitSchedule()}>Guardar turno</Button>
+          <Button variant="outline" className={PANEL_OUTLINE_BTN} onClick={() => { setOpen(false); setScheduleForm(emptyScheduleForm()) }}>Cancelar</Button>
+        </div>
+      </AdminFormPanel>
 
       <div className={cn(PANEL_CARD, 'space-y-3 p-4')}>
         <div className={PANEL_TOGGLE_ROW}>
@@ -171,41 +210,6 @@ export function SchedulesSection() {
           </div>
         </div>
       ))}
-
-      {editing ? (
-        <div className={cn(PANEL_CARD, 'space-y-3 p-4')}>
-          <p className="text-sm font-semibold">{scheduleForm.id ? 'Editar turno' : 'Nuevo turno'}</p>
-          <Field label="Canal">
-            <Select value={scheduleForm.channel} onValueChange={(value) => setScheduleForm((previous) => ({ ...previous, channel: value as ScheduleFormState['channel'] }))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="delivery">Delivery</SelectItem>
-                <SelectItem value="local">Local</SelectItem>
-                <SelectItem value="pickup">Retiros</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Nombre del turno">
-            <Input value={scheduleForm.label} onChange={(event) => setScheduleForm((previous) => ({ ...previous, label: event.target.value }))} placeholder="Turno mañana" />
-          </Field>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Desde">
-              <Input type="time" value={scheduleForm.startTime} onChange={(event) => setScheduleForm((previous) => ({ ...previous, startTime: event.target.value }))} />
-            </Field>
-            <Field label="Hasta">
-              <Input type="time" value={scheduleForm.endTime} onChange={(event) => setScheduleForm((previous) => ({ ...previous, endTime: event.target.value }))} />
-            </Field>
-          </div>
-          <div className={PANEL_TOGGLE_ROW}>
-            <Label>Activo</Label>
-            <Switch checked={scheduleForm.active} onCheckedChange={(checked) => setScheduleForm((previous) => ({ ...previous, active: checked }))} />
-          </div>
-          <div className="flex gap-2">
-            <Button className={PANEL_PRIMARY_BTN} onClick={() => submitSchedule()}>Guardar turno</Button>
-            <Button variant="outline" className={PANEL_OUTLINE_BTN} onClick={() => { setEditing(false); setScheduleForm(emptyScheduleForm()) }}>Cancelar</Button>
-          </div>
-        </div>
-      ) : null}
     </div>
   )
 }

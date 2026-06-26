@@ -82,6 +82,7 @@ export function PromotionsSection() {
       }
 
       setPromotionForm(emptyPromotionForm())
+      setOpen(false)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo guardar la promoción')
     }

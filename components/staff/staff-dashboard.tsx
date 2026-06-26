@@ -9,6 +9,7 @@ import { CallsSection } from '@/components/staff/sections/calls-section'
 import { CashSection } from '@/components/admin/sections/cash-section'
 import { StaffPageHeader, StaffShell, type StaffSection } from '@/components/staff/staff-shell'
 import { useKitchenAlert } from '@/hooks/use-kitchen-alert'
+import { useCallsAlert } from '@/hooks/use-calls-alert'
 import { useAuth } from '@/lib/store'
 
 const SECTION_COPY: Record<StaffSection, { title: string; description: string }> = {
@@ -20,19 +21,24 @@ const SECTION_COPY: Record<StaffSection, { title: string; description: string }>
   cash: { title: 'Caja', description: 'Apertura, movimientos y cierre de turno' },
 }
 
-// El cadete (runner) sólo opera sus entregas; el resto del staff ve el panel completo.
+// El cadete (runner) sólo opera sus entregas; cocina sólo ve la pantalla de
+// cocina; cajera/mesera y admin ven el panel completo.
 const RUNNER_SECTIONS: StaffSection[] = ['delivery']
+const KITCHEN_SECTIONS: StaffSection[] = ['kitchen']
 const FULL_SECTIONS: StaffSection[] = ['orders', 'kitchen', 'tables', 'delivery', 'calls', 'cash']
 
 export function StaffDashboard() {
   const { user } = useAuth()
   const isRunner = user?.role !== 'admin' && user?.staffRole === 'runner'
+  const isKitchen = user?.role !== 'admin' && user?.staffRole === 'kitchen'
 
-  const allowedSections = isRunner ? RUNNER_SECTIONS : FULL_SECTIONS
+  const allowedSections = isRunner
+    ? RUNNER_SECTIONS
+    : isKitchen
+      ? KITCHEN_SECTIONS
+      : FULL_SECTIONS
 
-  const [activeSection, setActiveSection] = useState<StaffSection>(
-    isRunner ? 'delivery' : 'orders'
-  )
+  const [activeSection, setActiveSection] = useState<StaffSection>(allowedSections[0])
 
   // Si por alguna razón la sección activa no está permitida para el rol, la corrige.
   const safeActiveSection = allowedSections.includes(activeSection)
@@ -41,6 +47,7 @@ export function StaffDashboard() {
 
   const copy = SECTION_COPY[safeActiveSection]
   const { showKitchenAlert } = useKitchenAlert(safeActiveSection === 'kitchen')
+  const { showCallsAlert } = useCallsAlert(safeActiveSection === 'calls')
 
   const runnerCopy = useMemo(
     () => ({ title: 'Mis entregas', description: 'Pedidos asignados a vos para retirar y entregar' }),
@@ -48,11 +55,18 @@ export function StaffDashboard() {
   )
   const headerCopy = isRunner ? runnerCopy : copy
 
+  const sectionAlerts = useMemo(() => {
+    const alerts: Partial<Record<StaffSection, boolean>> = {}
+    if (showKitchenAlert) alerts.kitchen = true
+    if (showCallsAlert) alerts.calls = true
+    return Object.keys(alerts).length > 0 ? alerts : undefined
+  }, [showKitchenAlert, showCallsAlert])
+
   return (
     <StaffShell
       activeSection={safeActiveSection}
       onSectionChange={setActiveSection}
-      sectionAlerts={showKitchenAlert ? { kitchen: true } : undefined}
+      sectionAlerts={sectionAlerts}
       sections={allowedSections}
     >
       <div className="mx-auto max-w-6xl space-y-4">

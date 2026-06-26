@@ -154,6 +154,7 @@ export function ProductsSection() {
       }
 
       setProductForm(emptyProductForm())
+      setOpen(false)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo guardar el producto')
     }
