@@ -528,10 +528,15 @@ export async function assignOrderToRunner(orderId: string, runnerId: string, del
 export async function updateDeliveryAssignment(
   orderId: string,
   status: 'assigned' | 'picked_up' | 'delivered',
-  userId?: string
+  userId?: string,
+  restrictToRunnerId?: string
 ) {
   const existing = await prisma.deliveryAssignment.findUnique({ where: { orderId } })
   if (!existing) throw new Error('ASSIGNMENT_NOT_FOUND')
+
+  if (restrictToRunnerId && existing.runnerId !== restrictToRunnerId) {
+    throw new Error('FORBIDDEN')
+  }
 
   if (status === 'picked_up' && existing.status !== DeliveryAssignmentStatus.ASSIGNED) {
     throw new Error('INVALID_ASSIGNMENT_STATUS')

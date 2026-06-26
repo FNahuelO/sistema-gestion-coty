@@ -39,9 +39,11 @@ function assignmentBadgeClass(status: DeliveryQueueEntry['assignmentStatus']) {
 function DeliveryQueueCard({
   entry,
   onUpdated,
+  canAssign = true,
 }: {
   entry: DeliveryQueueEntry
   onUpdated: () => void
+  canAssign?: boolean
 }) {
   const updateStatus = async (status: 'picked_up' | 'delivered') => {
     try {
@@ -112,13 +114,19 @@ function DeliveryQueueCard({
         </div>
 
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[220px] sm:items-end">
-          <AssignRunnerSelect
-            orderId={entry.orderId}
-            runner={entry.runner}
-            assignmentStatus={entry.assignmentStatus}
-            onAssigned={onUpdated}
-            disabled={entry.assignmentStatus === 'picked_up'}
-          />
+          {canAssign ? (
+            <AssignRunnerSelect
+              orderId={entry.orderId}
+              runner={entry.runner}
+              assignmentStatus={entry.assignmentStatus}
+              onAssigned={onUpdated}
+              disabled={entry.assignmentStatus === 'picked_up'}
+            />
+          ) : entry.runner ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C5DDD9]/50 px-2.5 py-1 text-xs font-medium text-[#2D5A57]">
+              {entry.runner.name}
+            </span>
+          ) : null}
 
           {canMarkPickedUp ? (
             <Button
@@ -149,11 +157,13 @@ function QueueGroup({
   description,
   entries,
   onUpdated,
+  canAssign = true,
 }: {
   title: string
   description?: string
   entries: DeliveryQueueEntry[]
   onUpdated: () => void
+  canAssign?: boolean
 }) {
   if (entries.length === 0) return null
 
@@ -165,21 +175,31 @@ function QueueGroup({
       </div>
       <div className="space-y-3">
         {entries.map((entry) => (
-          <DeliveryQueueCard key={entry.orderId} entry={entry} onUpdated={onUpdated} />
+          <DeliveryQueueCard key={entry.orderId} entry={entry} onUpdated={onUpdated} canAssign={canAssign} />
         ))}
       </div>
     </section>
   )
 }
 
-export function DeliverySection() {
+export function DeliverySection({
+  scopeToRunnerId,
+  canAssign = true,
+}: {
+  scopeToRunnerId?: string
+  canAssign?: boolean
+} = {}) {
   const { data, mutate, isLoading } = useSWR<DeliveryQueueEntry[]>(
     '/api/staff/operations?view=delivery',
     fetchJson,
     { refreshInterval: 12000 }
   )
 
-  const entries = data ?? []
+  const allEntries = data ?? []
+  // El cadete sólo ve las entregas asignadas a sí mismo.
+  const entries = scopeToRunnerId
+    ? allEntries.filter((entry) => entry.runner?.id === scopeToRunnerId)
+    : allEntries
   const onTheWay = entries.filter((entry) => entry.assignmentStatus === 'picked_up')
   const readyForPickup = entries.filter(
     (entry) =>
@@ -212,7 +232,9 @@ export function DeliverySection() {
         <div>
           <p className="font-medium text-foreground">Sin entregas activas</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Los pedidos delivery confirmados aparecerán acá para asignar cadete.
+            {scopeToRunnerId
+              ? 'Cuando te asignen un pedido de delivery, aparecerá acá.'
+              : 'Los pedidos delivery confirmados aparecerán acá para asignar cadete.'}
           </p>
         </div>
       </div>
@@ -226,18 +248,21 @@ export function DeliverySection() {
         description="Pedidos retirados por el cadete"
         entries={onTheWay}
         onUpdated={() => void mutate()}
+        canAssign={canAssign}
       />
       <QueueGroup
         title="Listos para salir"
         description="Pedidos listos en cocina"
         entries={readyForPickup}
         onUpdated={() => void mutate()}
+        canAssign={canAssign}
       />
       <QueueGroup
         title="En preparación"
-        description="Podés asignar cadete antes de que estén listos"
+        description={canAssign ? 'Podés asignar cadete antes de que estén listos' : 'Pedidos que todavía están en cocina'}
         entries={inKitchen}
         onUpdated={() => void mutate()}
+        canAssign={canAssign}
       />
     </div>
   )

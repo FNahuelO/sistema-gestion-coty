@@ -79,9 +79,18 @@ export async function GET(request: NextRequest) {
   }
 }
 
+function isRunnerUser(user: { role: string; staffRole?: string | null }) {
+  return user.role !== 'admin' && user.staffRole === 'runner'
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await requirePermission('staff:operate')
+    // El cadete sólo puede actualizar el estado de SUS entregas (PATCH), no asignar
+    // cadetes ni operar la cocina.
+    if (isRunnerUser(user)) {
+      throw new Error('FORBIDDEN')
+    }
     const body = z
       .object({
         action: z.enum(['assign_runner', 'ack_kitchen', 'mark_ready']),
@@ -141,7 +150,9 @@ export async function PATCH(request: NextRequest) {
         status: z.enum(['assigned', 'picked_up', 'delivered']),
       })
       .parse(await request.json())
-    const assignment = await updateDeliveryAssignment(body.orderId, body.status, user.id)
+    // El cadete sólo puede tocar entregas asignadas a sí mismo.
+    const restrictToRunnerId = isRunnerUser(user) ? user.id : undefined
+    const assignment = await updateDeliveryAssignment(body.orderId, body.status, user.id, restrictToRunnerId)
     return NextResponse.json(assignment)
   } catch (error) {
     const mapped = mapAssignmentError(error)

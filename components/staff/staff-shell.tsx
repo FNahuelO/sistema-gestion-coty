@@ -35,14 +35,20 @@ export function StaffShell({
   onSectionChange,
   children,
   sectionAlerts,
+  sections,
 }: {
   activeSection: StaffSection
   onSectionChange: (section: StaffSection) => void
   children: ReactNode
   sectionAlerts?: Partial<Record<StaffSection, boolean>>
+  sections?: StaffSection[]
 }) {
   const router = useRouter()
   const { user, logout } = useAuth()
+
+  const navItems = sections
+    ? NAV_ITEMS.filter((item) => sections.includes(item.id))
+    : NAV_ITEMS
 
   const handleLogout = async () => {
     await logout()
@@ -58,6 +64,7 @@ export function StaffShell({
           onLogout={() => void handleLogout()}
           userName={user?.name}
           sectionAlerts={sectionAlerts}
+          navItems={navItems}
         />
       </aside>
 
@@ -104,7 +111,7 @@ export function StaffShell({
           style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
         >
           <div className="mx-auto flex max-w-lg overflow-x-auto px-1 pt-1">
-            {NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const Icon = item.icon
               const isActive = activeSection === item.id
               const hasAlert = sectionAlerts?.[item.id]
@@ -152,12 +159,14 @@ function StaffSideNav({
   onLogout,
   userName,
   sectionAlerts,
+  navItems,
 }: {
   activeSection: StaffSection
   onSelect: (section: StaffSection) => void
   onLogout: () => void
   userName?: string
   sectionAlerts?: Partial<Record<StaffSection, boolean>>
+  navItems: { id: StaffSection; label: string; icon: ElementType }[]
 }) {
   return (
     <div className="flex h-full flex-col">
@@ -181,7 +190,7 @@ function StaffSideNav({
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon
           const isActive = activeSection === item.id
           const hasAlert = sectionAlerts?.[item.id]
