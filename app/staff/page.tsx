@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { AuthProvider, TablesProvider, OrdersProvider, BusinessProvider, useAuth } from '@/lib/store'
 import { StaffDashboard } from '@/components/staff/staff-dashboard'
 import { LoadingScreen } from '@/components/shared/loading'
+import { AdminThemeProvider } from '@/lib/admin-theme'
 import { isStaffRole } from '@/lib/types'
 
 function StaffContent() {
@@ -29,13 +30,15 @@ function StaffContent() {
 export default function StaffPage() {
   return (
     <AuthProvider>
-      <BusinessProvider>
-        <OrdersProvider>
-          <TablesProvider>
-            <StaffContent />
-          </TablesProvider>
-        </OrdersProvider>
-      </BusinessProvider>
+      <AdminThemeProvider>
+        <BusinessProvider>
+          <OrdersProvider>
+            <TablesProvider>
+              <StaffContent />
+            </TablesProvider>
+          </OrdersProvider>
+        </BusinessProvider>
+      </AdminThemeProvider>
     </AuthProvider>
   )
 }

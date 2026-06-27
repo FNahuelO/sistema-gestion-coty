@@ -43,6 +43,7 @@ import {
 } from '@/lib/coty-theme'
 import { LandingCarouselSkeleton, LandingFooterSkeleton, LoadingSkeleton } from '@/components/shared/loading'
 import { PromotionBanner } from '@/components/customer/promotion-banner'
+import { InstallAppPrompt } from '@/components/customer/install-app-prompt'
 
 const HERO_IMAGE =
   'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=999&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
@@ -656,6 +657,11 @@ export function CustomerLanding() {
           )}
         </div>
       </section>
+
+      {/* Instalar app (PWA) */}
+      <div className="mt-6 md:mt-8">
+        <InstallAppPrompt />
+      </div>
 
       {/* Footer final */}
       <footer className="mx-auto flex max-w-6xl flex-col items-center px-4 pb-10 pt-6 md:px-8 md:pb-14 md:pt-10">

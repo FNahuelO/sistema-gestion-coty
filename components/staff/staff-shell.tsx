@@ -2,13 +2,22 @@
 
 import { type ElementType, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { BellRing, ChefHat, Coffee, LogOut, Truck, Users, Wallet } from 'lucide-react'
+import { BellRing, ChefHat, LogOut, Truck, Users, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { COTY_HEADER } from '@/lib/coty-theme'
-import { PANEL_NAV_ACTIVE, PANEL_NAV_IDLE } from '@/lib/panel-theme'
+import { COTY_HEADER, LOGO_SRC_SVG } from '@/lib/coty-theme'
+import {
+  PANEL_BG,
+  PANEL_BORDER,
+  PANEL_BTN_GHOST,
+  PANEL_NAV_ACTIVE,
+  PANEL_NAV_IDLE,
+  PANEL_SHELL,
+  PANEL_SHELL_BLUR,
+} from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/store'
 import { MobileShellPadding } from '@/components/admin/ui/mobile-shell-padding'
+import { AdminThemeToggle } from '@/components/admin/ui/theme-toggle'
 
 export type StaffSection = 'orders' | 'tables' | 'kitchen' | 'delivery' | 'calls' | 'cash'
 
@@ -56,8 +65,8 @@ export function StaffShell({
   }
 
   return (
-    <div className="flex min-h-screen bg-[#FAFAFA]">
-      <aside className="hidden w-72 shrink-0 border-r border-gray-100 bg-white lg:flex lg:flex-col">
+    <div className={cn('flex min-h-screen', PANEL_BG)}>
+      <aside className={cn('hidden w-72 shrink-0 border-r lg:flex lg:flex-col', PANEL_BORDER, PANEL_SHELL)}>
         <StaffSideNav
           activeSection={activeSection}
           onSelect={onSectionChange}
@@ -70,34 +79,37 @@ export function StaffShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header
-          className="sticky top-0 z-40 border-b border-gray-100 bg-white/95 backdrop-blur-md"
+          className={cn('sticky top-0 z-40 border-b', PANEL_BORDER, PANEL_SHELL_BLUR)}
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
           <div className="flex h-14 items-center justify-between gap-2 px-3 sm:px-4">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <div
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full lg:hidden"
                 style={{ backgroundColor: COTY_HEADER }}
               >
-                <Coffee className="h-4 w-4 text-white" />
+                <img src={LOGO_SRC_SVG} alt="Coty Cafe" className="h-auto w-5 object-contain" />
               </div>
               <div className="min-w-0">
-                <p className="truncate font-serif text-base font-bold leading-tight">{SECTION_LABELS[activeSection]}</p>
-                <p className="truncate text-[10px] text-muted-foreground">
+                <p className="truncate font-serif text-base font-bold leading-tight text-foreground">{SECTION_LABELS[activeSection]}</p>
+                <p className="truncate text-[10px] text-muted-foreground lg:hidden">
                   {user?.name ? `${user.name} · ` : ''}Operaciones
                 </p>
               </div>
             </div>
 
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => void handleLogout()}
-              aria-label="Cerrar sesión"
-              className="h-11 w-11 shrink-0 text-[#2D5A57] hover:bg-[#C5DDD9]/40"
-            >
-              <LogOut className="h-5 w-5" />
-            </Button>
+            <div className="flex shrink-0 items-center gap-1">
+              <AdminThemeToggle />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => void handleLogout()}
+                aria-label="Cerrar sesión"
+                className={cn('h-11 w-11', PANEL_BTN_GHOST)}
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
         </header>
 
@@ -107,7 +119,7 @@ export function StaffShell({
         </main>
 
         <nav
-          className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-100 bg-white/95 backdrop-blur-md lg:hidden"
+          className={cn('fixed inset-x-0 bottom-0 z-50 border-t lg:hidden', PANEL_BORDER, PANEL_SHELL_BLUR)}
           style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
         >
           <div className="mx-auto flex max-w-lg overflow-x-auto px-1 pt-1">
@@ -128,7 +140,7 @@ export function StaffShell({
                 >
                   <span className="relative">
                     <Icon className={cn('h-5 w-5', isActive ? 'text-[#2D5A57]' : 'text-[#7EB8B3]')} />
-                    {hasAlert ? <StaffNavAlertDot className="ring-white" /> : null}
+                    {hasAlert ? <StaffNavAlertDot className="ring-white dark:ring-card" /> : null}
                   </span>
                   {item.label}
                 </button>
@@ -170,16 +182,16 @@ function StaffSideNav({
 }) {
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-start justify-between border-b border-gray-100 p-5">
+      <div className={cn('flex items-start justify-between border-b p-5', PANEL_BORDER)}>
         <div className="flex items-center gap-3">
           <div
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
             style={{ backgroundColor: COTY_HEADER }}
           >
-            <Coffee className="h-6 w-6 text-white" />
+            <img src={LOGO_SRC_SVG} alt="Coty Cafe" className="h-auto w-7 object-contain" />
           </div>
           <div>
-            <p className="font-serif text-xl font-bold leading-tight">Coty Cafe</p>
+            <p className="font-serif text-xl font-bold leading-tight dark:text-white">Coty Cafe</p>
             <p className="text-xs text-muted-foreground">Panel de Operaciones</p>
             {userName ? <p className="mt-1 text-xs font-medium text-[#2D5A57]">{userName}</p> : null}
           </div>
@@ -207,13 +219,20 @@ function StaffSideNav({
             >
               <span className="relative shrink-0">
                 <Icon className={cn('h-5 w-5', isActive ? 'text-[#2D5A57]' : 'text-[#7EB8B3]')} />
-                {hasAlert ? <StaffNavAlertDot className="ring-white" /> : null}
+                {hasAlert ? <StaffNavAlertDot className="ring-white dark:ring-card" /> : null}
               </span>
               <span className="flex-1">{item.label}</span>
             </button>
           )
         })}
       </nav>
+
+      <div className={cn('hidden border-t p-3 lg:block', PANEL_BORDER)}>
+        <div className="flex items-center justify-between rounded-xl px-2 py-1">
+          <span className="text-xs text-muted-foreground">Tema</span>
+          <AdminThemeToggle className="h-9 w-9" />
+        </div>
+      </div>
     </div>
   )
 }

@@ -766,7 +766,7 @@ export function useTables() {
   )
 
   const closeTable = useCallback(
-    async (tableId: string, paymentMethod: 'cash' | 'card' | 'transfer' = 'cash') => {
+    async (tableId: string, paymentMethod: 'cash' | 'card' | 'transfer' | 'mercado_pago' = 'cash') => {
       const table = await sendJson<Table>(`/api/tables/${tableId}/close`, 'POST', { paymentMethod })
       await mutate()
       return table

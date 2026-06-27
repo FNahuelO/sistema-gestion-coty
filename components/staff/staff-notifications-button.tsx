@@ -77,7 +77,7 @@ export function StaffNotificationsButton({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0">
-        <div className="border-b border-gray-100 px-4 py-3">
+        <div className="border-b border-gray-100 px-4 py-3 dark:border-border">
           <p className="text-sm font-semibold text-foreground">Notificaciones</p>
           <p className="text-xs text-muted-foreground">
             {count === 0 ? 'Todo al día' : `${count} pendiente${count === 1 ? '' : 's'}`}
@@ -102,7 +102,7 @@ export function StaffNotificationsButton({
                         <button
                           type="button"
                           onClick={() => handleSelectOrder(order)}
-                          className="flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[#F8FBFA]"
+                          className="flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[#F8FBFA] dark:hover:bg-muted"
                         >
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100">
                             <Clock className="h-4 w-4 text-amber-800" />
@@ -127,7 +127,7 @@ export function StaffNotificationsButton({
               )}
 
               {calls.length > 0 && (
-                <section className={pendingOrders.length > 0 ? 'border-t border-gray-100' : ''}>
+                <section className={pendingOrders.length > 0 ? 'border-t border-gray-100 dark:border-border' : ''}>
                   <p className="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Llamados de mesa
                   </p>
@@ -137,7 +137,7 @@ export function StaffNotificationsButton({
                         <button
                           type="button"
                           onClick={handleGoToCalls}
-                          className="flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[#F8FBFA]"
+                          className="flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[#F8FBFA] dark:hover:bg-muted"
                         >
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FCE8E4]">
                             <BellRing className="h-4 w-4 text-[#E8A598]" />

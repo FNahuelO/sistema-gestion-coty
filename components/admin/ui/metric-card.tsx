@@ -1,8 +1,11 @@
 'use client'
 
 import type { ElementType } from 'react'
-import { PANEL_CARD, PANEL_ICON_CIRCLE } from '@/lib/panel-theme'
+import { PANEL_ICON_CIRCLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
+
+const METRIC_CARD_SURFACE =
+  'rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-border dark:bg-muted dark:text-white'
 
 export function MetricCard({
   title,
@@ -16,7 +19,7 @@ export function MetricCard({
   comparison?: number | null
 }) {
   return (
-    <div className={cn('flex items-center justify-between p-4', PANEL_CARD)}>
+    <div className={cn('flex items-center justify-between p-4', METRIC_CARD_SURFACE)}>
       <div className="min-w-0">
         <p className="text-xs text-muted-foreground">{title}</p>
         <p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>

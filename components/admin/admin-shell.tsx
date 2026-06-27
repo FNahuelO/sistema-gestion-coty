@@ -2,10 +2,10 @@
 
 import { useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Coffee, LogOut, Menu } from 'lucide-react'
+import { LogOut, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
-import { COTY_HEADER } from '@/lib/coty-theme'
+import { COTY_HEADER, LOGO_SRC_SVG } from '@/lib/coty-theme'
 import { PANEL_BG, PANEL_BORDER, PANEL_BTN_GHOST, PANEL_SHELL, PANEL_SHELL_BLUR } from '@/lib/panel-theme'
 import { useAuth } from '@/lib/store'
 import { cn } from '@/lib/utils'
@@ -88,7 +88,7 @@ export function AdminShell({
                   className="mb-0.5 flex h-7 w-7 items-center justify-center rounded-full"
                   style={{ backgroundColor: COTY_HEADER }}
                 >
-                  <Coffee className="h-3.5 w-3.5 text-white" />
+                  <img src={LOGO_SRC_SVG} alt="Coty Cafe" className="h-auto w-4 object-contain" />
                 </div>
                 <p className="font-serif text-base font-bold leading-tight text-foreground">Coty Cafe</p>
               </div>

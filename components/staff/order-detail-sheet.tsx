@@ -87,7 +87,7 @@ export function OrderDetailSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         className={cn(
-          'flex h-full w-full flex-col gap-0 overflow-hidden border-gray-100 p-0 sm:max-w-md',
+          'flex h-full w-full flex-col gap-0 overflow-hidden border-gray-100 p-0 dark:border-border sm:max-w-md',
           '[&>button]:top-4 [&>button]:right-4 [&>button]:text-white [&>button]:opacity-90 [&>button]:hover:bg-white/10 [&>button]:hover:opacity-100'
         )}
       >
@@ -112,10 +112,10 @@ export function OrderDetailSheet({
           </div>
         </div>
 
-        <ScrollArea className="min-h-0 flex-1 bg-[#FAFAFA]">
+        <ScrollArea className="min-h-0 flex-1 bg-[#FAFAFA] dark:bg-background">
           <div className="space-y-4 p-4">
             <section className={cn(PANEL_CARD, 'overflow-hidden p-0')}>
-              <div className={cn('border-b border-gray-100 px-4 py-3', 'bg-[#F8FBFA]')}>
+              <div className={cn('border-b border-gray-100 px-4 py-3 dark:border-border', 'bg-[#F8FBFA] dark:bg-muted')}>
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
                   Cliente
                 </h3>
@@ -215,7 +215,7 @@ export function OrderDetailSheet({
           </div>
         </ScrollArea>
 
-        <div className="shrink-0 border-t border-gray-100 bg-white p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.04)]">
+        <div className="shrink-0 border-t border-gray-100 bg-white p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.04)] dark:border-border dark:bg-card dark:shadow-[0_-4px_20px_rgba(0,0,0,0.2)]">
           <div className="mb-4 space-y-2 text-sm">
             <div className="flex justify-between text-muted-foreground">
               <span>Subtotal</span>
@@ -231,9 +231,9 @@ export function OrderDetailSheet({
               <span>IVA</span>
               <span>{formatPrice(order.tax)}</span>
             </div>
-            <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+            <div className="flex items-center justify-between border-t border-gray-100 pt-3 dark:border-border">
               <span className="text-base font-semibold text-foreground">Total</span>
-              <span className="font-serif text-2xl font-bold text-[#2D5A57]">
+              <span className="text-2xl font-bold text-[#2D5A57]">
                 {formatPrice(order.total)}
               </span>
             </div>

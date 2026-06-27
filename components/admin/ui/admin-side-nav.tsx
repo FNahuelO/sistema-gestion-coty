@@ -1,9 +1,9 @@
 'use client'
 
 import type { ElementType } from 'react'
-import { Coffee, LogOut } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { COTY_HEADER } from '@/lib/coty-theme'
+import { COTY_HEADER, LOGO_SRC_SVG } from '@/lib/coty-theme'
 import { PANEL_BORDER, PANEL_ICON_ACTIVE, PANEL_ICON_IDLE, PANEL_NAV_ACTIVE, PANEL_NAV_IDLE } from '@/lib/panel-theme'
 import { AdminThemeToggle } from './theme-toggle'
 import { cn } from '@/lib/utils'
@@ -31,7 +31,7 @@ export function AdminSideNav({
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
             style={{ backgroundColor: COTY_HEADER }}
           >
-            <Coffee className="h-6 w-6 text-white" />
+            <img src={LOGO_SRC_SVG} alt="Coty Cafe" className="h-auto w-7 object-contain" />
           </div>
           <div>
             <p className="font-serif text-xl font-bold leading-tight">Coty Cafe</p>

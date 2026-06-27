@@ -82,7 +82,7 @@ export function KitchenSection() {
           {sortedOrders.length === 1 ? '1 comanda' : `${sortedOrders.length} comandas`}
         </p>
         <Select value={sortBy} onValueChange={(value) => setSortBy(value as OrderSortKey)}>
-          <SelectTrigger className="w-full border-gray-200 bg-[#F8FBFA] sm:w-56">
+          <SelectTrigger className="w-full border-gray-200 bg-[#F8FBFA] dark:border-border dark:bg-muted sm:w-56">
             <ArrowUpDown className="mr-2 h-4 w-4 shrink-0 text-[#2D5A57]" />
             <SelectValue placeholder="Ordenar" />
           </SelectTrigger>

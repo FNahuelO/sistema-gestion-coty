@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Coffee, Mail, Lock, Eye, EyeOff, ChevronLeft } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -13,7 +13,7 @@ import { Field } from '@/components/admin/ui/field'
 import { useAuth } from '@/lib/store'
 import { RATE_LIMITED_ERROR } from '@/lib/auth-errors'
 import type { User } from '@/lib/types'
-import { COTY_HEADER } from '@/lib/coty-theme'
+import { COTY_HEADER, LOGO_SRC_SVG } from '@/lib/coty-theme'
 import { PANEL_CARD, PANEL_PRIMARY_BTN, PANEL_TITLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -109,11 +109,11 @@ export function LoginPage() {
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
                 style={{ backgroundColor: COTY_HEADER }}
               >
-                <Coffee className="h-6 w-6 text-white" />
+                <img src={LOGO_SRC_SVG} alt="Coty Cafe" className="h-auto w-7 object-contain" />
               </div>
             </div>
             <h1 className="font-serif text-xl font-bold leading-tight text-foreground">Coty Cafe</h1>
-            <p className="mt-1 text-xs text-muted-foreground">Acceso para personal del café</p>
+            <p className="mt-1 text-xs text-muted-foreground">Acceso para personal</p>
           </div>
 
           <div className="space-y-4 p-5">

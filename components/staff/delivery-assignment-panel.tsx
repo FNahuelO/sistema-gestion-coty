@@ -39,7 +39,7 @@ export function DeliveryAssignmentPanel({
 
   return (
     <section className={cn(PANEL_CARD, 'overflow-hidden p-0')}>
-      <div className="border-b border-gray-100 bg-[#F8FBFA] px-4 py-3">
+      <div className="border-b border-gray-100 bg-[#F8FBFA] px-4 py-3 dark:border-border dark:bg-muted">
         <div className="flex items-center justify-between gap-2">
           <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
             <Truck className="h-3.5 w-3.5" />

@@ -26,8 +26,18 @@ export function DashboardSection() {
   const [rangeFrom, setRangeFrom] = useState(() => new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10))
   const [rangeTo, setRangeTo] = useState(() => new Date().toISOString().slice(0, 10))
 
+  const today = new Date().toISOString().slice(0, 10)
+
+  const rangeError = useMemo(() => {
+    if (!rangeFrom || !rangeTo) return 'Seleccioná ambas fechas para ver el reporte'
+    if (rangeFrom > rangeTo) return "La fecha 'Desde' no puede ser posterior a 'Hasta'"
+    if (rangeTo > today) return "La fecha 'Hasta' no puede ser futura"
+    if (rangeFrom > today) return "La fecha 'Desde' no puede ser futura"
+    return null
+  }, [rangeFrom, rangeTo, today])
+
   const rangeKey =
-    rangeFrom && rangeTo
+    !rangeError && rangeFrom && rangeTo
       ? `/api/admin/analytics/range?from=${encodeURIComponent(new Date(`${rangeFrom}T00:00:00`).toISOString())}&to=${encodeURIComponent(new Date(`${rangeTo}T23:59:59`).toISOString())}`
       : null
 
@@ -94,15 +104,33 @@ export function DashboardSection() {
           <CardContent className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <label className="mb-1 block text-xs text-muted-foreground">Desde</label>
-              <Input type="date" value={rangeFrom} onChange={(e) => setRangeFrom(e.target.value)} />
+              <Input
+                type="date"
+                value={rangeFrom}
+                max={rangeTo || today}
+                onChange={(e) => setRangeFrom(e.target.value)}
+                aria-invalid={Boolean(rangeError)}
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs text-muted-foreground">Hasta</label>
-              <Input type="date" value={rangeTo} onChange={(e) => setRangeTo(e.target.value)} />
+              <Input
+                type="date"
+                value={rangeTo}
+                min={rangeFrom || undefined}
+                max={today}
+                onChange={(e) => setRangeTo(e.target.value)}
+                aria-invalid={Boolean(rangeError)}
+              />
             </div>
             <MetricCard title="Ingresos período" value={formatPrice(rangeAnalytics?.revenue ?? 0)} icon={DollarSign} />
             <MetricCard title="Pedidos período" value={String(rangeAnalytics?.orders ?? 0)} icon={ShoppingCart} />
           </CardContent>
+          {rangeError && (
+            <div className="px-4 pb-3">
+              <p className="text-xs font-medium text-destructive">{rangeError}</p>
+            </div>
+          )}
         </Card>
       </section>
 

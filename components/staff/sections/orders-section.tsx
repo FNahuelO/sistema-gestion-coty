@@ -86,7 +86,7 @@ function StatCard({
         <Icon className="h-5 w-5" style={{ color: iconColor }} />
       </div>
       <div>
-        <p className="text-2xl font-bold tracking-tight">{value}</p>
+        <p className="text-2xl font-bold tracking-tight text-foreground">{value}</p>
         <p className="text-xs text-muted-foreground">{label}</p>
       </div>
     </div>
@@ -215,7 +215,7 @@ export function OrdersSection({
   }
 
   return (
-    <div className={cn('flex flex-col', !embedded && 'min-h-screen bg-[#FAFAFA]')}>
+    <div className={cn('flex flex-col', !embedded && 'min-h-screen bg-[#FAFAFA] dark:bg-background')}>
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <StatCard label="Pendientes" value={orderStats.pending} icon={Clock} iconColor="#CA8A04" />
@@ -232,11 +232,11 @@ export function OrdersSection({
                 placeholder="Buscar por ID, cliente o teléfono..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="border-gray-200 bg-[#F8FBFA] pl-9"
+                className="border-gray-200 bg-[#F8FBFA] pl-9 dark:border-border dark:bg-muted"
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full border-gray-200 bg-[#F8FBFA] md:w-44">
+              <SelectTrigger className="w-full border-gray-200 bg-[#F8FBFA] md:w-44 dark:border-border dark:bg-muted">
                 <Filter className="mr-2 h-4 w-4 text-[#2D5A57]" />
                 <SelectValue placeholder="Estado" />
               </SelectTrigger>
@@ -251,7 +251,7 @@ export function OrdersSection({
               </SelectContent>
             </Select>
             <Select value={sortBy} onValueChange={(value) => setSortBy(value as OrderSortKey)}>
-              <SelectTrigger className="w-full border-gray-200 bg-[#F8FBFA] md:w-52">
+              <SelectTrigger className="w-full border-gray-200 bg-[#F8FBFA] md:w-52 dark:border-border dark:bg-muted">
                 <ArrowUpDown className="mr-2 h-4 w-4 shrink-0 text-[#2D5A57]" />
                 <SelectValue placeholder="Ordenar" />
               </SelectTrigger>
@@ -272,10 +272,10 @@ export function OrdersSection({
         </div>
 
         <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-          <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto bg-[#F8FBFA] p-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto bg-[#F8FBFA] p-1 dark:bg-muted [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <TabsTrigger
               value="all"
-              className="min-h-11 shrink-0 gap-1.5 px-3 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
+              className="min-h-11 shrink-0 gap-1.5 px-3 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm dark:data-[state=active]:bg-card"
             >
               <Package className="h-4 w-4" />
               Todos
@@ -287,21 +287,21 @@ export function OrdersSection({
             </TabsTrigger>
             <TabsTrigger
               value="delivery"
-              className="min-h-11 shrink-0 gap-1.5 px-3 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
+              className="min-h-11 shrink-0 gap-1.5 px-3 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm dark:data-[state=active]:bg-card"
             >
               <Truck className="h-4 w-4" />
               Delivery
             </TabsTrigger>
             <TabsTrigger
               value="pickup"
-              className="min-h-11 shrink-0 gap-1.5 px-3 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
+              className="min-h-11 shrink-0 gap-1.5 px-3 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm dark:data-[state=active]:bg-card"
             >
               <Store className="h-4 w-4" />
               Recoger
             </TabsTrigger>
             <TabsTrigger
               value="table"
-              className="min-h-11 shrink-0 gap-1.5 px-3 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
+              className="min-h-11 shrink-0 gap-1.5 px-3 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm dark:data-[state=active]:bg-card"
             >
               <Users className="h-4 w-4" />
               Mesas
@@ -339,9 +339,9 @@ export function OrdersSection({
                           onClick={() => setSelectedOrder(order)}
                           className={cn(
                             PANEL_LIST_ROW,
-                            'w-full border-l-4 text-left transition-colors hover:bg-[#F8FBFA]',
+                            'w-full border-l-4 text-left transition-colors hover:bg-[#F8FBFA] dark:hover:bg-muted',
                             ORDER_TYPE_ACCENT[order.type],
-                            order.status === 'pending' && 'bg-[#FFFBEB]/80'
+                            order.status === 'pending' && 'bg-[#FFFBEB]/80 dark:bg-amber-950/30'
                           )}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -386,7 +386,7 @@ export function OrdersSection({
                           </div>
 
                           <div className="mt-3 space-y-1 pl-12 text-sm">
-                            <p className="font-medium">{order.customerName}</p>
+                            <p className="font-medium dark:text-white">{order.customerName}</p>
                             {isDisplayableCustomerPhone(order.customerPhone) && (
                               <p className="text-muted-foreground">{order.customerPhone}</p>
                             )}
@@ -402,7 +402,7 @@ export function OrdersSection({
                             </div>
                           </div>
 
-                          <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 pl-12">
+                          <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 pl-12 dark:border-border">
                             <span
                               className="rounded-full px-3 py-1 text-xs font-semibold"
                               style={{ backgroundColor: COTY_QTY_BG, color: COTY_TEAL }}

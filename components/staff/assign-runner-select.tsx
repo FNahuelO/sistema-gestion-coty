@@ -81,7 +81,7 @@ export function AssignRunnerSelect({
           {runner.name}
         </span>
         <Select disabled={disabled} onValueChange={(runnerId) => void assign(runnerId)}>
-          <SelectTrigger className={cn('h-8 border-gray-200 bg-white', compact ? 'w-28' : 'w-32')}>
+          <SelectTrigger className={cn('h-8 border-gray-200 bg-white dark:border-border dark:bg-card', compact ? 'w-28' : 'w-32')}>
             <SelectValue placeholder="Cambiar" />
           </SelectTrigger>
           <SelectContent>
@@ -106,7 +106,7 @@ export function AssignRunnerSelect({
 
   return (
     <Select disabled={disabled} onValueChange={(runnerId) => void assign(runnerId)}>
-      <SelectTrigger className={cn('h-9 border-gray-200 bg-white', compact ? 'w-36' : 'w-40')}>
+      <SelectTrigger className={cn('h-9 border-gray-200 bg-white dark:border-border dark:bg-card', compact ? 'w-36' : 'w-40')}>
         <SelectValue placeholder="Asignar cadete" />
       </SelectTrigger>
       <SelectContent>

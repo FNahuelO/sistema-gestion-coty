@@ -303,7 +303,7 @@ export function TablesSection() {
                     ) : (
                       <>
                         <div className="flex items-center justify-between">
-                          <span className={cn('font-serif text-2xl font-bold', PANEL_ICON_ACTIVE)}>
+                          <span className={cn('text-2xl font-bold', PANEL_ICON_ACTIVE)}>
                             {String(table.number).padStart(2, '0')}
                           </span>
                           <div

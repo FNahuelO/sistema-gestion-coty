@@ -12,7 +12,9 @@ import {
   CreditCard,
   Minus,
   Search,
+  ChevronDown,
 } from 'lucide-react'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -26,7 +28,16 @@ import { usePendingAction } from '@/hooks/use-pending-action'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ProductDetailModal } from '@/components/customer/product-detail-modal'
-import type { Table, Product, CartItem, TableStatus, SelectedOption, PaymentMethod } from '@/lib/types'
+import type {
+  Table,
+  Product,
+  CartItem,
+  TableStatus,
+  SelectedOption,
+  PaymentMethod,
+  Order,
+  OrderStatus,
+} from '@/lib/types'
 import { toast } from 'sonner'
 import { COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
 import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
@@ -35,21 +46,53 @@ import { cn } from '@/lib/utils'
 import { getDiscountedUnitPrice } from '@/lib/promotions'
 import { PAYMENT_METHOD_LABELS } from '@/lib/order-labels'
 
-const tableStatusColors: Record<TableStatus, string> = {
-  free: 'bg-[#7EB8B3]',
-  occupied: 'bg-[#2D5A57]',
-  waiting: 'bg-[#EAB308]',
-  finished: 'bg-[#053E38]',
+type DisplayStatus = OrderStatus | TableStatus
+
+const tableVisuals: Record<DisplayStatus, { color: string; icon: React.ElementType }> = {
+  free: { color: 'bg-[#7EB8B3]', icon: CheckCircle },
+  occupied: { color: 'bg-[#2D5A57]', icon: Coffee },
+  waiting: { color: 'bg-[#EAB308]', icon: Clock },
+  finished: { color: 'bg-[#053E38]', icon: CreditCard },
+  pending: { color: 'bg-amber-500', icon: Clock },
+  confirmed: { color: 'bg-sky-500', icon: CheckCircle },
+  preparing: { color: 'bg-orange-500', icon: Coffee },
+  ready: { color: 'bg-emerald-500', icon: CheckCircle },
+  delivered: { color: 'bg-emerald-600', icon: CheckCircle },
+  completed: { color: 'bg-gray-400', icon: CreditCard },
+  cancelled: { color: 'bg-red-500', icon: X },
 }
 
-const tableStatusIcons: Record<TableStatus, React.ElementType> = {
-  free: CheckCircle,
-  occupied: Coffee,
-  waiting: Clock,
-  finished: CreditCard,
+const STATUS_CHIP_ORDER: DisplayStatus[] = [
+  'occupied',
+  'waiting',
+  'pending',
+  'confirmed',
+  'preparing',
+  'ready',
+  'delivered',
+  'finished',
+]
+
+const ORDER_PROGRESS: OrderStatus[] = ['pending', 'confirmed', 'preparing', 'ready', 'delivered']
+
+function leastProgressedStatus(statuses: OrderStatus[]): OrderStatus {
+  let result: OrderStatus = 'delivered'
+  for (const status of statuses) {
+    const index = ORDER_PROGRESS.indexOf(status)
+    if (index !== -1 && index < ORDER_PROGRESS.indexOf(result)) {
+      result = status
+    }
+  }
+  return result
 }
 
-const CLOSE_PAYMENT_METHODS: PaymentMethod[] = ['cash', 'card', 'transfer']
+function resolveTableDisplayStatus(table: Table, tableOrders: Order[]): DisplayStatus {
+  if (table.status === 'free' || table.status === 'finished') return table.status
+  if (tableOrders.length === 0) return table.status
+  return leastProgressedStatus(tableOrders.map((order) => order.status))
+}
+
+const CLOSE_PAYMENT_METHODS: PaymentMethod[] = ['cash', 'card', 'transfer', 'mercado_pago']
 
 function optionsKey(options: SelectedOption[], notes?: string) {
   return `${JSON.stringify(options)}|${notes ?? ''}`
@@ -68,6 +111,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
   const [activeTab, setActiveTab] = useState('tables')
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
   const [closePaymentMethod, setClosePaymentMethod] = useState<PaymentMethod>('cash')
+  const [sessionOrdersOpen, setSessionOrdersOpen] = useState(false)
 
   const taxRate = settings?.taxRate ?? 0.16
 
@@ -80,6 +124,27 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
       ),
     [orders]
   )
+
+  const activeOrdersByTable = useMemo(() => {
+    const map = new Map<string, Order[]>()
+    for (const order of activeTableOrders) {
+      if (!order.tableId) continue
+      const list = map.get(order.tableId) ?? []
+      list.push(order)
+      map.set(order.tableId, list)
+    }
+    return map
+  }, [activeTableOrders])
+
+  const statusCounts = useMemo(() => {
+    const counts = new Map<DisplayStatus, number>()
+    for (const table of tables) {
+      const tableOrders = activeOrdersByTable.get(table.id) ?? []
+      const status = resolveTableDisplayStatus(table, tableOrders)
+      counts.set(status, (counts.get(status) ?? 0) + 1)
+    }
+    return counts
+  }, [tables, activeOrdersByTable])
 
   const sessionOrders = useMemo(() => {
     if (!selectedTable) return []
@@ -224,7 +289,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
 
     await run(`close:${selectedTable.id}`, async () => {
       try {
-        await closeTable(selectedTable.id, closePaymentMethod as 'cash' | 'card' | 'transfer')
+        await closeTable(selectedTable.id, closePaymentMethod)
         toast.success(`Mesa ${selectedTable.number} cobrada y cerrada`)
         setPaymentDialogOpen(false)
         setSelectedTable(null)
@@ -253,38 +318,38 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
   )
 
   return (
-    <div className={cn(!embedded && 'min-h-screen bg-[#FAFAFA]')}>
+    <div className={cn(!embedded && 'min-h-screen bg-[#FAFAFA] dark:bg-background')}>
       <div className={cn(embedded ? 'space-y-4' : 'w-full px-4 py-6 sm:px-6 lg:px-8')}>
         <div className={cn(PANEL_CARD, 'flex flex-wrap items-center gap-2 p-3')}>
           <Badge variant="outline" className="gap-1.5 border-[#C5DDD9] text-[#2D5A57]">
             <span className="h-2 w-2 rounded-full bg-[#7EB8B3]" />
             {tables.filter((t) => t.status === 'free').length} libres
           </Badge>
-          {Object.entries(tableStatusColors).map(([status, color]) => {
-            const Icon = tableStatusIcons[status as TableStatus]
-            const count = tables.filter((t) => t.status === status).length
+          {STATUS_CHIP_ORDER.filter((status) => (statusCounts.get(status) ?? 0) > 0).map((status) => {
+            const visual = tableVisuals[status]
+            const Icon = visual.icon
             return (
-              <Badge key={status} variant="outline" className="gap-1.5 border-gray-200">
-                <span className={cn('h-2 w-2 rounded-full', color)} />
+              <Badge key={status} variant="outline" className="gap-1.5 border-gray-200 dark:border-border">
+                <span className={cn('h-2 w-2 rounded-full', visual.color)} />
                 <Icon className="h-3 w-3 text-[#2D5A57]" />
-                <StatusBadge status={status as TableStatus} className="border-0 bg-transparent p-0" />
-                <span className="text-muted-foreground">({count})</span>
+                <StatusBadge status={status} className="border-0 bg-transparent p-0" />
+                <span className="text-muted-foreground">({statusCounts.get(status)})</span>
               </Badge>
             )
           })}
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4 h-auto w-full gap-1 bg-[#F8FBFA] p-1">
+          <TabsList className="mb-4 h-auto w-full gap-1 bg-[#F8FBFA] p-1 dark:bg-muted">
             <TabsTrigger
               value="tables"
-              className="flex-1 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
+              className="flex-1 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm dark:data-[state=active]:bg-card"
             >
               Mapa de mesas
             </TabsTrigger>
             <TabsTrigger
               value="orders"
-              className="flex-1 gap-1.5 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm"
+              className="flex-1 gap-1.5 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm dark:data-[state=active]:bg-card"
             >
               Pedidos activos
               {activeTableOrders.length > 0 && (
@@ -334,7 +399,10 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
           <TabsContent value="tables">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {tables.map((table, index) => {
-                const StatusIcon = tableStatusIcons[table.status]
+                const tableOrders = activeOrdersByTable.get(table.id) ?? []
+                const displayStatus = resolveTableDisplayStatus(table, tableOrders)
+                const visual = tableVisuals[displayStatus]
+                const StatusIcon = visual.icon
 
                 return (
                   <motion.button
@@ -353,16 +421,16 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
                     <div
                       className={cn(
                         'absolute right-0 top-0 h-16 w-16 -translate-y-8 translate-x-8 rounded-full opacity-20',
-                        tableStatusColors[table.status]
+                        visual.color
                       )}
                     />
 
                     <div className="flex items-center justify-between">
-                      <span className="font-serif text-2xl font-bold text-[#2D5A57]">{table.number}</span>
+                      <span className="text-2xl font-bold text-[#2D5A57]">{table.number}</span>
                       <div
                         className={cn(
                           'flex h-8 w-8 items-center justify-center rounded-full text-white',
-                          tableStatusColors[table.status]
+                          visual.color
                         )}
                       >
                         <StatusIcon className="h-4 w-4" />
@@ -370,7 +438,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
                     </div>
 
                     <div className="mt-2">
-                      <StatusBadge status={table.status} />
+                      <StatusBadge status={displayStatus} />
                     </div>
 
                     <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
@@ -395,136 +463,148 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
       </div>
 
       <Dialog open={!!selectedTable} onOpenChange={(open) => !open && setSelectedTable(null)}>
-        <DialogContent className="max-h-[90vh] overflow-hidden border-gray-100 sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between text-[#2D5A57] mt-4">
+        <DialogContent className="flex max-h-[92vh] flex-col gap-0 overflow-hidden border-gray-100 dark:border-border p-0 sm:max-w-lg">
+          <DialogHeader className="border-b border-gray-100 dark:border-border px-6 pb-3 pt-6">
+            <DialogTitle className="flex items-center justify-between gap-2 text-[#2D5A57]">
               <span>Mesa {selectedTable?.number}</span>
               {selectedTable && <StatusBadge status={selectedTable.status} />}
             </DialogTitle>
-          </DialogHeader>
-
-          <div className="flex max-h-[60vh] flex-col gap-4 overflow-hidden">
             {accumulatedTotal > 0 && (
-              <div className={cn(PANEL_CARD, 'bg-[#F0FAF8] p-3')}>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-[#2D5A57]">Total acumulado de la mesa</span>
-                  <span className="font-serif text-lg font-bold text-[#2D5A57]">
-                    {formatPrice(accumulatedTotal)}
-                  </span>
-                </div>
+              <div className="mt-2 flex items-center justify-between rounded-lg bg-[#F0FAF8] px-3 py-2 dark:bg-primary/10">
+                <span className="text-xs font-medium text-[#2D5A57]/80">Total acumulado de la mesa</span>
+                <span className="text-base font-bold text-[#2D5A57]">
+                  {formatPrice(accumulatedTotal)}
+                </span>
               </div>
             )}
+          </DialogHeader>
 
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-3">
             {sessionOrders.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
-                  Pedidos en curso
-                </p>
-                {sessionOrders.map((order) => (
-                  <div key={order.id} className="rounded-xl border border-gray-100 bg-[#F8FBFA] p-3 text-sm">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="font-medium">{order.displayCode ?? 'Pedido'}</span>
-                      <StatusBadge status={order.status} />
+              <Collapsible open={sessionOrdersOpen} onOpenChange={setSessionOrdersOpen}>
+                <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-gray-100 dark:border-border bg-[#F8FBFA] px-3 py-2 text-left dark:bg-muted">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
+                    Pedidos en curso ({sessionOrders.length})
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 text-[#2D5A57] transition-transform',
+                      sessionOrdersOpen && 'rotate-180'
+                    )}
+                  />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-2 pt-2">
+                  {sessionOrders.map((order) => (
+                    <div key={order.id} className="rounded-xl border border-gray-100 dark:border-border bg-[#F8FBFA] p-3 text-sm dark:bg-muted">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="font-medium">{order.displayCode ?? 'Pedido'}</span>
+                        <StatusBadge status={order.status} />
+                      </div>
+                      <ul className="space-y-1 text-muted-foreground">
+                        {order.items.map((item) => (
+                          <li key={item.id}>
+                            {item.quantity}x {item.product.name} · {formatPrice(item.product.price * item.quantity)}
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 text-right font-semibold text-[#2D5A57]">{formatPrice(order.total)}</p>
                     </div>
-                    <ul className="space-y-1 text-muted-foreground">
-                      {order.items.map((item) => (
-                        <li key={item.id}>
-                          {item.quantity}x {item.product.name} · {formatPrice(item.product.price * item.quantity)}
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="mt-2 text-right font-semibold text-[#2D5A57]">{formatPrice(order.total)}</p>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
+            {orderItems.length === 0 ? (
+              <EmptyState
+                icon="cart"
+                title="Nuevos productos"
+                description={
+                  selectedTable?.status === 'free'
+                    ? 'Ocupá la mesa para empezar a cargar productos'
+                    : 'Agregá productos al próximo pedido de esta mesa'
+                }
+              />
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
+                    Nuevo pedido
+                  </p>
+                  <span className="text-xs text-muted-foreground">
+                    {orderItems.reduce((sum, item) => sum + item.quantity, 0)} u.
+                  </span>
+                </div>
+                {orderItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-2 rounded-xl border border-gray-100 dark:border-border bg-[#F8FBFA] p-2 dark:bg-muted"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <img
+                        src={item.product.image}
+                        alt={item.product.name}
+                        className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{item.product.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatPrice(
+                            getDiscountedUnitPrice(item.product, item.selectedOptions, promotions) * item.quantity
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className={cn('h-7 w-7', PANEL_OUTLINE_BTN)}
+                        onClick={() => handleUpdateQuantity(item.id, -1)}
+                      >
+                        <Minus className="h-3 w-3" />
+                      </Button>
+                      <span className="w-5 text-center text-sm font-medium">{item.quantity}</span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className={cn('h-7 w-7', PANEL_OUTLINE_BTN)}
+                        onClick={() => handleUpdateQuantity(item.id, 1)}
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive"
+                        onClick={() => handleRemoveItem(item.id)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
-
-            <div className="flex-1 overflow-y-auto">
-              {orderItems.length === 0 ? (
-                <EmptyState
-                  icon="cart"
-                  title="Nuevos productos"
-                  description={
-                    selectedTable?.status === 'free'
-                      ? 'Ocupá la mesa para empezar a cargar productos'
-                      : 'Agregá productos al próximo pedido de esta mesa'
-                  }
-                />
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
-                    Nuevo pedido
-                  </p>
-                  {orderItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between rounded-xl border border-gray-100 bg-[#F8FBFA] p-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={item.product.image}
-                          alt={item.product.name}
-                          className="h-12 w-12 rounded-lg object-cover"
-                        />
-                        <div>
-                          <p className="font-medium">{item.product.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {formatPrice(getDiscountedUnitPrice(item.product, item.selectedOptions, promotions))} c/u
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className={cn('h-7 w-7', PANEL_OUTLINE_BTN)}
-                          onClick={() => handleUpdateQuantity(item.id, -1)}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className={cn('h-7 w-7', PANEL_OUTLINE_BTN)}
-                          onClick={() => handleUpdateQuantity(item.id, 1)}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive"
-                          onClick={() => handleRemoveItem(item.id)}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {orderItems.length > 0 && (
-              <div className={cn(PANEL_CARD, 'p-3')}>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal nuevo pedido</span>
-                  <span>{formatPrice(newItemsSubtotal)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">IVA ({Math.round(taxRate * 100)}%)</span>
-                  <span>{formatPrice(newItemsTax)}</span>
-                </div>
-                <div className="mt-2 flex justify-between border-t border-gray-100 pt-2 font-bold">
-                  <span>Total nuevo pedido</span>
-                  <span className="font-serif text-[#2D5A57]">{formatPrice(newItemsTotal)}</span>
-                </div>
-              </div>
-            )}
           </div>
 
-          <DialogFooter className="flex-col gap-2 sm:flex-row">
+          {orderItems.length > 0 && (
+            <div className="border-t border-gray-100 dark:border-border px-6 py-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal nuevo pedido</span>
+                <span>{formatPrice(newItemsSubtotal)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">IVA ({Math.round(taxRate * 100)}%)</span>
+                <span>{formatPrice(newItemsTax)}</span>
+              </div>
+              <div className="mt-1 flex justify-between border-t border-gray-100 dark:border-border pt-1 font-bold">
+                <span>Total nuevo pedido</span>
+                <span className="text-[#2D5A57]">{formatPrice(newItemsTotal)}</span>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex-col gap-2 border-t border-gray-100 dark:border-border px-6 py-4 sm:flex-row">
             {selectedTable?.status === 'free' && (
               <Button
                 className={PANEL_PRIMARY_BTN}
@@ -606,7 +686,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
       </Dialog>
 
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-        <DialogContent className="border-gray-100 sm:max-w-md">
+        <DialogContent className="border-gray-100 dark:border-border sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-[#2D5A57]">
               Cobrar mesa {selectedTable?.number}
@@ -614,7 +694,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className={cn(PANEL_CARD, 'bg-[#F0FAF8] p-4 text-center')}>
+            <div className={cn(PANEL_CARD, 'bg-[#F0FAF8] p-4 text-center dark:bg-primary/10')}>
               <p className="text-sm text-muted-foreground">Total a cobrar</p>
               <p className="text-3xl font-bold text-[#2D5A57]">
                 {formatPrice(accumulatedTotal)}
@@ -629,7 +709,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
                 className="grid gap-2"
               >
                 {CLOSE_PAYMENT_METHODS.map((method) => (
-                  <div key={method} className="flex items-center gap-2 rounded-lg border border-gray-100 p-3">
+                  <div key={method} className="flex items-center gap-2 rounded-lg border border-gray-100 dark:border-border p-3">
                     <RadioGroupItem value={method} id={`close-pay-${method}`} />
                     <Label htmlFor={`close-pay-${method}`} className="flex-1 cursor-pointer font-normal">
                       {PAYMENT_METHOD_LABELS[method]}
@@ -663,7 +743,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
       </Dialog>
 
       <Dialog open={addProductOpen} onOpenChange={setAddProductOpen}>
-        <DialogContent className="max-h-[90vh] border-gray-100 sm:max-w-lg">
+        <DialogContent className="max-h-[90vh] border-gray-100 dark:border-border sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-[#2D5A57]">Agregar producto</DialogTitle>
           </DialogHeader>
@@ -674,7 +754,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
               placeholder="Buscar producto..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="border-gray-200 bg-[#F8FBFA] pl-9"
+              className="border-gray-200 dark:border-border bg-[#F8FBFA] pl-9 dark:bg-muted"
             />
           </div>
 
@@ -695,7 +775,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
                           key={product.id}
                           type="button"
                           onClick={() => handleProductClick(product)}
-                          className="flex w-full items-center gap-3 rounded-xl border border-gray-100 bg-white p-2 text-left transition-colors hover:bg-[#F8FBFA]"
+                          className="flex w-full items-center gap-3 rounded-xl border border-gray-100 dark:border-border bg-white p-2 text-left transition-colors hover:bg-[#F8FBFA] dark:bg-card dark:hover:bg-muted"
                         >
                           <img
                             src={product.image}

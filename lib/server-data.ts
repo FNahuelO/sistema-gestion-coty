@@ -1434,7 +1434,7 @@ export async function occupyTable(tableId: string, userId?: string) {
 export async function closeTableAndOrders(
   tableId: string,
   userId?: string,
-  paymentMethod: 'cash' | 'card' | 'transfer' = 'cash'
+  paymentMethod: 'cash' | 'card' | 'transfer' | 'mercado_pago' = 'cash'
 ) {
   const session = await prisma.tableSession.findFirst({
     where: {
@@ -1454,7 +1454,13 @@ export async function closeTableAndOrders(
   }
 
   const prismaPaymentMethod =
-    paymentMethod === 'card' ? 'CARD' : paymentMethod === 'transfer' ? 'TRANSFER' : 'CASH'
+    paymentMethod === 'card'
+      ? 'CARD'
+      : paymentMethod === 'transfer'
+        ? 'TRANSFER'
+        : paymentMethod === 'mercado_pago'
+          ? 'MERCADO_PAGO'
+          : 'CASH'
   const orderIds = session.orders.map((order) => order.id)
 
   await prisma.$transaction([

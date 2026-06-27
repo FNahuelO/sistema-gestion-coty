@@ -1,7 +1,6 @@
 'use client'
 
-import { Coffee } from 'lucide-react'
-import { COTY_HEADER } from '@/lib/coty-theme'
+import { COTY_HEADER, LOGO_SRC_SVG } from '@/lib/coty-theme'
 import { PANEL_BG } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 
@@ -18,7 +17,7 @@ export function AdminLoadingScreen() {
           className="flex h-14 w-14 items-center justify-center rounded-full shadow-sm ring-4 ring-[#C5DDD9]/40 dark:ring-primary/20"
           style={{ backgroundColor: COTY_HEADER }}
         >
-          <Coffee className="h-7 w-7 text-white" />
+          <img src={LOGO_SRC_SVG} alt="Coty Cafe" className="h-auto w-8 object-contain" />
         </div>
 
         <div className="text-center">

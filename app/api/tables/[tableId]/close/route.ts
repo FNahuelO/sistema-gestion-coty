@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { closeTableAndOrders, requireSessionRole, serializeTable } from '@/lib/server-data'
 
 const closeSchema = z.object({
-  paymentMethod: z.enum(['cash', 'card', 'transfer']).default('cash'),
+  paymentMethod: z.enum(['cash', 'card', 'transfer', 'mercado_pago']).default('cash'),
 })
 
 export async function POST(request: NextRequest, context: { params: Promise<{ tableId: string }> }) {

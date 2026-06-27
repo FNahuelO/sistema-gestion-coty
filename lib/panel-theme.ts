@@ -1,5 +1,5 @@
 export const PANEL_CARD =
-  'rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-border dark:bg-card'
+  'rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-border dark:bg-card dark:text-white'
 export const PANEL_LIST_ROW =
   'rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-border dark:bg-card'
 export const PANEL_TOGGLE_ROW =
