@@ -793,6 +793,9 @@ export function useTables() {
           tableNumber,
           payload: orderPayload,
         })
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('coty-refresh-orders'))
+        }
         return queuedEntryToOrder(entry)
       }
 
@@ -800,6 +803,9 @@ export function useTables() {
         await sendJson<Order & { createdAt: string; updatedAt: string }>(`/api/tables/${tableId}/orders`, 'POST', payload)
       )
       await mutate()
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('coty-refresh-orders'))
+      }
       return order
     },
     [mutate]

@@ -132,6 +132,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
       return
     }
     handleAddProductItem(product, 1, [])
+    setAddProductOpen(false)
   }
 
   const handleUpdateQuantity = (itemId: string, delta: number) => {
@@ -195,7 +196,9 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
             : 'Pedido guardado sin conexión. Se enviará al recuperar señal.'
         )
         setOrderItems([])
-        setSelectedTable(null)
+        setSelectedTable((current) =>
+          current?.id === selectedTable.id ? { ...current, status: 'waiting' } : current
+        )
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'No se pudo enviar el pedido')
         throw error
@@ -243,7 +246,11 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
   const newItemsSubtotal = calculateNewItemsSubtotal()
   const newItemsTax = newItemsSubtotal * taxRate
   const newItemsTotal = newItemsSubtotal + newItemsTax
-  const accumulatedTotal = selectedTable?.currentTotal ?? 0
+  const accumulatedTotal = useMemo(
+    () =>
+      sessionOrders.reduce((sum, order) => sum + order.total, 0) || (selectedTable?.currentTotal ?? 0),
+    [sessionOrders, selectedTable]
+  )
 
   return (
     <div className={cn(!embedded && 'min-h-screen bg-[#FAFAFA]')}>
