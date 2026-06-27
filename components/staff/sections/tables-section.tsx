@@ -13,13 +13,13 @@ import {
   Minus,
   Search,
   ChevronDown,
+  ChevronLeft,
 } from 'lucide-react'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
@@ -158,6 +158,14 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
   const handleSelectTable = (table: Table) => {
     setSelectedTable(table)
     setOrderItems([])
+    setAddProductOpen(false)
+    setSearchQuery('')
+  }
+
+  const handleCloseTableDialog = () => {
+    setSelectedTable(null)
+    setAddProductOpen(false)
+    setSearchQuery('')
   }
 
   const handleAddProductItem = (
@@ -333,7 +341,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
                 <span className={cn('h-2 w-2 rounded-full', visual.color)} />
                 <Icon className="h-3 w-3 text-[#2D5A57]" />
                 <StatusBadge status={status} className="border-0 bg-transparent p-0" />
-                <span className="text-muted-foreground">({statusCounts.get(status)})</span>
+                <span className="text-muted-foreground dark:text-white">({statusCounts.get(status)})</span>
               </Badge>
             )
           })}
@@ -462,14 +470,28 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
         </Tabs>
       </div>
 
-      <Dialog open={!!selectedTable} onOpenChange={(open) => !open && setSelectedTable(null)}>
+      <Dialog open={!!selectedTable} onOpenChange={(open) => !open && handleCloseTableDialog()}>
         <DialogContent className="flex max-h-[92vh] flex-col gap-0 overflow-hidden border-gray-100 dark:border-border p-0 sm:max-w-lg">
           <DialogHeader className="border-b border-gray-100 dark:border-border px-6 pb-3 pt-6">
             <DialogTitle className="flex items-center justify-between gap-2 text-[#2D5A57]">
-              <span>Mesa {selectedTable?.number}</span>
-              {selectedTable && <StatusBadge status={selectedTable.status} />}
+              {addProductOpen ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddProductOpen(false)
+                    setSearchQuery('')
+                  }}
+                  className="flex items-center gap-1.5 text-[#2D5A57]"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                  <span>Agregar producto</span>
+                </button>
+              ) : (
+                <span>Mesa {selectedTable?.number}</span>
+              )}
+              {!addProductOpen && selectedTable && <StatusBadge status={selectedTable.status} />}
             </DialogTitle>
-            {accumulatedTotal > 0 && (
+            {!addProductOpen && accumulatedTotal > 0 && (
               <div className="mt-2 flex items-center justify-between rounded-lg bg-[#F0FAF8] px-3 py-2 dark:bg-primary/10">
                 <span className="text-xs font-medium text-[#2D5A57]/80">Total acumulado de la mesa</span>
                 <span className="text-base font-bold text-[#2D5A57]">
@@ -477,211 +499,269 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
                 </span>
               </div>
             )}
+            {addProductOpen && (
+              <div className="relative mt-2">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar producto..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="border-gray-200 dark:border-border bg-[#F8FBFA] pl-9 dark:bg-muted"
+                />
+              </div>
+            )}
           </DialogHeader>
 
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-3">
-            {sessionOrders.length > 0 && (
-              <Collapsible open={sessionOrdersOpen} onOpenChange={setSessionOrdersOpen}>
-                <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-gray-100 dark:border-border bg-[#F8FBFA] px-3 py-2 text-left dark:bg-muted">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
-                    Pedidos en curso ({sessionOrders.length})
-                  </span>
-                  <ChevronDown
-                    className={cn(
-                      'h-4 w-4 text-[#2D5A57] transition-transform',
-                      sessionOrdersOpen && 'rotate-180'
-                    )}
-                  />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-2 pt-2">
-                  {sessionOrders.map((order) => (
-                    <div key={order.id} className="rounded-xl border border-gray-100 dark:border-border bg-[#F8FBFA] p-3 text-sm dark:bg-muted">
-                      <div className="mb-2 flex items-center justify-between">
-                        <span className="font-medium">{order.displayCode ?? 'Pedido'}</span>
-                        <StatusBadge status={order.status} />
-                      </div>
-                      <ul className="space-y-1 text-muted-foreground">
-                        {order.items.map((item) => (
-                          <li key={item.id}>
-                            {item.quantity}x {item.product.name} · {formatPrice(item.product.price * item.quantity)}
-                          </li>
+          {addProductOpen ? (
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-3">
+              <div className="space-y-4">
+                {categories.map((category) => {
+                  const categoryProducts = filteredProducts.filter((p) => p.categoryId === category.id)
+                  if (categoryProducts.length === 0) return null
+
+                  return (
+                    <div key={category.id}>
+                      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
+                        {category.name}
+                      </h3>
+                      <div className="space-y-2">
+                        {categoryProducts.map((product) => (
+                          <button
+                            key={product.id}
+                            type="button"
+                            onClick={() => handleProductClick(product)}
+                            className="flex w-full items-center gap-3 rounded-xl border border-gray-100 dark:border-border bg-white p-2 text-left transition-colors hover:bg-[#F8FBFA] dark:bg-card dark:hover:bg-muted"
+                          >
+                            <img
+                              src={product.image}
+                              alt={product.name}
+                              className="h-12 w-12 rounded-lg object-cover"
+                            />
+                            <div className="flex-1">
+                              <p className="font-medium">{product.name}</p>
+                              <p className="text-sm text-muted-foreground">{formatPrice(product.price)}</p>
+                            </div>
+                            <Plus className="h-5 w-5 text-[#7EB8B3]" />
+                          </button>
                         ))}
-                      </ul>
-                      <p className="mt-2 text-right font-semibold text-[#2D5A57]">{formatPrice(order.total)}</p>
-                    </div>
-                  ))}
-                </CollapsibleContent>
-              </Collapsible>
-            )}
-
-            {orderItems.length === 0 ? (
-              <EmptyState
-                icon="cart"
-                title="Nuevos productos"
-                description={
-                  selectedTable?.status === 'free'
-                    ? 'Ocupá la mesa para empezar a cargar productos'
-                    : 'Agregá productos al próximo pedido de esta mesa'
-                }
-              />
-            ) : (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
-                    Nuevo pedido
-                  </p>
-                  <span className="text-xs text-muted-foreground">
-                    {orderItems.reduce((sum, item) => sum + item.quantity, 0)} u.
-                  </span>
-                </div>
-                {orderItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between gap-2 rounded-xl border border-gray-100 dark:border-border bg-[#F8FBFA] p-2 dark:bg-muted"
-                  >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <img
-                        src={item.product.image}
-                        alt={item.product.name}
-                        className="h-10 w-10 shrink-0 rounded-lg object-cover"
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{item.product.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatPrice(
-                            getDiscountedUnitPrice(item.product, item.selectedOptions, promotions) * item.quantity
-                          )}
-                        </p>
                       </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className={cn('h-7 w-7', PANEL_OUTLINE_BTN)}
-                        onClick={() => handleUpdateQuantity(item.id, -1)}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="w-5 text-center text-sm font-medium">{item.quantity}</span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className={cn('h-7 w-7', PANEL_OUTLINE_BTN)}
-                        onClick={() => handleUpdateQuantity(item.id, 1)}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive"
-                        onClick={() => handleRemoveItem(item.id)}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {orderItems.length > 0 && (
-            <div className="border-t border-gray-100 dark:border-border px-6 py-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal nuevo pedido</span>
-                <span>{formatPrice(newItemsSubtotal)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">IVA ({Math.round(taxRate * 100)}%)</span>
-                <span>{formatPrice(newItemsTax)}</span>
-              </div>
-              <div className="mt-1 flex justify-between border-t border-gray-100 dark:border-border pt-1 font-bold">
-                <span>Total nuevo pedido</span>
-                <span className="text-[#2D5A57]">{formatPrice(newItemsTotal)}</span>
+                  )
+                })}
+                {filteredProducts.length === 0 && (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    No se encontraron productos
+                  </p>
+                )}
               </div>
             </div>
-          )}
-
-          <DialogFooter className="flex-col gap-2 border-t border-gray-100 dark:border-border px-6 py-4 sm:flex-row">
-            {selectedTable?.status === 'free' && (
-              <Button
-                className={PANEL_PRIMARY_BTN}
-                disabled={isBusy}
-                onClick={() => selectedTable && void handleOccupyTable(selectedTable)}
-              >
-                {isPending(`occupy:${selectedTable.id}`) ? (
-                  <>
-                    <Spinner className="mr-2" />
-                    Procesando...
-                  </>
-                ) : (
-                  'Ocupar mesa'
+          ) : (
+            <>
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-3">
+                {sessionOrders.length > 0 && (
+                  <Collapsible open={sessionOrdersOpen} onOpenChange={setSessionOrdersOpen}>
+                    <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-gray-100 dark:border-border bg-[#F8FBFA] px-3 py-2 text-left dark:bg-muted">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
+                        Pedidos en curso ({sessionOrders.length})
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          'h-4 w-4 text-[#2D5A57] transition-transform',
+                          sessionOrdersOpen && 'rotate-180'
+                        )}
+                      />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-2 pt-2">
+                      {sessionOrders.map((order) => (
+                        <div key={order.id} className="rounded-xl border border-gray-100 dark:border-border bg-[#F8FBFA] p-3 text-sm dark:bg-muted">
+                          <div className="mb-2 flex items-center justify-between">
+                            <span className="font-medium">{order.displayCode ?? 'Pedido'}</span>
+                            <StatusBadge status={order.status} />
+                          </div>
+                          <ul className="space-y-1 text-muted-foreground">
+                            {order.items.map((item) => (
+                              <li key={item.id}>
+                                {item.quantity}x {item.product.name} · {formatPrice(item.product.price * item.quantity)}
+                              </li>
+                            ))}
+                          </ul>
+                          <p className="mt-2 text-right font-semibold text-[#2D5A57]">{formatPrice(order.total)}</p>
+                        </div>
+                      ))}
+                    </CollapsibleContent>
+                  </Collapsible>
                 )}
-              </Button>
-            )}
 
-            {selectedTable && ['occupied', 'waiting'].includes(selectedTable.status) && (
-              <>
-                <Button
-                  variant="outline"
-                  className={cn('gap-2', PANEL_OUTLINE_BTN)}
-                  onClick={() => setAddProductOpen(true)}
-                >
-                  <Plus className="h-4 w-4" />
-                  Agregar producto
-                </Button>
+                {orderItems.length === 0 ? (
+                  <EmptyState
+                    icon="cart"
+                    title="Nuevos productos"
+                    description={
+                      selectedTable?.status === 'free'
+                        ? 'Ocupá la mesa para empezar a cargar productos'
+                        : 'Agregá productos al próximo pedido de esta mesa'
+                    }
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
+                        Nuevo pedido
+                      </p>
+                      <span className="text-xs text-muted-foreground">
+                        {orderItems.reduce((sum, item) => sum + item.quantity, 0)} u.
+                      </span>
+                    </div>
+                    {orderItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between gap-2 rounded-xl border border-gray-100 dark:border-border bg-[#F8FBFA] p-2 dark:bg-muted"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <img
+                            src={item.product.image}
+                            alt={item.product.name}
+                            className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{item.product.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatPrice(
+                                getDiscountedUnitPrice(item.product, item.selectedOptions, promotions) * item.quantity
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className={cn('h-7 w-7', PANEL_OUTLINE_BTN)}
+                            onClick={() => handleUpdateQuantity(item.id, -1)}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="w-5 text-center text-sm font-medium">{item.quantity}</span>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className={cn('h-7 w-7', PANEL_OUTLINE_BTN)}
+                            onClick={() => handleUpdateQuantity(item.id, 1)}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive"
+                            onClick={() => handleRemoveItem(item.id)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-                {orderItems.length > 0 && (
+              {orderItems.length > 0 && (
+                <div className="border-t border-gray-100 dark:border-border px-6 py-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal nuevo pedido</span>
+                    <span>{formatPrice(newItemsSubtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">IVA ({Math.round(taxRate * 100)}%)</span>
+                    <span>{formatPrice(newItemsTax)}</span>
+                  </div>
+                  <div className="mt-1 flex justify-between border-t border-gray-100 dark:border-border pt-1 font-bold">
+                    <span>Total nuevo pedido</span>
+                    <span className="text-[#2D5A57]">{formatPrice(newItemsTotal)}</span>
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter className="flex-col gap-2 border-t border-gray-100 dark:border-border px-6 py-4 sm:flex-row">
+                {selectedTable?.status === 'free' && (
                   <Button
                     className={PANEL_PRIMARY_BTN}
                     disabled={isBusy}
-                    onClick={() => void handleSendOrder()}
+                    onClick={() => selectedTable && void handleOccupyTable(selectedTable)}
                   >
-                    {isPending(`send:${selectedTable.id}`) ? (
-                      <>
-                        <Spinner className="mr-2" />
-                        Enviando...
-                      </>
-                    ) : (
-                      'Enviar pedido'
-                    )}
-                  </Button>
-                )}
-
-                {(sessionOrders.length > 0 || accumulatedTotal > 0) && (
-                  <Button
-                    variant="secondary"
-                    disabled={isBusy}
-                    onClick={() => selectedTable && void handleMarkReadyToPay(selectedTable)}
-                  >
-                    {isPending(`ready:${selectedTable.id}`) ? (
+                    {isPending(`occupy:${selectedTable.id}`) ? (
                       <>
                         <Spinner className="mr-2" />
                         Procesando...
                       </>
                     ) : (
-                      'Listo para cobrar'
+                      'Ocupar mesa'
                     )}
                   </Button>
                 )}
-              </>
-            )}
 
-            {selectedTable?.status === 'finished' && (
-              <Button
-                variant="destructive"
-                disabled={isBusy}
-                onClick={() => {
-                  setClosePaymentMethod('cash')
-                  setPaymentDialogOpen(true)
-                }}
-              >
-                Cobrar y cerrar mesa
-              </Button>
-            )}
-          </DialogFooter>
+                {selectedTable && ['occupied', 'waiting'].includes(selectedTable.status) && (
+                  <>
+                    <Button
+                      variant="outline"
+                      className={cn('gap-2', PANEL_OUTLINE_BTN)}
+                      onClick={() => setAddProductOpen(true)}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Agregar producto
+                    </Button>
+
+                    {orderItems.length > 0 && (
+                      <Button
+                        className={PANEL_PRIMARY_BTN}
+                        disabled={isBusy}
+                        onClick={() => void handleSendOrder()}
+                      >
+                        {isPending(`send:${selectedTable.id}`) ? (
+                          <>
+                            <Spinner className="mr-2" />
+                            Enviando...
+                          </>
+                        ) : (
+                          'Enviar pedido'
+                        )}
+                      </Button>
+                    )}
+
+                    {(sessionOrders.length > 0 || accumulatedTotal > 0) && (
+                      <Button
+                        variant="secondary"
+                        disabled={isBusy}
+                        onClick={() => selectedTable && void handleMarkReadyToPay(selectedTable)}
+                      >
+                        {isPending(`ready:${selectedTable.id}`) ? (
+                          <>
+                            <Spinner className="mr-2" />
+                            Procesando...
+                          </>
+                        ) : (
+                          'Listo para cobrar'
+                        )}
+                      </Button>
+                    )}
+                  </>
+                )}
+
+                {selectedTable?.status === 'finished' && (
+                  <Button
+                    variant="destructive"
+                    disabled={isBusy}
+                    onClick={() => {
+                      setClosePaymentMethod('cash')
+                      setPaymentDialogOpen(true)
+                    }}
+                  >
+                    Cobrar y cerrar mesa
+                  </Button>
+                )}
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -739,62 +819,6 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
               )}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={addProductOpen} onOpenChange={setAddProductOpen}>
-        <DialogContent className="max-h-[90vh] border-gray-100 dark:border-border sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-[#2D5A57]">Agregar producto</DialogTitle>
-          </DialogHeader>
-
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar producto..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="border-gray-200 dark:border-border bg-[#F8FBFA] pl-9 dark:bg-muted"
-            />
-          </div>
-
-          <ScrollArea className="h-[50vh]">
-            <div className="space-y-4 pr-4">
-              {categories.map((category) => {
-                const categoryProducts = filteredProducts.filter((p) => p.categoryId === category.id)
-                if (categoryProducts.length === 0) return null
-
-                return (
-                  <div key={category.id}>
-                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
-                      {category.name}
-                    </h3>
-                    <div className="space-y-2">
-                      {categoryProducts.map((product) => (
-                        <button
-                          key={product.id}
-                          type="button"
-                          onClick={() => handleProductClick(product)}
-                          className="flex w-full items-center gap-3 rounded-xl border border-gray-100 dark:border-border bg-white p-2 text-left transition-colors hover:bg-[#F8FBFA] dark:bg-card dark:hover:bg-muted"
-                        >
-                          <img
-                            src={product.image}
-                            alt={product.name}
-                            className="h-12 w-12 rounded-lg object-cover"
-                          />
-                          <div className="flex-1">
-                            <p className="font-medium">{product.name}</p>
-                            <p className="text-sm text-muted-foreground">{formatPrice(product.price)}</p>
-                          </div>
-                          <Plus className="h-5 w-5 text-[#7EB8B3]" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </ScrollArea>
         </DialogContent>
       </Dialog>
 
