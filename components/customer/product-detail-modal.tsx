@@ -39,11 +39,11 @@ function OptionRow({
       onKeyDown={
         onClick
           ? (event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                onClick()
-              }
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              onClick()
             }
+          }
           : undefined
       }
       className={cn(
@@ -159,7 +159,7 @@ export function ProductDetailModal({ product, promotions = [], onClose, onAddToC
   return (
     <SimpleModal open onClose={onClose} title={product.name} footer={addToCartFooter}>
       <div className="space-y-5">
-        <div className="relative aspect-4/3 overflow-hidden rounded-2xl bg-[#F8FBFA]">
+        <div className="relative mx-auto aspect-square w-full max-w-[200px] overflow-hidden rounded-2xl bg-[#F8FBFA]">
           <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
         </div>
 
@@ -179,102 +179,102 @@ export function ProductDetailModal({ product, promotions = [], onClose, onAddToC
         </div>
 
         {product.options?.map((option) => (
-              <div key={option.id} className="space-y-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <Label className="text-sm font-semibold text-[#053E38]">
-                    {option.name}
-                    {option.required ? <span className="ml-1 text-red-500">*</span> : null}
-                  </Label>
-                  {!option.required ? (
-                    <span className="text-xs text-muted-foreground">Opcional</span>
-                  ) : null}
-                </div>
-
-                {option.multiple ? (
-                  <div className="space-y-2">
-                    {option.choices.map((choice) => {
-                      const isSelected = selectedOptions.some(
-                        (so) => so.optionId === option.id && so.choiceIds.includes(choice.id)
-                      )
-
-                      return (
-                        <OptionRow key={choice.id} selected={isSelected}>
-                          <div className="flex items-center gap-3">
-                            <Checkbox
-                              id={`${option.id}-${choice.id}`}
-                              checked={isSelected}
-                              className={OPTION_CONTROL_CLASS}
-                              onCheckedChange={() => handleOptionChange(option.id, choice.id, true)}
-                            />
-                            <Label
-                              htmlFor={`${option.id}-${choice.id}`}
-                              className="cursor-pointer text-sm font-medium text-foreground"
-                            >
-                              {choice.name}
-                            </Label>
-                          </div>
-                          {choice.priceModifier > 0 ? (
-                            <span className="text-sm font-medium text-[#2D5A57]">
-                              +{formatPrice(choice.priceModifier)}
-                            </span>
-                          ) : null}
-                        </OptionRow>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <RadioGroup
-                    value={selectedOptions.find((so) => so.optionId === option.id)?.choiceIds[0] || ''}
-                    onValueChange={(value) => handleOptionChange(option.id, value, false)}
-                    className="gap-2"
-                  >
-                    {option.choices.map((choice) => {
-                      const isSelected = selectedOptions.some(
-                        (so) => so.optionId === option.id && so.choiceIds.includes(choice.id)
-                      )
-
-                      return (
-                        <OptionRow
-                          key={choice.id}
-                          selected={isSelected}
-                          onClick={() => handleOptionChange(option.id, choice.id, false)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <RadioGroupItem
-                              value={choice.id}
-                              id={`${option.id}-${choice.id}`}
-                              className={OPTION_CONTROL_CLASS}
-                            />
-                            <Label
-                              htmlFor={`${option.id}-${choice.id}`}
-                              className="cursor-pointer text-sm font-medium text-foreground"
-                            >
-                              {choice.name}
-                            </Label>
-                          </div>
-                          {choice.priceModifier > 0 ? (
-                            <span className="text-sm font-medium text-[#2D5A57]">
-                              +{formatPrice(choice.priceModifier)}
-                            </span>
-                          ) : null}
-                        </OptionRow>
-                      )
-                    })}
-                  </RadioGroup>
-                )}
-              </div>
-            ))}
-
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold text-[#053E38]">Notas especiales</Label>
-              <Textarea
-                placeholder="Ej: Sin azúcar, extra caliente..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={2}
-                className="resize-none rounded-2xl border-gray-100 bg-[#F8FBFA] focus-visible:border-[#2D5A57] focus-visible:ring-[#C5DDD9]/50"
-              />
+          <div key={option.id} className="space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <Label className="text-sm font-semibold text-[#053E38]">
+                {option.name}
+                {option.required ? <span className="ml-1 text-red-500">*</span> : null}
+              </Label>
+              {!option.required ? (
+                <span className="text-xs text-muted-foreground">Opcional</span>
+              ) : null}
             </div>
+
+            {option.multiple ? (
+              <div className="space-y-2">
+                {option.choices.map((choice) => {
+                  const isSelected = selectedOptions.some(
+                    (so) => so.optionId === option.id && so.choiceIds.includes(choice.id)
+                  )
+
+                  return (
+                    <OptionRow key={choice.id} selected={isSelected}>
+                      <div className="flex items-center gap-3">
+                        <Checkbox
+                          id={`${option.id}-${choice.id}`}
+                          checked={isSelected}
+                          className={OPTION_CONTROL_CLASS}
+                          onCheckedChange={() => handleOptionChange(option.id, choice.id, true)}
+                        />
+                        <Label
+                          htmlFor={`${option.id}-${choice.id}`}
+                          className="cursor-pointer text-sm font-medium text-foreground"
+                        >
+                          {choice.name}
+                        </Label>
+                      </div>
+                      {choice.priceModifier > 0 ? (
+                        <span className="text-sm font-medium text-[#2D5A57]">
+                          +{formatPrice(choice.priceModifier)}
+                        </span>
+                      ) : null}
+                    </OptionRow>
+                  )
+                })}
+              </div>
+            ) : (
+              <RadioGroup
+                value={selectedOptions.find((so) => so.optionId === option.id)?.choiceIds[0] || ''}
+                onValueChange={(value) => handleOptionChange(option.id, value, false)}
+                className="gap-2"
+              >
+                {option.choices.map((choice) => {
+                  const isSelected = selectedOptions.some(
+                    (so) => so.optionId === option.id && so.choiceIds.includes(choice.id)
+                  )
+
+                  return (
+                    <OptionRow
+                      key={choice.id}
+                      selected={isSelected}
+                      onClick={() => handleOptionChange(option.id, choice.id, false)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <RadioGroupItem
+                          value={choice.id}
+                          id={`${option.id}-${choice.id}`}
+                          className={OPTION_CONTROL_CLASS}
+                        />
+                        <Label
+                          htmlFor={`${option.id}-${choice.id}`}
+                          className="cursor-pointer text-sm font-medium text-foreground"
+                        >
+                          {choice.name}
+                        </Label>
+                      </div>
+                      {choice.priceModifier > 0 ? (
+                        <span className="text-sm font-medium text-[#2D5A57]">
+                          +{formatPrice(choice.priceModifier)}
+                        </span>
+                      ) : null}
+                    </OptionRow>
+                  )
+                })}
+              </RadioGroup>
+            )}
+          </div>
+        ))}
+
+        <div className="space-y-2 mb-2">
+          <Label className="text-sm font-semibold text-[#053E38]">Notas especiales</Label>
+          <Textarea
+            placeholder="Ej: Sin azúcar, extra caliente..."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            className="resize-none rounded-2xl border-gray-100 bg-[#F8FBFA] focus-visible:border-[#2D5A57] focus-visible:ring-[#C5DDD9]/50"
+          />
+        </div>
       </div>
     </SimpleModal>
   )
