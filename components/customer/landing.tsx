@@ -181,9 +181,8 @@ function QuantityControl({
       <div className="relative mx-1 flex min-w-[52px] items-center justify-center md:min-w-[60px]">
         <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-[#2D5A57]/30" />
         <span
-          className={`relative px-2 text-sm font-medium text-foreground md:text-base ${
-            quantityBg === 'white/95' ? 'bg-white/95' : 'bg-white'
-          }`}
+          className={`relative px-2 text-sm font-medium text-foreground md:text-base ${quantityBg === 'white/95' ? 'bg-white/95' : 'bg-white'
+            }`}
         >
           {quantity || ''}
         </span>
@@ -238,9 +237,8 @@ function ProductCard({
 
   return (
     <div
-      className={`flex h-full flex-col overflow-hidden rounded-2xl border border-black/8 shadow-sm md:rounded-3xl ${
-        cardBg === 'white' ? 'bg-white' : 'bg-white/95'
-      }`}
+      className={`flex h-full flex-col overflow-hidden rounded-2xl border border-black/8 shadow-sm md:rounded-3xl ${cardBg === 'white' ? 'bg-white' : 'bg-white/95'
+        }`}
     >
       <div className="aspect-4/3 shrink-0 overflow-hidden">
         <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
@@ -570,14 +568,12 @@ export function CustomerLanding() {
                   Lun a Sáb {settings.openTime} - {settings.closeTime} hs
                 </p>
                 <span
-                  className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-medium md:mt-3 md:px-3 md:py-1 md:text-xs ${
-                    settings.isOpen ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                  }`}
+                  className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-medium md:mt-3 md:px-3 md:py-1 md:text-xs ${settings.isOpen ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    }`}
                 >
                   <span
-                    className={`h-1.5 w-1.5 rounded-full md:h-2 md:w-2 ${
-                      settings.isOpen ? 'bg-green-500' : 'bg-red-500'
-                    }`}
+                    className={`h-1.5 w-1.5 rounded-full md:h-2 md:w-2 ${settings.isOpen ? 'bg-green-500' : 'bg-red-500'
+                      }`}
                   />
                   {settings.isOpen ? 'Abierto ahora' : 'Cerrado'}
                 </span>
@@ -586,11 +582,10 @@ export function CustomerLanding() {
                     {(['delivery', 'pickup'] as const).map((channel) => (
                       <span
                         key={channel}
-                        className={`rounded-full px-2 py-0.5 text-[9px] ${
-                          channelAvailability[channel]?.open
+                        className={`rounded-full px-2 py-0.5 text-[9px] ${channelAvailability[channel]?.open
                             ? 'bg-[#C5DDD9]/50 text-[#2D5A57]'
                             : 'bg-gray-100 text-muted-foreground'
-                        }`}
+                          }`}
                       >
                         {channel === 'delivery' ? 'Delivery' : 'Retiro'}:{' '}
                         {channelAvailability[channel]?.open ? 'Abierto' : 'Cerrado'}
@@ -666,7 +661,7 @@ export function CustomerLanding() {
       {/* Footer final */}
       <footer className="mx-auto flex max-w-6xl flex-col items-center px-4 pb-10 pt-6 md:px-8 md:pb-14 md:pt-10">
         <img
-          src={settings.logo?.trim() ? settings.logo : LOGO_SRC_SVG_NEGRO}
+          src={LOGO_SRC_SVG_NEGRO}
           alt={settings.name}
           className="h-16 w-auto object-contain md:h-24"
         />
