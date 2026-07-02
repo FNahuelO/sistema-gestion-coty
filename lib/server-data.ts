@@ -19,7 +19,8 @@ import { getProductDiscountPercent } from '@/lib/promotions'
 import type { AnalyticsOverview, BusinessSettings, CartItem, Category, ChannelSchedule, ChannelSetting, Order, PaymentMethod, Product, Promotion, SelectedOption, Table, User } from '@/lib/types'
 import { getChannelAvailability, mapOrderTypeToChannel, mapPrismaChannel, mapToPrismaChannel } from '@/lib/channel-hours'
 import { hasPermission, type Permission, type SessionRoleContext } from '@/lib/permissions'
-import { buildWhatsAppOrderMessage } from '@/lib/whatsapp-message'
+import { buildWhatsAppOrderMessage, buildWhatsAppUrl } from '@/lib/whatsapp-message'
+import { requiresTransferProofApproval } from '@/lib/payment-flow'
 import { createTrackingProof, verifyTrackingProof } from '@/lib/tracking-proof'
 import {
   buildMercadoPagoPreferenceItems,
@@ -149,6 +150,8 @@ export const settingsInputSchema = z.object({
   instagram: z.string().trim().optional().or(z.literal('')),
   facebook: z.string().trim().optional().or(z.literal('')),
   whatsapp: z.string().trim().min(1),
+  transferAlias: z.string().trim().max(120).optional().or(z.literal('')),
+  transferCbu: z.string().trim().max(30).optional().or(z.literal('')),
   deliveryFee: z.number().min(0),
   minOrderAmount: z.number().min(0),
   taxRate: z.number().min(0).max(1),
@@ -505,6 +508,8 @@ export function serializeSettings(settings: Prisma.BusinessSettingsGetPayload<ob
     instagram: settings.instagram ?? undefined,
     facebook: settings.facebook ?? undefined,
     whatsapp: settings.whatsapp,
+    transferAlias: settings.transferAlias ?? undefined,
+    transferCbu: settings.transferCbu ?? undefined,
     deliveryFee: decimalToNumber(settings.deliveryFee),
     minOrderAmount: decimalToNumber(settings.minOrderAmount),
     taxRate: decimalToNumber(settings.taxRate),
@@ -613,12 +618,16 @@ export function stripOrderPii(order: Order): Order {
 }
 
 /** Respuesta segura al crear pedido desde el cliente (sin PII + prueba HMAC para MP). */
-export function buildCustomerOrderResponse(order: Order): Order & { trackingProof: string } {
+export function buildCustomerOrderResponse(
+  order: Order,
+  options?: { whatsappCheckoutUrl?: string }
+): Order & { trackingProof: string } {
   const trackingCode = order.publicTrackingCode ?? order.id
 
   return {
     ...stripOrderPii(order),
     paymentUrl: order.paymentUrl,
+    whatsappCheckoutUrl: options?.whatsappCheckoutUrl,
     trackingProof: createTrackingProof(order.id, trackingCode),
   }
 }
@@ -1064,6 +1073,11 @@ export async function createOrderFromPayload(payload: z.input<typeof createOrder
       ? await upsertCustomerFromOrder(input.customerPhone, input.customerName, input.customerAddress)
       : null
 
+  const awaitingTransferProof =
+    input.type !== 'table' && requiresTransferProofApproval(input.paymentMethod, input.type)
+  const awaitingMercadoPago = input.paymentMethod === 'mercado_pago'
+  const initialStatus = awaitingTransferProof || awaitingMercadoPago ? 'PENDING' : 'CONFIRMED'
+
   const orderData = {
     displayCode: buildDisplayCode(),
     publicTrackingCode: buildTrackingCode(),
@@ -1073,7 +1087,7 @@ export async function createOrderFromPayload(payload: z.input<typeof createOrder
         : input.type === 'pickup'
           ? 'PICKUP'
           : 'TABLE',
-    status: input.paymentMethod === 'mercado_pago' ? 'PENDING' : 'CONFIRMED',
+    status: initialStatus,
     paymentMethod:
       input.paymentMethod === 'card'
         ? 'CARD'
@@ -1135,14 +1149,18 @@ export async function createOrderFromPayload(payload: z.input<typeof createOrder
     },
     statusHistory: {
       create: {
-        status: input.paymentMethod === 'mercado_pago' ? 'PENDING' : 'CONFIRMED',
+        status: initialStatus,
         changedByUserId: createdByUserId,
-        note: input.paymentMethod === 'mercado_pago' ? 'Pedido creado, pendiente de pago online' : 'Pedido creado',
+        note: awaitingMercadoPago
+          ? 'Pedido creado, pendiente de pago online'
+          : awaitingTransferProof
+            ? 'Pedido creado, pendiente de comprobante por WhatsApp'
+            : 'Pedido creado',
       },
     },
-  } 
+  }
 
-  const deferStockDecrement = input.paymentMethod === 'mercado_pago'
+  const deferStockDecrement = awaitingTransferProof || awaitingMercadoPago
 
   const createdOrder = await prisma.$transaction(async (tx) => {
     if (!deferStockDecrement) {
@@ -1175,7 +1193,16 @@ export async function createOrderFromPayload(payload: z.input<typeof createOrder
 
   const serialized = serializeOrder(createdOrder)
 
-  const whatsappMessage = buildWhatsAppOrderMessage(serialized, settings.name)
+  const whatsappMessageOptions = {
+    transferAlias: settings.transferAlias,
+    transferCbu: settings.transferCbu,
+    includePaymentInstructions: awaitingTransferProof,
+  }
+  const whatsappMessage = buildWhatsAppOrderMessage(serialized, settings.name, whatsappMessageOptions)
+  const whatsappCheckoutUrl = awaitingTransferProof
+    ? buildWhatsAppUrl(settings.whatsapp, serialized, settings.name, whatsappMessageOptions)
+    : undefined
+
   await prisma.order.update({
     where: { id: createdOrder.id },
     data: {
@@ -1190,6 +1217,7 @@ export async function createOrderFromPayload(payload: z.input<typeof createOrder
       createdOrder.payment?.initPoint,
       createdOrder.payment?.sandboxInitPoint
     ),
+    whatsappCheckoutUrl,
   }
 }
 
@@ -1379,6 +1407,24 @@ export async function updateOrderStatus(orderId: string, status: Order['status']
   const shouldApproveManualPayment = status === 'delivered' || status === 'completed'
 
   const order = await prisma.$transaction(async (tx) => {
+    const existing = await tx.order.findUnique({
+      where: { id: orderId },
+      include: { payment: true },
+    })
+
+    if (!existing) {
+      throw new Error('ORDER_NOT_FOUND')
+    }
+
+    if (
+      status === 'confirmed' &&
+      existing.status === PrismaOrderStatus.PENDING &&
+      existing.paymentMethod === PrismaPaymentMethod.TRANSFER &&
+      existing.payment?.status === PrismaPaymentStatus.PENDING
+    ) {
+      throw new Error('PAYMENT_NOT_APPROVED')
+    }
+
     const updated = await tx.order.update({
       where: { id: orderId },
       data: {
@@ -1415,6 +1461,57 @@ export async function updateOrderStatus(orderId: string, status: Order['status']
     })
     return serializeOrder(withPayment ?? order)
   }
+
+  return serializeOrder(order)
+}
+
+export async function approveOrderPayment(orderId: string, userId?: string) {
+  const order = await prisma.$transaction(async (tx) => {
+    const existingOrder = await tx.order.findUnique({
+      where: { id: orderId },
+      include: orderInclude,
+    })
+
+    if (!existingOrder) {
+      throw new Error('ORDER_NOT_FOUND')
+    }
+
+    if (existingOrder.paymentMethod !== PrismaPaymentMethod.TRANSFER) {
+      throw new Error('INVALID_PAYMENT_METHOD')
+    }
+
+    if (existingOrder.status !== PrismaOrderStatus.PENDING) {
+      throw new Error('ORDER_NOT_PAYABLE')
+    }
+
+    if (existingOrder.payment?.status !== PrismaPaymentStatus.PENDING) {
+      throw new Error('PAYMENT_ALREADY_PROCESSED')
+    }
+
+    await tx.payment.update({
+      where: { orderId },
+      data: { status: PrismaPaymentStatus.APPROVED },
+    })
+
+    const updated = await tx.order.update({
+      where: { id: orderId },
+      data: {
+        status: PrismaOrderStatus.CONFIRMED,
+        statusHistory: {
+          create: {
+            status: PrismaOrderStatus.CONFIRMED,
+            changedByUserId: userId,
+            note: 'Pago verificado por WhatsApp',
+          },
+        },
+      },
+      include: orderInclude,
+    })
+
+    await applyStockDeltaForOrderItems(tx, existingOrder.items, 'decrement')
+
+    return updated
+  })
 
   return serializeOrder(order)
 }

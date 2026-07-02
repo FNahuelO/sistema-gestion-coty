@@ -14,6 +14,7 @@ import {
   Clock,
   ShoppingBag,
   CheckCircle2,
+  MessageCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -30,6 +31,7 @@ import {
 import { LoadingSkeleton } from '@/components/shared/loading'
 import { calculateOrderEstimatedMinutes, shouldShowOrderEstimate } from '@/lib/order-estimate'
 import { ORDER_STATUS_LABELS } from '@/lib/order-labels'
+import { canApproveTransferPayment } from '@/lib/payment-flow'
 import { useTrackedOrders } from '@/lib/store'
 import type { Order, OrderType } from '@/lib/types'
 
@@ -164,11 +166,13 @@ export function OrderConfirmationView({
   menuHref,
   tableId,
   tableNumber: tableNumberFallback,
+  whatsappCheckoutUrl: whatsappCheckoutUrlProp,
 }: {
   orderId: string
   menuHref: string
   tableId?: string
   tableNumber?: number
+  whatsappCheckoutUrl?: string
 }) {
   const [calling, setCalling] = useState(false)
   const { orders, isLoading } = useTrackedOrders('', orderId)
@@ -183,6 +187,8 @@ export function OrderConfirmationView({
   const estimatedMinutes = order && shouldShowOrderEstimate(order.status)
     ? calculateOrderEstimatedMinutes(order)
     : null
+  const awaitingTransferProof = order ? canApproveTransferPayment(order) : false
+  const whatsappCheckoutUrl = order?.whatsappCheckoutUrl ?? whatsappCheckoutUrlProp
 
   const leftDetail = isTable
     ? { label: 'Mesa', value: tableNumber != null ? `Mesa ${tableNumber}` : 'Mesa', icon: Armchair }
@@ -305,6 +311,35 @@ export function OrderConfirmationView({
               <p className="text-lg font-bold text-foreground">{estimatedMinutes} min</p>
             </div>
             <ClocheIllustration />
+          </section>
+        ) : null}
+
+        {awaitingTransferProof ? (
+          <section className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                <MessageCircle className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-foreground">Completá el pago por WhatsApp</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Enviá el detalle del pedido y el comprobante de transferencia al negocio. Tu pedido se
+                  confirmará cuando el local verifique el pago.
+                </p>
+                {whatsappCheckoutUrl ? (
+                  <a
+                    href={whatsappCheckoutUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-bold text-white transition-opacity hover:opacity-95"
+                    style={{ backgroundColor: '#25D366' }}
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    Enviar pedido por WhatsApp
+                  </a>
+                ) : null}
+              </div>
+            </div>
           </section>
         ) : null}
 

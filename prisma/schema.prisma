@@ -284,6 +284,8 @@ model BusinessSettings {
   instagram      String?
   facebook       String?
   whatsapp       String
+  transferAlias  String?
+  transferCbu    String?
   deliveryFee    Decimal  @db.Decimal(10, 2)
   minOrderAmount Decimal  @db.Decimal(10, 2)
   taxRate        Decimal  @db.Decimal(5, 4)

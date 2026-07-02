@@ -24,6 +24,13 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ o
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 
+    if (error instanceof Error && error.message === 'PAYMENT_NOT_APPROVED') {
+      return NextResponse.json(
+        { error: 'Debés aprobar el comprobante de transferencia antes de confirmar el pedido' },
+        { status: 400 }
+      )
+    }
+
     console.error('PATCH /api/cashier/orders/[orderId]/status', error)
     return NextResponse.json({ error: 'No se pudo actualizar el estado del pedido' }, { status: 500 })
   }

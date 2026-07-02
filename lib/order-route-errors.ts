@@ -17,6 +17,7 @@ const ORDER_ERROR_MESSAGES = new Map<string, [string, number]>([
   ['SETTINGS_NOT_FOUND', ['La configuración del negocio no está lista', 500]],
   ['MIN_ORDER_AMOUNT', ['El pedido no alcanza el monto mínimo requerido', 400]],
   ['MERCADOPAGO_UNAVAILABLE', ['Mercado Pago no está disponible en este momento', 400]],
+  ['PAYMENT_NOT_APPROVED', ['Debés aprobar el comprobante de transferencia antes de confirmar el pedido', 400]],
 ])
 
 export function handleOrderRouteError(error: unknown, context: string) {

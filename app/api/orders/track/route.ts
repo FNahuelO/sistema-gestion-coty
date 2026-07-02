@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { serializePublicTrackedOrder } from '@/lib/server-data'
+import { buildWhatsAppUrl } from '@/lib/whatsapp-message'
 
 function buildExactMatchWhere(query: string) {
   return {
@@ -49,7 +50,29 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    return NextResponse.json(orders.map(serializePublicTrackedOrder))
+    const settings = await prisma.businessSettings.findUnique({ where: { id: 'main' } })
+
+    return NextResponse.json(
+      orders.map((order) => {
+        const serialized = serializePublicTrackedOrder(order)
+        if (
+          settings &&
+          serialized.status === 'pending' &&
+          serialized.paymentMethod === 'transfer' &&
+          serialized.paymentStatus === 'pending'
+        ) {
+          return {
+            ...serialized,
+            whatsappCheckoutUrl: buildWhatsAppUrl(settings.whatsapp, serialized, settings.name, {
+              transferAlias: settings.transferAlias,
+              transferCbu: settings.transferCbu,
+              includePaymentInstructions: true,
+            }),
+          }
+        }
+        return serialized
+      })
+    )
   } catch (error) {
     console.error('GET /api/orders/track', error)
     return NextResponse.json({ error: 'No se pudo consultar el estado del pedido' }, { status: 500 })

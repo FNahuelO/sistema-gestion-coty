@@ -26,7 +26,7 @@ export const ORDER_TYPE_LABELS: Record<OrderType, string> = {
 export const PAYMENT_METHOD_LABELS: Record<Order['paymentMethod'], string> = {
   cash: 'Efectivo',
   card: 'Tarjeta',
-  transfer: 'Transferencia',
+  transfer: 'Transferencia (WhatsApp)',
   mercado_pago: 'Mercado Pago',
 }
 
@@ -39,10 +39,17 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   refunded: 'Reembolsado',
 }
 
-const COLLECT_ON_DELIVERY_METHODS: Order['paymentMethod'][] = ['cash', 'card', 'transfer']
+const COLLECT_ON_DELIVERY_METHODS: Order['paymentMethod'][] = ['cash', 'card']
 
-export function getPaymentStatusLabel(order: Pick<Order, 'paymentMethod' | 'paymentStatus'>): string {
+export function getPaymentStatusLabel(order: Pick<Order, 'paymentMethod' | 'paymentStatus' | 'status'>): string {
   if (!order.paymentStatus) return ''
+  if (
+    order.paymentStatus === 'pending' &&
+    order.paymentMethod === 'transfer' &&
+    order.status === 'pending'
+  ) {
+    return 'Esperando comprobante'
+  }
   if (
     order.paymentStatus === 'pending' &&
     COLLECT_ON_DELIVERY_METHODS.includes(order.paymentMethod)

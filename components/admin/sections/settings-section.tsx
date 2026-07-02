@@ -87,6 +87,29 @@ export function SettingsSection() {
           </div>
           <Field label="Tasa impositiva"><Input type="number" step="0.01" value={settingsDraft?.taxRate ?? 0} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, taxRate: Number(event.target.value) } : previous)} /></Field>
           <Field label="WhatsApp"><Input value={settingsDraft?.whatsapp ?? ''} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, whatsapp: event.target.value } : previous)} /></Field>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Alias / CVU para transferencias">
+              <Input
+                value={settingsDraft?.transferAlias ?? ''}
+                onChange={(event) =>
+                  setSettingsDraft((previous) =>
+                    previous ? { ...previous, transferAlias: event.target.value } : previous
+                  )
+                }
+                placeholder="ej. coty.cafe.mp"
+              />
+            </Field>
+            <Field label="CBU (opcional)">
+              <Input
+                value={settingsDraft?.transferCbu ?? ''}
+                onChange={(event) =>
+                  setSettingsDraft((previous) =>
+                    previous ? { ...previous, transferCbu: event.target.value } : previous
+                  )
+                }
+              />
+            </Field>
+          </div>
           <Field label="Instagram"><Input value={settingsDraft?.instagram ?? ''} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, instagram: event.target.value } : previous)} /></Field>
           <Field label="Facebook"><Input value={settingsDraft?.facebook ?? ''} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, facebook: event.target.value } : previous)} /></Field>
           <div className={PANEL_TOGGLE_ROW}>

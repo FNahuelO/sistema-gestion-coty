@@ -27,6 +27,7 @@ import { StaffNotificationsButton } from '@/components/staff/staff-notifications
 import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
 import { formatOrderStatus, isDisplayableCustomerPhone } from '@/lib/order-labels'
+import { canApproveTransferPayment } from '@/lib/payment-flow'
 import { ORDER_SORT_OPTIONS, sortOrders, type OrderSortKey } from '@/lib/order-sort'
 import type { DeliveryQueueEntry, Order, OrderStatus, OrderType } from '@/lib/types'
 import { formatDistanceToNow } from 'date-fns'
@@ -100,7 +101,7 @@ export function OrdersSection({
   embedded?: boolean
   onNavigateToCalls?: () => void
 }) {
-  const { orders, updateOrderStatus, closeOrder } = useOrders()
+  const { orders, updateOrderStatus, closeOrder, approveOrderPayment } = useOrders()
   const { data: deliveryQueue = [], mutate: mutateDeliveryQueue } = useSWR<DeliveryQueueEntry[]>(
     '/api/staff/operations?view=delivery',
     fetchJson,
@@ -183,6 +184,19 @@ export function OrdersSection({
         toast.success(`Pedido actualizado a: ${formatOrderStatus(newStatus)}`)
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'No se pudo actualizar el pedido')
+        throw error
+      }
+    })
+  }
+
+  const handleApprovePayment = async (orderId: string) => {
+    await run(`approve:${orderId}`, async () => {
+      try {
+        await approveOrderPayment(orderId)
+        toast.success('Pago aprobado. El pedido quedó confirmado.')
+        setSelectedOrder(null)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'No se pudo aprobar el pago')
         throw error
       }
     })
@@ -322,7 +336,14 @@ export function OrdersSection({
                 <AnimatePresence>
                   {sortedOrders.map((order, index) => {
                     const TypeIcon = orderTypeIcons[order.type]
-                    const action = order.offlinePending ? null : statusActions[order.status]
+                    const awaitingTransferProof = canApproveTransferPayment(order)
+                    const action = order.offlinePending
+                      ? null
+                      : awaitingTransferProof
+                        ? { type: 'approve' as const, label: 'Aprobar pago' }
+                        : statusActions[order.status]
+                          ? { type: 'status' as const, ...statusActions[order.status]! }
+                          : null
                     const deliveryEntry =
                       order.type === 'delivery' ? deliveryByOrderId.get(order.id) : undefined
 
@@ -362,6 +383,11 @@ export function OrdersSection({
                               </div>
                             </div>
                             <div className="flex flex-col items-end gap-1">
+                              {awaitingTransferProof && (
+                                <Badge className="border-0 bg-emerald-100 text-[10px] text-emerald-900 hover:bg-emerald-100">
+                                  Esperando comprobante
+                                </Badge>
+                              )}
                               {order.offlinePending && (
                                 <Badge className="border-0 bg-amber-100 text-[10px] text-amber-900 hover:bg-amber-100">
                                   Sin enviar
@@ -416,10 +442,16 @@ export function OrdersSection({
                                 disabled={isBusy}
                                 onClick={(e) => {
                                   e.stopPropagation()
+                                  if (action.type === 'approve') {
+                                    void handleApprovePayment(order.id)
+                                    return
+                                  }
                                   void handleStatusChange(order.id, action.next)
                                 }}
                               >
-                                {isPending(`status:${order.id}`) ? (
+                                {isPending(
+                                  action.type === 'approve' ? `approve:${order.id}` : `status:${order.id}`
+                                ) ? (
                                   <>
                                     <Spinner className="mr-1.5" />
                                     ...
@@ -446,13 +478,14 @@ export function OrdersSection({
         open={!!selectedOrder}
         onOpenChange={(open) => !open && setSelectedOrder(null)}
         statusAction={
-          selectedOrder?.offlinePending
+          selectedOrder?.offlinePending || (selectedOrder && canApproveTransferPayment(selectedOrder))
             ? null
             : selectedOrder
               ? statusActions[selectedOrder.status]
               : null
         }
         onAdvanceStatus={handleStatusChange}
+        onApprovePayment={handleApprovePayment}
         onCancel={handleCancelOrder}
         onArchive={handleCloseOrder}
         onDeliveryUpdated={() => void mutateDeliveryQueue()}

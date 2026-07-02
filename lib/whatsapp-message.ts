@@ -10,6 +10,12 @@ type OrderMessageInput = Pick<
   items: OrderMessageItem[]
 }
 
+export type WhatsAppMessageOptions = {
+  transferAlias?: string | null
+  transferCbu?: string | null
+  includePaymentInstructions?: boolean
+}
+
 function formatItemOptions(item: OrderMessageItem) {
   return item.selectedOptions
     ?.map((opt) => {
@@ -26,17 +32,35 @@ function formatItemOptions(item: OrderMessageItem) {
     .join(' | ')
 }
 
-export function buildWhatsAppOrderMessage(order: OrderMessageInput, businessName: string) {
+function formatTransferDetails(options?: WhatsAppMessageOptions) {
+  const lines: string[] = []
+  if (options?.transferAlias?.trim()) {
+    lines.push(`🏦 *Alias/CVU:* ${options.transferAlias.trim()}`)
+  }
+  if (options?.transferCbu?.trim()) {
+    lines.push(`🔢 *CBU:* ${options.transferCbu.trim()}`)
+  }
+  return lines.join('\n')
+}
+
+export function buildWhatsAppOrderMessage(
+  order: OrderMessageInput,
+  businessName: string,
+  options?: WhatsAppMessageOptions
+) {
   const code = order.displayCode ?? order.id
   const itemsList = order.items
     .map((item) => {
-      const options = formatItemOptions(item)
-      return `• ${item.quantity}x ${item.product.name}${options ? ` (${options})` : ''}`
+      const optionsLabel = formatItemOptions(item)
+      return `• ${item.quantity}x ${item.product.name}${optionsLabel ? ` (${optionsLabel})` : ''}`
     })
     .join('\n')
 
   const paymentLabel = PAYMENT_METHOD_LABELS[order.paymentMethod as PaymentMethod] ?? order.paymentMethod
   const typeLabel = ORDER_TYPE_LABELS[order.type] ?? order.type
+  const transferDetails = formatTransferDetails(options)
+  const showPaymentInstructions =
+    options?.includePaymentInstructions && order.paymentMethod === 'transfer' && order.type !== 'table'
 
   return `🧾 *Nuevo Pedido - ${businessName}*
 
@@ -48,12 +72,21 @@ ${itemsList}
 
 💰 *Total:* $${order.total.toFixed(2)}
 💳 *Pago:* ${paymentLabel}
-📦 *Tipo:* ${typeLabel}
-${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}`.trim()
+${transferDetails ? `${transferDetails}\n` : ''}📦 *Tipo:* ${typeLabel}
+${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}${
+    showPaymentInstructions
+      ? `\n\n📎 *Enviá el comprobante de transferencia por este chat para confirmar tu pedido.*`
+      : ''
+  }`.trim()
 }
 
-export function buildWhatsAppUrl(phone: string, order: OrderMessageInput, businessName: string) {
+export function buildWhatsAppUrl(
+  phone: string,
+  order: OrderMessageInput,
+  businessName: string,
+  options?: WhatsAppMessageOptions
+) {
   const normalizedPhone = phone.replace(/\D/g, '')
-  const text = encodeURIComponent(buildWhatsAppOrderMessage(order, businessName))
+  const text = encodeURIComponent(buildWhatsAppOrderMessage(order, businessName, options))
   return `https://wa.me/${normalizedPhone}?text=${text}`
 }

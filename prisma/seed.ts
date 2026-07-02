@@ -192,10 +192,12 @@ async function main() {
       instagram: businessSettings.instagram,
       facebook: businessSettings.facebook,
       whatsapp: businessSettings.whatsapp,
+      transferAlias: businessSettings.transferAlias,
+      transferCbu: businessSettings.transferCbu || null,
       deliveryFee: businessSettings.deliveryFee,
       minOrderAmount: businessSettings.minOrderAmount,
       taxRate: businessSettings.taxRate,
-      mercadoPagoEnabled: true,
+      mercadoPagoEnabled: businessSettings.mercadoPagoEnabled ?? false,
     },
   })
 

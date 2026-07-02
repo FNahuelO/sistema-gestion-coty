@@ -633,11 +633,26 @@ export function useOrders() {
     [mutate]
   )
 
+  const approveOrderPayment = useCallback(
+    async (orderId: string) => {
+      const order = parseOrder(
+        await sendJson<Order & { createdAt: string; updatedAt: string }>(
+          `/api/cashier/orders/${orderId}/approve-payment`,
+          'POST'
+        )
+      )
+      await mutate()
+      return order
+    },
+    [mutate]
+  )
+
   return {
     orders,
     addOrder,
     updateOrderStatus,
     closeOrder,
+    approveOrderPayment,
     isLoading,
     error,
     refresh: mutate,
