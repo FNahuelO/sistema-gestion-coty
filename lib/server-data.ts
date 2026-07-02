@@ -187,6 +187,7 @@ const orderInclude = {
   payment: true,
   diningTable: true,
   createdByUser: true,
+  deliveryZone: true,
 } satisfies Prisma.OrderInclude
 
 const productInclude = {
@@ -552,6 +553,7 @@ export function serializeOrder(order: Prisma.OrderGetPayload<{ include: typeof o
     customerName: order.customerName,
     customerPhone: order.customerPhone,
     customerAddress: order.customerAddress ?? undefined,
+    deliveryZoneName: order.deliveryZone?.name ?? undefined,
     notes: order.notes ?? undefined,
     subtotal: decimalToNumber(order.subtotal),
     tax: decimalToNumber(order.tax),
@@ -580,6 +582,12 @@ export function serializeOrder(order: Prisma.OrderGetPayload<{ include: typeof o
         },
         quantity: item.quantity,
         notes: item.notes ?? undefined,
+        unitPrice: decimalToNumber(item.unitPrice),
+        selectionLines: item.selections.map((selection) => ({
+          optionName: selection.optionName,
+          choiceName: selection.choiceName,
+          priceModifier: decimalToNumber(selection.priceModifier),
+        })),
         selectedOptions: item.selections.reduce<SelectedOption[]>((accumulator, selection) => {
           const existing = accumulator.find((candidate) => candidate.optionId === selection.optionName)
           if (existing) {

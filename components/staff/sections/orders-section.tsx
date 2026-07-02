@@ -20,7 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useOrders } from '@/lib/store'
+import { useOrders, useBusiness } from '@/lib/store'
 import { usePendingAction } from '@/hooks/use-pending-action'
 import { OrderDetailSheet } from '@/components/staff/order-detail-sheet'
 import { StaffNotificationsButton } from '@/components/staff/staff-notifications-button'
@@ -38,6 +38,7 @@ import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN } from
 import { Spinner } from '@/components/ui/spinner'
 import { formatDeliveryAssignmentStatus } from '@/lib/delivery-labels'
 import { cn } from '@/lib/utils'
+import { printOrderTickets } from '@/lib/ticket-print'
 
 const fetchJson = async (url: string) => {
   const res = await fetch(url, { credentials: 'include' })
@@ -102,6 +103,8 @@ export function OrdersSection({
   onNavigateToCalls?: () => void
 }) {
   const { orders, updateOrderStatus, closeOrder, approveOrderPayment } = useOrders()
+  const { settings } = useBusiness()
+  const businessName = settings?.name ?? 'Coty Café'
   const { data: deliveryQueue = [], mutate: mutateDeliveryQueue } = useSWR<DeliveryQueueEntry[]>(
     '/api/staff/operations?view=delivery',
     fetchJson,
@@ -177,10 +180,17 @@ export function OrdersSection({
     previousPendingCount.current = pending
   }, [orderStats.pending])
 
+  const printTicketsForOrder = (order: Order) => {
+    printOrderTickets({ order, businessName }, ['kitchen', 'customer'])
+  }
+
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     await run(`status:${orderId}`, async () => {
       try {
-        await updateOrderStatus(orderId, newStatus)
+        const order = await updateOrderStatus(orderId, newStatus)
+        if (newStatus === 'preparing') {
+          printTicketsForOrder(order)
+        }
         toast.success(`Pedido actualizado a: ${formatOrderStatus(newStatus)}`)
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'No se pudo actualizar el pedido')
@@ -193,7 +203,9 @@ export function OrdersSection({
     await run(`approve:${orderId}`, async () => {
       try {
         await approveOrderPayment(orderId)
-        toast.success('Pago aprobado. El pedido quedó confirmado.')
+        const order = await updateOrderStatus(orderId, 'preparing')
+        printTicketsForOrder(order)
+        toast.success('Pago aprobado. Pedido enviado a cocina e impresión iniciada.')
         setSelectedOrder(null)
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'No se pudo aprobar el pago')
@@ -340,7 +352,7 @@ export function OrdersSection({
                     const action = order.offlinePending
                       ? null
                       : awaitingTransferProof
-                        ? { type: 'approve' as const, label: 'Aprobar pago' }
+                        ? { type: 'approve' as const, label: 'Aprobar y enviar a cocina' }
                         : statusActions[order.status]
                           ? { type: 'status' as const, ...statusActions[order.status]! }
                           : null
@@ -486,6 +498,9 @@ export function OrdersSection({
         }
         onAdvanceStatus={handleStatusChange}
         onApprovePayment={handleApprovePayment}
+        onPrintKitchen={(order) => printOrderTickets({ order, businessName }, ['kitchen'])}
+        onPrintCustomer={(order) => printOrderTickets({ order, businessName }, ['customer'])}
+        onPrintBoth={(order) => printTicketsForOrder(order)}
         onCancel={handleCancelOrder}
         onArchive={handleCloseOrder}
         onDeliveryUpdated={() => void mutateDeliveryQueue()}
