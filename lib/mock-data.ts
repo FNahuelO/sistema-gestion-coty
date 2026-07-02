@@ -21,10 +21,12 @@ export const businessSettings: BusinessSettings = {
   instagram: 'cotycafe',
   facebook: 'cotycafe',
   whatsapp: '5491145678901',
+  transferAlias: 'coty.cafe.mp',
+  transferCbu: '',
   deliveryFee: 2500,
   minOrderAmount: 9000,
   taxRate: 0.21,
-  mercadoPagoEnabled: true,
+  mercadoPagoEnabled: false,
 }
 
 export const categories: Category[] = [

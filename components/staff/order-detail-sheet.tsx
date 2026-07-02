@@ -9,6 +9,7 @@ import {
   Truck,
   Users,
   XCircle,
+  MessageCircle,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -22,6 +23,7 @@ import type { Order, OrderStatus, OrderType } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS, getPaymentStatusLabel, isDisplayableCustomerPhone } from '@/lib/order-labels'
+import { canApproveTransferPayment } from '@/lib/payment-flow'
 import { DeliveryAssignmentPanel } from '@/components/staff/delivery-assignment-panel'
 
 const ORDER_TYPE_META: Record<
@@ -55,6 +57,7 @@ type OrderDetailSheetProps = {
   onOpenChange: (open: boolean) => void
   statusAction: { next: OrderStatus; label: string } | null
   onAdvanceStatus: (orderId: string, status: OrderStatus) => Promise<void>
+  onApprovePayment?: (orderId: string) => Promise<void>
   onCancel: (orderId: string) => Promise<void>
   onArchive: (orderId: string) => Promise<void>
   onDeliveryUpdated?: () => void
@@ -68,6 +71,7 @@ export function OrderDetailSheet({
   onOpenChange,
   statusAction,
   onAdvanceStatus,
+  onApprovePayment,
   onCancel,
   onArchive,
   onDeliveryUpdated,
@@ -79,7 +83,10 @@ export function OrderDetailSheet({
   const typeMeta = ORDER_TYPE_META[order.type]
   const TypeIcon = typeMeta.icon
   const isFinished = ['completed', 'cancelled'].includes(order.status)
+  const awaitingTransferProof = canApproveTransferPayment(order)
+  const effectiveStatusAction = awaitingTransferProof ? null : statusAction
   const statusPending = isPending(`status:${order.id}`)
+  const approvePending = isPending(`approve:${order.id}`)
   const cancelPending = isPending(`cancel:${order.id}`)
   const archivePending = isPending(`archive:${order.id}`)
 
@@ -125,7 +132,16 @@ export function OrderDetailSheet({
                 {isDisplayableCustomerPhone(order.customerPhone) ? (
                   <p className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Phone className="h-3.5 w-3.5 shrink-0 text-[#7EB8B3]" />
-                    {order.customerPhone}
+                    <span>{order.customerPhone}</span>
+                    <a
+                      href={`https://wa.me/${order.customerPhone.replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-[#25D366]"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5" />
+                      WhatsApp
+                    </a>
                   </p>
                 ) : null}
                 {order.customerAddress ? (
@@ -208,8 +224,20 @@ export function OrderDetailSheet({
               {order.paymentStatus ? (
                 <div className="mt-2 flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Estado del pago</span>
-                  <span className="font-medium">{getPaymentStatusLabel(order)}</span>
+                  <span
+                    className={cn(
+                      'font-medium',
+                      awaitingTransferProof && 'text-amber-700'
+                    )}
+                  >
+                    {getPaymentStatusLabel(order)}
+                  </span>
                 </div>
+              ) : null}
+              {awaitingTransferProof ? (
+                <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  Revisá el comprobante en WhatsApp y aprobá el pago para confirmar el pedido.
+                </p>
               ) : null}
             </section>
           </div>
@@ -240,12 +268,32 @@ export function OrderDetailSheet({
           </div>
 
           <div className="space-y-2">
-            {statusAction && !isFinished ? (
+            {awaitingTransferProof && onApprovePayment ? (
               <Button
                 className={cn('h-11 w-full text-base', PANEL_PRIMARY_BTN)}
                 disabled={isBusy}
                 onClick={async () => {
-                  await onAdvanceStatus(order.id, statusAction.next)
+                  await onApprovePayment(order.id)
+                  onOpenChange(false)
+                }}
+              >
+                {approvePending ? (
+                  <>
+                    <Spinner className="mr-2" />
+                    Procesando...
+                  </>
+                ) : (
+                  'Aprobar pago'
+                )}
+              </Button>
+            ) : null}
+
+            {effectiveStatusAction && !isFinished ? (
+              <Button
+                className={cn('h-11 w-full text-base', PANEL_PRIMARY_BTN)}
+                disabled={isBusy}
+                onClick={async () => {
+                  await onAdvanceStatus(order.id, effectiveStatusAction.next)
                   onOpenChange(false)
                 }}
               >
@@ -255,7 +303,7 @@ export function OrderDetailSheet({
                     Procesando...
                   </>
                 ) : (
-                  statusAction.label
+                  effectiveStatusAction.label
                 )}
               </Button>
             ) : null}

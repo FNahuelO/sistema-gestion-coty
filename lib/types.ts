@@ -76,6 +76,7 @@ export interface Order {
   paymentMethod: PaymentMethod
   paymentStatus?: PaymentStatus
   paymentUrl?: string
+  whatsappCheckoutUrl?: string
   customerName: string
   customerPhone: string
   customerAddress?: string
@@ -212,6 +213,8 @@ export interface BusinessSettings {
   instagram?: string
   facebook?: string
   whatsapp: string
+  transferAlias?: string
+  transferCbu?: string
   deliveryFee: number
   minOrderAmount: number
   taxRate: number

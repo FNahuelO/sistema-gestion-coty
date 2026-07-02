@@ -179,7 +179,7 @@ export function CheckoutPage() {
   const { isOffline } = useOnlineStatus()
 
   const [orderType, setOrderType] = useState<OrderType>('pickup')
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('transfer')
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [customerAddress, setCustomerAddress] = useState('')
@@ -193,6 +193,7 @@ export function CheckoutPage() {
   const [completedOrderId, setCompletedOrderId] = useState('')
   const [completedTableId, setCompletedTableId] = useState<string | undefined>()
   const [completedTableNumber, setCompletedTableNumber] = useState<number | undefined>()
+  const [completedWhatsappUrl, setCompletedWhatsappUrl] = useState<string | undefined>()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [deliveryCoords, setDeliveryCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [coverageStatus, setCoverageStatus] = useState<
@@ -259,7 +260,7 @@ export function CheckoutPage() {
     if (!tableSessionHydrated) return
     if (tableSession) {
       setOrderType('table')
-      setPaymentMethod((current) => (current === 'mercado_pago' ? 'cash' : current))
+      setPaymentMethod('cash')
       return
     }
     setOrderType((current) => (current === 'table' ? 'pickup' : current))
@@ -452,6 +453,7 @@ export function CheckoutPage() {
       setCompletedOrderId(createdOrder.id)
       setCompletedTableId(tableSession?.tableId)
       setCompletedTableNumber(tableSession?.tableNumber)
+      setCompletedWhatsappUrl(createdOrder.whatsappCheckoutUrl)
 
       if (paymentMethod === 'mercado_pago') {
         if (!createdOrder.trackingProof) {
@@ -496,6 +498,10 @@ export function CheckoutPage() {
       setOrderComplete(true)
       setConfirmOpen(false)
       clearCart()
+
+      if (createdOrder.whatsappCheckoutUrl) {
+        window.open(createdOrder.whatsappCheckoutUrl, '_blank', 'noopener,noreferrer')
+      }
 
       if (createdOrder.offlinePending || isOffline) {
         toast.success('Pedido guardado. Se enviará automáticamente al recuperar conexión.')
@@ -606,6 +612,7 @@ export function CheckoutPage() {
           tableId={completedTableId}
           tableNumber={completedTableNumber}
           menuHref={menuHref}
+          whatsappCheckoutUrl={completedWhatsappUrl}
         />
       ) : (
         <div className="coly-landing min-h-screen bg-white pb-36 md:pb-24">
@@ -1008,8 +1015,8 @@ export function CheckoutPage() {
                   className="space-y-2"
                 >
                   {[
+                    { value: 'transfer', label: 'Transferencia por WhatsApp', icon: Building2 },
                     { value: 'cash', label: 'Efectivo', icon: Banknote },
-                    { value: 'transfer', label: 'Transferencia', icon: Building2 },
                     ...(isTableMode || !mercadoPagoAvailable
                       ? []
                       : [{ value: 'mercado_pago' as const, label: 'Mercado Pago', icon: CreditCard }]),
