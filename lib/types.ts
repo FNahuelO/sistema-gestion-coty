@@ -76,6 +76,7 @@ export interface Order {
   discountAmount?: number
   total: number
   estimatedMinutes?: number
+  estimatedReadyAt?: Date
   paymentMethod: PaymentMethod
   paymentStatus?: PaymentStatus
   paymentUrl?: string

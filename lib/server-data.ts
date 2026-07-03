@@ -565,6 +565,7 @@ export function serializeOrder(order: Prisma.OrderGetPayload<{ include: typeof o
     discountAmount: decimalToNumber(order.discountAmount ?? 0),
     total: decimalToNumber(order.total),
     estimatedMinutes: order.estimatedMinutes ?? undefined,
+    estimatedReadyAt: order.estimatedReadyAt ?? undefined,
     tableId: order.diningTableId ?? undefined,
     tableNumber: order.diningTable?.number ?? undefined,
     tableSessionId: order.tableSessionId ?? undefined,
@@ -1404,7 +1405,11 @@ export async function updateOrderEstimatedMinutes(orderId: string, estimatedMinu
 
   const order = await prisma.order.update({
     where: { id: orderId },
-    data: { estimatedMinutes: normalized },
+    data: {
+      estimatedMinutes: normalized,
+      // El contador regresivo del cliente arranca desde este instante.
+      estimatedReadyAt: new Date(Date.now() + normalized * 60_000),
+    },
     include: orderInclude,
   })
 
@@ -1465,7 +1470,13 @@ export async function updateOrderStatus(
       where: { id: orderId },
       data: {
         status: prismaStatus,
-        ...(normalizedEstimate !== undefined ? { estimatedMinutes: normalizedEstimate } : {}),
+        ...(normalizedEstimate !== undefined
+          ? {
+              estimatedMinutes: normalizedEstimate,
+              // Reinicia el contador regresivo desde el momento del cambio.
+              estimatedReadyAt: new Date(Date.now() + normalizedEstimate * 60_000),
+            }
+          : {}),
         statusHistory: {
           create: {
             status: prismaStatus,

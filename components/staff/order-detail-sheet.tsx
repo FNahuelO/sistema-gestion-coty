@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils'
 
 import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS, getPaymentStatusLabel, isDisplayableCustomerPhone } from '@/lib/order-labels'
 import { getOrderEstimatedMinutes } from '@/lib/order-estimate'
+import { useOrderCountdown } from '@/hooks/use-order-countdown'
 import { canApproveTransferPayment } from '@/lib/payment-flow'
 import { DeliveryAssignmentPanel } from '@/components/staff/delivery-assignment-panel'
 
@@ -39,6 +40,26 @@ const ORDER_TYPE_META: Record<
   delivery: { label: ORDER_TYPE_LABELS.delivery, icon: Truck, accent: 'border-l-[#E8A598]' },
   pickup: { label: ORDER_TYPE_LABELS.pickup, icon: Store, accent: 'border-l-[#7EB8B3]' },
   table: { label: ORDER_TYPE_LABELS.table, icon: Users, accent: 'border-l-[#2D5A57]' },
+}
+
+function EstimateCountdownHint({ order }: { order: Order }) {
+  const countdown = useOrderCountdown(order)
+
+  // Solo tiene sentido una vez que se cargó un tiempo estimado (al confirmar).
+  if (!order.estimatedReadyAt) return null
+
+  return (
+    <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-[#2D5A57]">
+      <Clock className="h-3.5 w-3.5" />
+      {countdown.isReady ? (
+        'Tiempo estimado cumplido'
+      ) : (
+        <>
+          Faltan <span className="tabular-nums">{countdown.label}</span>
+        </>
+      )}
+    </p>
+  )
 }
 
 function getItemOptionsLabel(order: Order, itemId: string) {
@@ -313,8 +334,9 @@ export function OrderDetailSheet({
               <p className="mt-1 text-xs text-muted-foreground">
                 {isConfirming
                   ? 'El cliente verá este tiempo en el seguimiento de su pedido.'
-                  : 'Ajustalo si el pedido se demora; el cliente verá el cambio al instante.'}
+                  : 'Ajustalo si el pedido se demora; el contador del cliente arranca de nuevo.'}
               </p>
+              <EstimateCountdownHint order={order} />
               <div className="mt-2 flex gap-2">
                 <Input
                   id="estimated-minutes"
@@ -371,12 +393,6 @@ export function OrderDetailSheet({
                   'Aprobar y enviar a cocina'
                 )}
               </Button>
-            ) : null}
-
-            {effectiveStatusAction?.next === 'preparing' && onPrintBoth ? (
-              <p className="text-center text-xs text-muted-foreground">
-                Al enviar a cocina se imprimirán ticket de cocina y de cliente.
-              </p>
             ) : null}
 
             {!isFinished && (onPrintKitchen || onPrintCustomer || onPrintBoth) ? (

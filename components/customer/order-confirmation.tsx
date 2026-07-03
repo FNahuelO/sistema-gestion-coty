@@ -30,7 +30,8 @@ import {
 } from '@/components/customer/customer-order-tracking'
 import { LoadingSkeleton } from '@/components/shared/loading'
 import { OrderNotificationsButton } from '@/components/customer/order-notifications-button'
-import { getOrderEstimatedMinutes, shouldShowOrderEstimate } from '@/lib/order-estimate'
+import { shouldShowOrderEstimate } from '@/lib/order-estimate'
+import { useOrderCountdown } from '@/hooks/use-order-countdown'
 import { ORDER_STATUS_LABELS } from '@/lib/order-labels'
 import { canApproveTransferPayment } from '@/lib/payment-flow'
 import { useTrackedOrders } from '@/lib/store'
@@ -154,6 +155,28 @@ function ConfirmationHeader({
   )
 }
 
+function EstimatedCountdownSection({ order }: { order: Order }) {
+  const countdown = useOrderCountdown(order)
+
+  return (
+    <section className="mt-4 flex items-center gap-4 rounded-2xl border border-[#E8E4DF] bg-white px-4 py-4">
+      <div
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+        style={{ backgroundColor: COTY_HEADER }}
+      >
+        <Clock className="h-5 w-5 text-white" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-muted-foreground">
+          {countdown.isReady ? 'Tu pedido' : 'Tiempo estimado'}
+        </p>
+        <p className="text-lg font-bold text-foreground tabular-nums">{countdown.label}</p>
+      </div>
+      <ClocheIllustration />
+    </section>
+  )
+}
+
 function getOrderSubtitle(orderType: OrderType, isTable: boolean) {
   if (isTable) return 'Estamos preparando tu pedido ☕'
   if (orderType === 'delivery') {
@@ -185,9 +208,7 @@ export function OrderConfirmationView({
   const displayCode = order ? getOrderLabel(order) : '...'
   const highlight = order ? getStatusHighlight(order) : null
   const HighlightIcon = highlight?.icon ?? ChefHat
-  const estimatedMinutes = order && shouldShowOrderEstimate(order.status)
-    ? getOrderEstimatedMinutes(order)
-    : null
+  const showEstimate = order ? shouldShowOrderEstimate(order.status) : false
   const awaitingTransferProof = order ? canApproveTransferPayment(order) : false
   const whatsappCheckoutUrl = order?.whatsappCheckoutUrl ?? whatsappCheckoutUrlProp
 
@@ -299,21 +320,7 @@ export function OrderConfirmationView({
           </div>
         </section>
 
-        {estimatedMinutes != null ? (
-          <section className="mt-4 flex items-center gap-4 rounded-2xl border border-[#E8E4DF] bg-white px-4 py-4">
-            <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-              style={{ backgroundColor: COTY_HEADER }}
-            >
-              <Clock className="h-5 w-5 text-white" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs text-muted-foreground">Tiempo estimado</p>
-              <p className="text-lg font-bold text-foreground">{estimatedMinutes} min</p>
-            </div>
-            <ClocheIllustration />
-          </section>
-        ) : null}
+        {order && showEstimate ? <EstimatedCountdownSection order={order} /> : null}
 
         {order && shouldShowOrderEstimate(order.status) ? (
           <OrderNotificationsButton orderId={order.id} />

@@ -363,6 +363,7 @@ model Order {
   customerId             String?
   total                  Decimal              @db.Decimal(10, 2)
   estimatedMinutes       Int?
+  estimatedReadyAt       DateTime?
   kitchenAckAt           DateTime?
   whatsappMessage        String?
   whatsappSentAt         DateTime?

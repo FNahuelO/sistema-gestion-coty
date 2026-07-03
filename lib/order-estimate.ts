@@ -47,3 +47,23 @@ export function getOrderEstimatedMinutes(
 export function shouldShowOrderEstimate(status: Order['status']) {
   return status !== 'completed' && status !== 'delivered' && status !== 'cancelled'
 }
+
+/**
+ * Momento objetivo en el que el pedido debería estar listo. Es el ancla del
+ * contador regresivo: si el personal actualiza el tiempo estimado, el servidor
+ * recalcula `estimatedReadyAt` desde ese instante. Si nunca se cargó un tiempo
+ * manual, caemos en `createdAt` + estimación automática.
+ */
+export function getOrderEstimatedReadyAt(
+  order: Pick<Order, 'items' | 'type' | 'estimatedMinutes' | 'estimatedReadyAt' | 'createdAt'>
+): Date {
+  if (order.estimatedReadyAt) {
+    return order.estimatedReadyAt instanceof Date
+      ? order.estimatedReadyAt
+      : new Date(order.estimatedReadyAt)
+  }
+
+  const minutes = getOrderEstimatedMinutes(order)
+  const base = order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt)
+  return new Date(base.getTime() + minutes * 60_000)
+}

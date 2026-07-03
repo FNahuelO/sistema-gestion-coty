@@ -117,6 +117,7 @@ const parseOrder = (order: Order & { createdAt: string | Date; updatedAt: string
   ...order,
   createdAt: new Date(order.createdAt),
   updatedAt: new Date(order.updatedAt),
+  estimatedReadyAt: order.estimatedReadyAt ? new Date(order.estimatedReadyAt) : undefined,
 })
 
 const storeTrackingCode = (value?: string) => {

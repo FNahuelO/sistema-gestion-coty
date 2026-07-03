@@ -13,10 +13,8 @@ import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ORDER_STATUS_LABELS } from '@/lib/order-labels'
 import { OrderNotificationsButton } from '@/components/customer/order-notifications-button'
-import {
-  getOrderEstimatedMinutes,
-  shouldShowOrderEstimate,
-} from '@/lib/order-estimate'
+import { shouldShowOrderEstimate } from '@/lib/order-estimate'
+import { useOrderCountdown } from '@/hooks/use-order-countdown'
 import type { CartItem, Order, OrderStatus } from '@/lib/types'
 import { COTY_TEAL, formatPrice } from '@/lib/coty-theme'
 import { cn } from '@/lib/utils'
@@ -210,16 +208,20 @@ function OrderItemsSummary({ order }: { order: Order }) {
 }
 
 export function OrderEstimatedTime({ order }: { order: Order }) {
-  if (!shouldShowOrderEstimate(order.status)) return null
+  const countdown = useOrderCountdown(order)
 
-  const minutes = getOrderEstimatedMinutes(order)
+  if (!shouldShowOrderEstimate(order.status)) return null
 
   return (
     <div className="flex items-center justify-center gap-2 rounded-xl bg-[#F8FBFA] px-3 py-2.5 text-sm text-[#2D5A57]">
       <Clock className="h-4 w-4 shrink-0 text-[#7EB8B3]" />
-      <span>
-        Tiempo estimado: <span className="font-bold">{minutes} min</span>
-      </span>
+      {countdown.isReady ? (
+        <span className="font-bold">{countdown.label}</span>
+      ) : (
+        <span>
+          Tiempo estimado: <span className="font-bold tabular-nums">{countdown.label}</span>
+        </span>
+      )}
     </div>
   )
 }

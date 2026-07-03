@@ -187,10 +187,7 @@ export function OrdersSection({
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus, estimatedMinutes?: number) => {
     await run(`status:${orderId}`, async () => {
       try {
-        const order = await updateOrderStatus(orderId, newStatus, estimatedMinutes)
-        if (newStatus === 'preparing') {
-          printTicketsForOrder(order)
-        }
+        await updateOrderStatus(orderId, newStatus, estimatedMinutes)
         toast.success(`Pedido actualizado a: ${formatOrderStatus(newStatus)}`)
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'No se pudo actualizar el pedido')
@@ -216,9 +213,8 @@ export function OrdersSection({
     await run(`approve:${orderId}`, async () => {
       try {
         await approveOrderPayment(orderId)
-        const order = await updateOrderStatus(orderId, 'preparing', estimatedMinutes)
-        printTicketsForOrder(order)
-        toast.success('Pago aprobado. Pedido enviado a cocina e impresión iniciada.')
+        await updateOrderStatus(orderId, 'preparing', estimatedMinutes)
+        toast.success('Pago aprobado. Pedido enviado a cocina.')
         setSelectedOrder(null)
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'No se pudo aprobar el pago')
