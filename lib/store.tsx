@@ -609,12 +609,28 @@ export function useOrders() {
   )
 
   const updateOrderStatus = useCallback(
-    async (orderId: string, status: OrderStatus, note?: string) => {
+    async (orderId: string, status: OrderStatus, estimatedMinutes?: number, note?: string) => {
       const order = parseOrder(
         await sendJson<Order & { createdAt: string; updatedAt: string }>(`/api/cashier/orders/${orderId}/status`, 'PATCH', {
           status,
           note,
+          estimatedMinutes,
         })
+      )
+      await mutate()
+      return order
+    },
+    [mutate]
+  )
+
+  const updateOrderEstimate = useCallback(
+    async (orderId: string, estimatedMinutes: number) => {
+      const order = parseOrder(
+        await sendJson<Order & { createdAt: string; updatedAt: string }>(
+          `/api/cashier/orders/${orderId}/estimate`,
+          'PATCH',
+          { estimatedMinutes }
+        )
       )
       await mutate()
       return order
@@ -651,6 +667,7 @@ export function useOrders() {
     orders,
     addOrder,
     updateOrderStatus,
+    updateOrderEstimate,
     closeOrder,
     approveOrderPayment,
     isLoading,

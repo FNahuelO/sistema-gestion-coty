@@ -30,6 +30,20 @@ export function calculateOrderEstimatedMinutes(order: Pick<Order, 'items' | 'typ
   return calculateEstimatedMinutesFromItems(order.items, order.type)
 }
 
+/**
+ * Devuelve el tiempo estimado que ve el cliente. Prioriza el valor cargado
+ * manualmente por el personal al confirmar el pedido y, si no existe, cae en
+ * el cálculo automático a partir de los tiempos de preparación.
+ */
+export function getOrderEstimatedMinutes(
+  order: Pick<Order, 'items' | 'type' | 'estimatedMinutes'>
+): number {
+  if (typeof order.estimatedMinutes === 'number' && order.estimatedMinutes > 0) {
+    return Math.round(order.estimatedMinutes)
+  }
+  return calculateOrderEstimatedMinutes(order)
+}
+
 export function shouldShowOrderEstimate(status: Order['status']) {
   return status !== 'completed' && status !== 'delivered' && status !== 'cancelled'
 }

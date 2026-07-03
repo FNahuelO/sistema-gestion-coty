@@ -562,6 +562,7 @@ export function serializeOrder(order: Prisma.OrderGetPayload<{ include: typeof o
     discountCode: order.discountCode ?? undefined,
     discountAmount: decimalToNumber(order.discountAmount ?? 0),
     total: decimalToNumber(order.total),
+    estimatedMinutes: order.estimatedMinutes ?? undefined,
     tableId: order.diningTableId ?? undefined,
     tableNumber: order.diningTable?.number ?? undefined,
     tableSessionId: order.tableSessionId ?? undefined,
@@ -1396,7 +1397,25 @@ export async function syncMercadoPagoPayment(paymentId: string | number, payload
   })
 }
 
-export async function updateOrderStatus(orderId: string, status: Order['status'], userId?: string, note?: string) {
+export async function updateOrderEstimatedMinutes(orderId: string, estimatedMinutes: number) {
+  const normalized = Math.max(1, Math.round(estimatedMinutes))
+
+  const order = await prisma.order.update({
+    where: { id: orderId },
+    data: { estimatedMinutes: normalized },
+    include: orderInclude,
+  })
+
+  return serializeOrder(order)
+}
+
+export async function updateOrderStatus(
+  orderId: string,
+  status: Order['status'],
+  userId?: string,
+  note?: string,
+  estimatedMinutes?: number | null
+) {
   const prismaStatus =
     status === 'pending'
       ? PrismaOrderStatus.PENDING
@@ -1433,10 +1452,16 @@ export async function updateOrderStatus(orderId: string, status: Order['status']
       throw new Error('PAYMENT_NOT_APPROVED')
     }
 
+    const normalizedEstimate =
+      typeof estimatedMinutes === 'number' && Number.isFinite(estimatedMinutes) && estimatedMinutes > 0
+        ? Math.round(estimatedMinutes)
+        : undefined
+
     const updated = await tx.order.update({
       where: { id: orderId },
       data: {
         status: prismaStatus,
+        ...(normalizedEstimate !== undefined ? { estimatedMinutes: normalizedEstimate } : {}),
         statusHistory: {
           create: {
             status: prismaStatus,

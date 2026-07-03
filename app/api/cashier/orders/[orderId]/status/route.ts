@@ -5,6 +5,7 @@ import { requireSessionRole, updateOrderStatus } from '@/lib/server-data'
 const schema = z.object({
   status: z.enum(['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'completed', 'cancelled']),
   note: z.string().trim().max(500).optional(),
+  estimatedMinutes: z.number().int().min(1).max(600).optional(),
 })
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ orderId: string }> }) {
@@ -13,7 +14,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ o
     const { orderId } = await context.params
     const body = schema.parse(await request.json())
 
-    const order = await updateOrderStatus(orderId, body.status, user.id, body.note)
+    const order = await updateOrderStatus(orderId, body.status, user.id, body.note, body.estimatedMinutes)
     return NextResponse.json(order)
   } catch (error) {
     if (error instanceof Error && error.message === 'UNAUTHORIZED') {

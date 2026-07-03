@@ -29,7 +29,7 @@ import {
   getOrderLabel,
 } from '@/components/customer/customer-order-tracking'
 import { LoadingSkeleton } from '@/components/shared/loading'
-import { calculateOrderEstimatedMinutes, shouldShowOrderEstimate } from '@/lib/order-estimate'
+import { getOrderEstimatedMinutes, shouldShowOrderEstimate } from '@/lib/order-estimate'
 import { ORDER_STATUS_LABELS } from '@/lib/order-labels'
 import { canApproveTransferPayment } from '@/lib/payment-flow'
 import { useTrackedOrders } from '@/lib/store'
@@ -185,7 +185,7 @@ export function OrderConfirmationView({
   const highlight = order ? getStatusHighlight(order) : null
   const HighlightIcon = highlight?.icon ?? ChefHat
   const estimatedMinutes = order && shouldShowOrderEstimate(order.status)
-    ? calculateOrderEstimatedMinutes(order)
+    ? getOrderEstimatedMinutes(order)
     : null
   const awaitingTransferProof = order ? canApproveTransferPayment(order) : false
   const whatsappCheckoutUrl = order?.whatsappCheckoutUrl ?? whatsappCheckoutUrlProp

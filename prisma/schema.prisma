@@ -362,6 +362,7 @@ model Order {
   deliveryZoneId         String?
   customerId             String?
   total                  Decimal              @db.Decimal(10, 2)
+  estimatedMinutes       Int?
   kitchenAckAt           DateTime?
   whatsappMessage        String?
   whatsappSentAt         DateTime?

@@ -1,8 +1,10 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { formatDistanceToNow, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
+  Clock,
   MapPin,
   Phone,
   Store,
@@ -14,6 +16,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Spinner } from '@/components/ui/spinner'
@@ -24,6 +27,7 @@ import type { Order, OrderStatus, OrderType } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS, getPaymentStatusLabel, isDisplayableCustomerPhone } from '@/lib/order-labels'
+import { getOrderEstimatedMinutes } from '@/lib/order-estimate'
 import { canApproveTransferPayment } from '@/lib/payment-flow'
 import { DeliveryAssignmentPanel } from '@/components/staff/delivery-assignment-panel'
 
@@ -57,8 +61,9 @@ type OrderDetailSheetProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   statusAction: { next: OrderStatus; label: string } | null
-  onAdvanceStatus: (orderId: string, status: OrderStatus) => Promise<void>
-  onApprovePayment?: (orderId: string) => Promise<void>
+  onAdvanceStatus: (orderId: string, status: OrderStatus, estimatedMinutes?: number) => Promise<void>
+  onApprovePayment?: (orderId: string, estimatedMinutes?: number) => Promise<void>
+  onUpdateEstimate?: (orderId: string, estimatedMinutes: number) => Promise<void>
   onPrintKitchen?: (order: Order) => void
   onPrintCustomer?: (order: Order) => void
   onPrintBoth?: (order: Order) => void
@@ -82,9 +87,19 @@ export function OrderDetailSheet({
   onCancel,
   onArchive,
   onDeliveryUpdated,
+  onUpdateEstimate,
   isPending,
   isBusy,
 }: OrderDetailSheetProps) {
+  const [estimatedInput, setEstimatedInput] = useState('')
+
+  useEffect(() => {
+    if (!order || ['completed', 'cancelled'].includes(order.status)) return
+    setEstimatedInput(String(getOrderEstimatedMinutes(order)))
+    // Reiniciamos el valor sugerido cada vez que se abre otro pedido
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.id])
+
   if (!order) return null
 
   const typeMeta = ORDER_TYPE_META[order.type]
@@ -92,6 +107,17 @@ export function OrderDetailSheet({
   const isFinished = ['completed', 'cancelled'].includes(order.status)
   const awaitingTransferProof = canApproveTransferPayment(order)
   const effectiveStatusAction = awaitingTransferProof ? null : statusAction
+  // El tiempo estimado se ingresa al confirmar/aprobar y luego se puede reajustar
+  // mientras el pedido siga activo (por ejemplo, si la cocina se atrasa).
+  const isConfirming = effectiveStatusAction?.next === 'confirmed' || (awaitingTransferProof && !!onApprovePayment)
+  const showEstimateInput = !isFinished
+  const canUpdateEstimate = showEstimateInput && !isConfirming && !!onUpdateEstimate
+  const parsedEstimate = Number.parseInt(estimatedInput, 10)
+  const estimateValue =
+    Number.isFinite(parsedEstimate) && parsedEstimate > 0 ? parsedEstimate : undefined
+  const estimateInvalid = showEstimateInput && estimateValue === undefined
+  const estimateUnchanged = estimateValue !== undefined && estimateValue === order.estimatedMinutes
+  const estimatePending = isPending(`estimate:${order.id}`)
   const statusPending = isPending(`status:${order.id}`)
   const approvePending = isPending(`approve:${order.id}`)
   const cancelPending = isPending(`cancel:${order.id}`)
@@ -274,13 +300,64 @@ export function OrderDetailSheet({
             </div>
           </div>
 
+          {showEstimateInput ? (
+            <div className="mb-4 rounded-xl border border-[#D6E8E6] bg-[#F8FBFA] p-3 dark:border-border dark:bg-muted">
+              <label
+                htmlFor="estimated-minutes"
+                className="flex items-center gap-2 text-sm font-semibold text-[#2D5A57]"
+              >
+                <Clock className="h-4 w-4" />
+                Tiempo estimado (min)
+              </label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {isConfirming
+                  ? 'El cliente verá este tiempo en el seguimiento de su pedido.'
+                  : 'Ajustalo si el pedido se demora; el cliente verá el cambio al instante.'}
+              </p>
+              <div className="mt-2 flex gap-2">
+                <Input
+                  id="estimated-minutes"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={600}
+                  value={estimatedInput}
+                  onChange={(event) => setEstimatedInput(event.target.value)}
+                  aria-invalid={estimateInvalid}
+                  className="h-11 flex-1 bg-white text-base dark:bg-card"
+                  placeholder="Ej. 20"
+                />
+                {canUpdateEstimate ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn('h-11 shrink-0', PANEL_OUTLINE_BTN)}
+                    disabled={isBusy || estimateInvalid || estimateUnchanged}
+                    onClick={async () => {
+                      if (estimateValue !== undefined && onUpdateEstimate) {
+                        await onUpdateEstimate(order.id, estimateValue)
+                      }
+                    }}
+                  >
+                    {estimatePending ? <Spinner /> : 'Actualizar'}
+                  </Button>
+                ) : null}
+              </div>
+              {estimateInvalid ? (
+                <p className="mt-1 text-xs text-red-600">
+                  Ingresá un tiempo estimado válido (entre 1 y 600 minutos).
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="space-y-2">
             {awaitingTransferProof && onApprovePayment ? (
               <Button
                 className={cn('h-11 w-full text-base', PANEL_PRIMARY_BTN)}
-                disabled={isBusy}
+                disabled={isBusy || estimateInvalid}
                 onClick={async () => {
-                  await onApprovePayment(order.id)
+                  await onApprovePayment(order.id, estimateValue)
                   onOpenChange(false)
                 }}
               >
@@ -345,9 +422,13 @@ export function OrderDetailSheet({
             {effectiveStatusAction && !isFinished ? (
               <Button
                 className={cn('h-11 w-full text-base', PANEL_PRIMARY_BTN)}
-                disabled={isBusy}
+                disabled={isBusy || (effectiveStatusAction.next === 'confirmed' && estimateInvalid)}
                 onClick={async () => {
-                  await onAdvanceStatus(order.id, effectiveStatusAction.next)
+                  await onAdvanceStatus(
+                    order.id,
+                    effectiveStatusAction.next,
+                    effectiveStatusAction.next === 'confirmed' ? estimateValue : undefined
+                  )
                   onOpenChange(false)
                 }}
               >

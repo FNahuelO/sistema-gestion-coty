@@ -102,7 +102,7 @@ export function OrdersSection({
   embedded?: boolean
   onNavigateToCalls?: () => void
 }) {
-  const { orders, updateOrderStatus, closeOrder, approveOrderPayment } = useOrders()
+  const { orders, updateOrderStatus, updateOrderEstimate, closeOrder, approveOrderPayment } = useOrders()
   const { settings } = useBusiness()
   const businessName = settings?.name ?? 'Coty Café'
   const { data: deliveryQueue = [], mutate: mutateDeliveryQueue } = useSWR<DeliveryQueueEntry[]>(
@@ -184,10 +184,10 @@ export function OrdersSection({
     printOrderTickets({ order, businessName }, ['kitchen', 'customer'])
   }
 
-  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus, estimatedMinutes?: number) => {
     await run(`status:${orderId}`, async () => {
       try {
-        const order = await updateOrderStatus(orderId, newStatus)
+        const order = await updateOrderStatus(orderId, newStatus, estimatedMinutes)
         if (newStatus === 'preparing') {
           printTicketsForOrder(order)
         }
@@ -199,11 +199,24 @@ export function OrdersSection({
     })
   }
 
-  const handleApprovePayment = async (orderId: string) => {
+  const handleUpdateEstimate = async (orderId: string, estimatedMinutes: number) => {
+    await run(`estimate:${orderId}`, async () => {
+      try {
+        const updated = await updateOrderEstimate(orderId, estimatedMinutes)
+        setSelectedOrder((current) => (current && current.id === orderId ? updated : current))
+        toast.success(`Tiempo estimado actualizado a ${estimatedMinutes} min`)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'No se pudo actualizar el tiempo estimado')
+        throw error
+      }
+    })
+  }
+
+  const handleApprovePayment = async (orderId: string, estimatedMinutes?: number) => {
     await run(`approve:${orderId}`, async () => {
       try {
         await approveOrderPayment(orderId)
-        const order = await updateOrderStatus(orderId, 'preparing')
+        const order = await updateOrderStatus(orderId, 'preparing', estimatedMinutes)
         printTicketsForOrder(order)
         toast.success('Pago aprobado. Pedido enviado a cocina e impresión iniciada.')
         setSelectedOrder(null)
@@ -461,8 +474,9 @@ export function OrdersSection({
                                 disabled={isBusy}
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  if (action.type === 'approve') {
-                                    void handleApprovePayment(order.id)
+                                  // Confirmar o aprobar requiere cargar el tiempo estimado desde el detalle
+                                  if (action.type === 'approve' || action.next === 'confirmed') {
+                                    setSelectedOrder(order)
                                     return
                                   }
                                   void handleStatusChange(order.id, action.next)
@@ -505,6 +519,7 @@ export function OrdersSection({
         }
         onAdvanceStatus={handleStatusChange}
         onApprovePayment={handleApprovePayment}
+        onUpdateEstimate={handleUpdateEstimate}
         onPrintKitchen={(order) => printOrderTickets({ order, businessName }, ['kitchen'])}
         onPrintCustomer={(order) => printOrderTickets({ order, businessName }, ['customer'])}
         onPrintBoth={(order) => printTicketsForOrder(order)}

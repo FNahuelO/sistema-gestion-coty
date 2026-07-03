@@ -13,7 +13,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ORDER_STATUS_LABELS } from '@/lib/order-labels'
 import {
-  calculateOrderEstimatedMinutes,
+  getOrderEstimatedMinutes,
   shouldShowOrderEstimate,
 } from '@/lib/order-estimate'
 import type { CartItem, Order, OrderStatus } from '@/lib/types'
@@ -211,7 +211,7 @@ function OrderItemsSummary({ order }: { order: Order }) {
 export function OrderEstimatedTime({ order }: { order: Order }) {
   if (!shouldShowOrderEstimate(order.status)) return null
 
-  const minutes = calculateOrderEstimatedMinutes(order)
+  const minutes = getOrderEstimatedMinutes(order)
 
   return (
     <div className="flex items-center justify-center gap-2 rounded-xl bg-[#F8FBFA] px-3 py-2.5 text-sm text-[#2D5A57]">
