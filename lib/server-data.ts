@@ -23,6 +23,7 @@ import { buildWhatsAppOrderMessage, buildWhatsAppUrl } from '@/lib/whatsapp-mess
 import { requiresTransferProofApproval } from '@/lib/payment-flow'
 import { createTrackingProof, verifyTrackingProof } from '@/lib/tracking-proof'
 import { notifyOrderStatusChanged, notifyOrderEstimateChanged } from '@/lib/push-notifications'
+import { arDayKey, arHour, isSameArDay } from '@/lib/datetime'
 import {
   buildMercadoPagoPreferenceItems,
   isMercadoPagoAvailable,
@@ -1669,7 +1670,7 @@ export async function getAnalytics(): Promise<AnalyticsOverview> {
   ])
 
   const now = new Date()
-  const todayOrders = orders.filter((order) => order.createdAt.toDateString() === now.toDateString())
+  const todayOrders = orders.filter((order) => isSameArDay(order.createdAt, now))
   const totalRevenue = orders
     .filter((order) => order.status !== PrismaOrderStatus.CANCELLED)
     .reduce((sum, order) => sum + decimalToNumber(order.total), 0)
@@ -1696,7 +1697,7 @@ export async function getAnalytics(): Promise<AnalyticsOverview> {
   const hourlyBuckets = Array.from({ length: 24 }, (_, hour) => ({ hour, revenue: 0 }))
   for (const order of todayOrders) {
     if (order.status === PrismaOrderStatus.CANCELLED) continue
-    hourlyBuckets[order.createdAt.getHours()].revenue += decimalToNumber(order.total)
+    hourlyBuckets[arHour(order.createdAt)].revenue += decimalToNumber(order.total)
   }
 
   const productMap = new Map<string, { productName: string; quantity: number; revenue: number; imageUrl?: string }>()
@@ -1734,7 +1735,7 @@ export async function getAnalytics(): Promise<AnalyticsOverview> {
   const dailyMap = new Map<string, { revenue: number; orders: number }>()
   for (const order of orders) {
     if (order.status === PrismaOrderStatus.CANCELLED) continue
-    const day = order.createdAt.toISOString().slice(0, 10)
+    const day = arDayKey(order.createdAt)
     const current = dailyMap.get(day) ?? { revenue: 0, orders: 0 }
     current.revenue += decimalToNumber(order.total)
     current.orders += 1
@@ -1749,7 +1750,7 @@ export async function getAnalytics(): Promise<AnalyticsOverview> {
     activeOrders: orders.filter((order) => ![PrismaOrderStatus.COMPLETED, PrismaOrderStatus.CANCELLED].includes(order.status)).length,
     tablesServed: tables.filter((session) => session.closedAt !== null).length,
     tablesServedToday: tables.filter(
-      (session) => session.closedAt && session.closedAt.toDateString() === now.toDateString()
+      (session) => session.closedAt && isSameArDay(session.closedAt, now)
     ).length,
     salesByType,
     salesByTypeToday,

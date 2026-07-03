@@ -1,5 +1,4 @@
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { formatDateAR, formatTimeAR, formatDateTimeAR } from '@/lib/datetime'
 import { formatPrice } from '@/lib/coty-theme'
 import { getPaymentStatusLabel, ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS } from '@/lib/order-labels'
 import type { Order } from '@/lib/types'
@@ -116,8 +115,8 @@ function renderCustomerTicket({ order, businessName }: TicketPrintInput) {
       <div>Modalidad: ${escapeHtml(ORDER_TYPE_LABELS[order.type])}</div>
       <div>Medio de pago: ${escapeHtml(PAYMENT_METHOD_LABELS[order.paymentMethod])}</div>
       <div>Estado: ${escapeHtml(paymentStatus)}</div>
-      <div>Fecha: ${format(createdAt, 'dd/MM/yyyy', { locale: es })}</div>
-      <div>Hora: ${format(createdAt, 'HH:mm', { locale: es })}</div>
+      <div>Fecha: ${formatDateAR(createdAt)}</div>
+      <div>Hora: ${formatTimeAR(createdAt)}</div>
       <div class="line"></div>
 
       <div class="section-title">Datos del cliente:</div>
@@ -160,7 +159,7 @@ function renderKitchenTicket({ order, businessName }: TicketPrintInput) {
       <div class="line"></div>
 
       <div class="bold">${escapeHtml(ORDER_TYPE_LABELS[order.type])}${order.tableNumber ? ` · Mesa ${order.tableNumber}` : ''}</div>
-      <div>Hora: ${format(createdAt, 'dd/MM/yyyy HH:mm', { locale: es })}</div>
+      <div>Hora: ${formatDateTimeAR(createdAt)}</div>
       <div>Cliente: ${escapeHtml(order.customerName)}</div>
       ${order.customerAddress ? `<div>Dirección: ${escapeHtml(order.customerAddress)}</div>` : ''}
       ${order.deliveryZoneName ? `<div>Zona: ${escapeHtml(order.deliveryZoneName)}</div>` : ''}

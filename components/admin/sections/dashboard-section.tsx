@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { formatPrice } from '@/lib/coty-theme'
+import { arDayEndISO, arDayKey, arDayStartISO } from '@/lib/datetime'
 import { PANEL_CARD, PANEL_INPUT, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_SURFACE_ALT, PANEL_TITLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { useAdminData } from '@/lib/store'
@@ -23,10 +24,10 @@ export function DashboardSection() {
   const admin = useAdminData()
   const [historySearch, setHistorySearch] = useState('')
   const [historyPage, setHistoryPage] = useState(0)
-  const [rangeFrom, setRangeFrom] = useState(() => new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10))
-  const [rangeTo, setRangeTo] = useState(() => new Date().toISOString().slice(0, 10))
+  const [rangeFrom, setRangeFrom] = useState(() => arDayKey(new Date(Date.now() - 7 * 86400000)))
+  const [rangeTo, setRangeTo] = useState(() => arDayKey(new Date()))
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = arDayKey(new Date())
 
   const rangeError = useMemo(() => {
     if (!rangeFrom || !rangeTo) return 'Seleccioná ambas fechas para ver el reporte'
@@ -38,7 +39,7 @@ export function DashboardSection() {
 
   const rangeKey =
     !rangeError && rangeFrom && rangeTo
-      ? `/api/admin/analytics/range?from=${encodeURIComponent(new Date(`${rangeFrom}T00:00:00`).toISOString())}&to=${encodeURIComponent(new Date(`${rangeTo}T23:59:59`).toISOString())}`
+      ? `/api/admin/analytics/range?from=${encodeURIComponent(arDayStartISO(rangeFrom))}&to=${encodeURIComponent(arDayEndISO(rangeTo))}`
       : null
 
   const { data: rangeAnalytics } = useSWR(rangeKey, async (url: string) => {

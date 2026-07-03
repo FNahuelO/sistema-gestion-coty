@@ -1,7 +1,6 @@
 'use client'
 
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { formatDateTimeAR } from '@/lib/datetime'
 import { formatPrice } from '@/lib/coty-theme'
 import { PANEL_ICON_ACTIVE, PANEL_ICON_CIRCLE, PANEL_LIST_ROW, PANEL_SURFACE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
@@ -43,7 +42,7 @@ export function HistoryOrderRow({ order, compact = false }: { order: Order; comp
         <div className="min-w-0">
           <p className="truncate font-semibold text-foreground">{order.displayCode ?? order.id}</p>
           <p className="truncate text-xs text-muted-foreground">
-            {order.customerName} · {meta.label} · {format(order.createdAt, 'dd/MM/yyyy HH:mm', { locale: es })}
+            {order.customerName} · {meta.label} · {formatDateTimeAR(order.createdAt)}
           </p>
         </div>
       </div>

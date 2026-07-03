@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatPrice } from '@/lib/coty-theme'
+import { formatDateAR, formatDateTimeAR } from '@/lib/datetime'
 import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TITLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { useFormPanel } from '../hooks/use-form-panel'
@@ -273,7 +274,7 @@ export function CashSection() {
               <p>Apertura: {formatPrice(num(openSession.openingAmount))}</p>
               <p>Abierta por: {openSession.openedByUser?.name ?? '—'}</p>
               <p className="text-muted-foreground">
-                Desde {new Date(openSession.openedAt).toLocaleString('es-AR')}
+                Desde {formatDateTimeAR(openSession.openedAt)}
               </p>
             </CardContent>
           </Card>
@@ -312,7 +313,7 @@ export function CashSection() {
               .map((session) => (
                 <div key={session.id} className={cn(PANEL_LIST_ROW, 'text-sm')}>
                   <div className="flex justify-between font-medium">
-                    <span>{new Date(session.openedAt).toLocaleDateString('es-AR')}</span>
+                    <span>{formatDateAR(session.openedAt)}</span>
                     <span>{formatPrice(num(session.closingAmount))}</span>
                   </div>
                   {session.difference != null ? (

@@ -17,9 +17,34 @@ type PushPayload = {
   tag?: string
 }
 
+const DEFAULT_VAPID_SUBJECT = 'mailto:notificaciones@cotycafe.app'
+
+/**
+ * Normaliza el VAPID subject. web-push exige que sea una URL válida (mailto: o
+ * http/https) y lanza una excepción si no lo es, lo que romperia todo el envío.
+ * Toleramos errores comunes de las variables de entorno: comillas envolventes,
+ * espacios y un '=' inicial accidental al pegar el valor (VAPID_SUBJECT==mailto:).
+ */
+function normalizeVapidSubject(raw: string | undefined): string {
+  if (!raw) return DEFAULT_VAPID_SUBJECT
+  let value = raw.trim()
+  value = value.replace(/^["']|["']$/g, '').trim()
+  value = value.replace(/^=+/, '').trim()
+  if (!value) return DEFAULT_VAPID_SUBJECT
+  if (value.startsWith('mailto:') || value.startsWith('http://') || value.startsWith('https://')) {
+    return value
+  }
+  // Un email suelto (sin el prefijo mailto:) es un error común: lo completamos.
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    return `mailto:${value}`
+  }
+  console.warn(`[push] VAPID_SUBJECT inválido ("${raw}"); se usa el valor por defecto`)
+  return DEFAULT_VAPID_SUBJECT
+}
+
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY?.trim()
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY?.trim()
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT?.trim() || 'mailto:notificaciones@cotycafe.app'
+const VAPID_SUBJECT = normalizeVapidSubject(process.env.VAPID_SUBJECT)
 
 let vapidConfigured = false
 
@@ -34,9 +59,14 @@ export function getVapidPublicKey() {
 function ensureVapidConfigured() {
   if (vapidConfigured) return true
   if (!isPushConfigured()) return false
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY!, VAPID_PRIVATE_KEY!)
-  vapidConfigured = true
-  return true
+  try {
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY!, VAPID_PRIVATE_KEY!)
+    vapidConfigured = true
+    return true
+  } catch (error) {
+    console.error('[push] No se pudo configurar VAPID (revisá VAPID_SUBJECT / claves):', error)
+    return false
+  }
 }
 
 /** Guarda (o actualiza) la suscripción push del navegador del cliente para un pedido. */

@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { formatDistanceToNow, format } from 'date-fns'
+import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { formatDateTimeAR } from '@/lib/datetime'
 import {
   Clock,
   MapPin,
@@ -139,7 +140,7 @@ export function OrderDetailSheet({
           <p className="mt-1 text-xs text-white/75">
             {formatDistanceToNow(order.createdAt, { addSuffix: true, locale: es })}
             {' · '}
-            {format(order.createdAt, 'dd/MM/yyyy HH:mm', { locale: es })}
+            {formatDateTimeAR(order.createdAt)}
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
