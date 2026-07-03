@@ -46,6 +46,8 @@ export interface CartItem {
   quantity: number
   selectedOptions: SelectedOption[]
   notes?: string
+  unitPrice?: number
+  selectionLines?: Array<{ optionName: string; choiceName: string; priceModifier: number }>
 }
 
 export interface SelectedOption {
@@ -85,6 +87,7 @@ export interface Order {
   tableSessionId?: string
   createdByUserId?: string
   notes?: string
+  deliveryZoneName?: string
   createdAt: Date
   updatedAt: Date
   offlinePending?: boolean

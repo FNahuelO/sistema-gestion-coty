@@ -9,7 +9,7 @@ import {
   Truck,
   Users,
   XCircle,
-  MessageCircle,
+  Printer,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -58,6 +58,9 @@ type OrderDetailSheetProps = {
   statusAction: { next: OrderStatus; label: string } | null
   onAdvanceStatus: (orderId: string, status: OrderStatus) => Promise<void>
   onApprovePayment?: (orderId: string) => Promise<void>
+  onPrintKitchen?: (order: Order) => void
+  onPrintCustomer?: (order: Order) => void
+  onPrintBoth?: (order: Order) => void
   onCancel: (orderId: string) => Promise<void>
   onArchive: (orderId: string) => Promise<void>
   onDeliveryUpdated?: () => void
@@ -72,6 +75,9 @@ export function OrderDetailSheet({
   statusAction,
   onAdvanceStatus,
   onApprovePayment,
+  onPrintKitchen,
+  onPrintCustomer,
+  onPrintBoth,
   onCancel,
   onArchive,
   onDeliveryUpdated,
@@ -283,9 +289,56 @@ export function OrderDetailSheet({
                     Procesando...
                   </>
                 ) : (
-                  'Aprobar pago'
+                  'Aprobar y enviar a cocina'
                 )}
               </Button>
+            ) : null}
+
+            {effectiveStatusAction?.next === 'preparing' && onPrintBoth ? (
+              <p className="text-center text-xs text-muted-foreground">
+                Al enviar a cocina se imprimirán ticket de cocina y de cliente.
+              </p>
+            ) : null}
+
+            {!isFinished && (onPrintKitchen || onPrintCustomer || onPrintBoth) ? (
+              <div className="grid grid-cols-3 gap-2">
+                {onPrintKitchen ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn('h-10 px-2 text-xs', PANEL_OUTLINE_BTN)}
+                    disabled={isBusy}
+                    onClick={() => onPrintKitchen(order)}
+                  >
+                    <Printer className="mr-1 h-3.5 w-3.5" />
+                    Cocina
+                  </Button>
+                ) : null}
+                {onPrintCustomer ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn('h-10 px-2 text-xs', PANEL_OUTLINE_BTN)}
+                    disabled={isBusy}
+                    onClick={() => onPrintCustomer(order)}
+                  >
+                    <Printer className="mr-1 h-3.5 w-3.5" />
+                    Cliente
+                  </Button>
+                ) : null}
+                {onPrintBoth ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn('h-10 px-2 text-xs', PANEL_OUTLINE_BTN)}
+                    disabled={isBusy}
+                    onClick={() => onPrintBoth(order)}
+                  >
+                    <Printer className="mr-1 h-3.5 w-3.5" />
+                    Ambos
+                  </Button>
+                ) : null}
+              </div>
             ) : null}
 
             {effectiveStatusAction && !isFinished ? (
