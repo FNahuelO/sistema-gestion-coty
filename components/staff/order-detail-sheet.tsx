@@ -2,18 +2,8 @@
 
 import { formatDistanceToNow, format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import {
-  MapPin,
-  Phone,
-  Store,
-  Truck,
-  Users,
-  XCircle,
-  Printer,
-  MessageCircle,
-  type LucideIcon,
-  MessageCircle,
-} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import { MapPin, MessageCircle, Phone, Printer, Store, Truck, Users, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
