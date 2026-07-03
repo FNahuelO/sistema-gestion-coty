@@ -453,7 +453,7 @@ export function CustomerLanding() {
                     className="flex h-14 w-14 items-center justify-center rounded-xl transition-shadow group-hover:shadow-md md:h-16 md:w-16 md:rounded-2xl lg:h-[4.5rem] lg:w-[4.5rem]"
                     style={{ backgroundColor: COTY_HEADER }}
                   >
-                    <Icon className="h-6 w-6 text-white md:h-7 md:w-7" strokeWidth={1.75} />
+                    <Icon className="h-6 w-6 text-[#6baca5] md:h-7 md:w-7" strokeWidth={1.75} />
                   </div>
                   <span className="text-center text-[10px] font-medium leading-tight text-[#1A1A1A] md:text-xs lg:text-sm">
                     {category.name}
@@ -583,8 +583,8 @@ export function CustomerLanding() {
                       <span
                         key={channel}
                         className={`rounded-full px-2 py-0.5 text-[9px] ${channelAvailability[channel]?.open
-                            ? 'bg-[#C5DDD9]/50 text-[#2D5A57]'
-                            : 'bg-gray-100 text-muted-foreground'
+                          ? 'bg-[#C5DDD9]/50 text-[#2D5A57]'
+                          : 'bg-gray-100 text-muted-foreground'
                           }`}
                       >
                         {channel === 'delivery' ? 'Delivery' : 'Retiro'}:{' '}
