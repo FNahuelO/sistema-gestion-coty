@@ -38,6 +38,9 @@ export function OrderNotificationsButton({ orderId }: { orderId: string }) {
   const [subscribed, setSubscribed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [iosNeedsInstall, setIosNeedsInstall] = useState(false)
+  // Solo mostramos la confirmación "Avisos activados" apenas se activan en esta
+  // sesión; en cargas posteriores (ya suscripto) no mostramos nada.
+  const [justEnabled, setJustEnabled] = useState(false)
 
   useEffect(() => {
     setSupported(isPushSupported())
@@ -103,6 +106,7 @@ export function OrderNotificationsButton({ orderId }: { orderId: string }) {
       if (ok) {
         markSubscribed(orderId)
         setSubscribed(true)
+        setJustEnabled(true)
         toast.success('Listo, te avisaremos cuando cambie el estado de tu pedido')
       } else if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
         toast.error('Activá las notificaciones desde los ajustes de tu navegador')
@@ -117,6 +121,9 @@ export function OrderNotificationsButton({ orderId }: { orderId: string }) {
   }
 
   if (alreadyOn) {
+    // Ya estaba suscripto de antes: no repetimos el cartel en cada visita.
+    if (!justEnabled) return null
+
     return (
       <div className="mt-4 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
