@@ -12,6 +12,23 @@ export function isPushSupported(): boolean {
   )
 }
 
+/** Detecta iPhone/iPad (incluye iPadOS que se reporta como Mac con pantalla táctil). */
+export function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent
+  const isAppleMobile = /iPad|iPhone|iPod/.test(ua)
+  const isIpadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+  return isAppleMobile || isIpadOS
+}
+
+/** True si la app corre como PWA instalada (standalone), no en una pestaña del navegador. */
+export function isStandalone(): boolean {
+  if (typeof window === 'undefined') return false
+  const standaloneDisplay = window.matchMedia?.('(display-mode: standalone)').matches ?? false
+  const iosStandalone = (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+  return standaloneDisplay || iosStandalone
+}
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')

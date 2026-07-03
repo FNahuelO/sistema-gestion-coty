@@ -1,10 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Bell, BellRing } from 'lucide-react'
+import { Bell, BellRing, Share, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { COTY_HEADER } from '@/lib/coty-theme'
-import { fetchPushConfig, isPushSupported, subscribeToOrderPush } from '@/lib/push-client'
+import {
+  fetchPushConfig,
+  isIOS,
+  isPushSupported,
+  isStandalone,
+  subscribeToOrderPush,
+} from '@/lib/push-client'
 
 const SUBSCRIBED_KEY = 'coty-push-subscribed-orders'
 
@@ -31,11 +37,12 @@ export function OrderNotificationsButton({ orderId }: { orderId: string }) {
   const [permission, setPermission] = useState<NotificationPermission>('default')
   const [subscribed, setSubscribed] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [iosNeedsInstall, setIosNeedsInstall] = useState(false)
 
   useEffect(() => {
-    if (!isPushSupported()) return
-    setSupported(true)
-    setPermission(Notification.permission)
+    setSupported(isPushSupported())
+    setIosNeedsInstall(isIOS() && !isStandalone())
+    if (typeof Notification !== 'undefined') setPermission(Notification.permission)
     setSubscribed(getSubscribedOrders().includes(orderId))
     void fetchPushConfig().then((config) => {
       setEnabled(config.enabled)
@@ -43,7 +50,46 @@ export function OrderNotificationsButton({ orderId }: { orderId: string }) {
     })
   }, [orderId])
 
-  if (!supported || !enabled) return null
+  // Si el servidor no tiene notificaciones configuradas, no mostramos nada.
+  if (!enabled) return null
+
+  // En iPhone/iPad el push solo funciona con la app instalada en la pantalla de inicio.
+  if (iosNeedsInstall) {
+    return (
+      <div className="mt-4 rounded-2xl border border-[#E8E4DF] bg-white p-4">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+            style={{ backgroundColor: COTY_HEADER }}
+          >
+            <Bell className="h-5 w-5 text-white" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-foreground">Recibí avisos del pedido</p>
+            <p className="text-xs text-muted-foreground">
+              En iPhone necesitás agregar la app a tu pantalla de inicio para activar las notificaciones.
+            </p>
+          </div>
+        </div>
+        <ol className="mt-3 space-y-1.5 rounded-xl bg-[#F8FBFA] px-3 py-2.5 text-xs text-[#2D5A57]">
+          <li className="flex items-center gap-2">
+            <Share className="h-3.5 w-3.5 shrink-0" />
+            <span>Tocá el botón <span className="font-semibold">Compartir</span> de Safari.</span>
+          </li>
+          <li className="flex items-center gap-2">
+            <Plus className="h-3.5 w-3.5 shrink-0" />
+            <span>Elegí <span className="font-semibold">Agregar a inicio</span>.</span>
+          </li>
+          <li className="flex items-center gap-2">
+            <Bell className="h-3.5 w-3.5 shrink-0" />
+            <span>Abrí la app desde el ícono y activá los avisos.</span>
+          </li>
+        </ol>
+      </div>
+    )
+  }
+
+  if (!supported) return null
 
   const alreadyOn = subscribed && permission === 'granted'
   const denied = permission === 'denied'

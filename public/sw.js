@@ -79,17 +79,29 @@ self.addEventListener('notificationclick', (event) => {
   const targetUrl = (event.notification.data && event.notification.data.url) || '/order-status'
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+    (async () => {
+      const clientList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+
+      // Reutilizamos una ventana ya abierta de la app y la llevamos al pedido.
       for (const client of clientList) {
-        const clientUrl = new URL(client.url)
-        if (clientUrl.pathname === targetUrl && 'focus' in client) {
+        if ('focus' in client) {
+          try {
+            if ('navigate' in client) {
+              const navigated = await client.navigate(targetUrl)
+              return (navigated || client).focus()
+            }
+          } catch {
+            // navigate puede fallar si el cliente no está controlado; usamos focus.
+          }
           return client.focus()
         }
       }
+
       if (self.clients.openWindow) {
         return self.clients.openWindow(targetUrl)
       }
+
       return undefined
-    })
+    })()
   )
 })

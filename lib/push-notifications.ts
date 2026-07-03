@@ -60,32 +60,49 @@ export async function savePushSubscription(orderId: string, subscription: Browse
 }
 
 async function sendOrderPush(orderId: string, payload: PushPayload) {
-  if (!ensureVapidConfigured()) return
+  if (!ensureVapidConfigured()) {
+    console.warn('[push] VAPID no configurado (faltan VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY); se omite el envío')
+    return
+  }
 
   const subscriptions = await prisma.pushSubscription.findMany({ where: { orderId } })
-  if (subscriptions.length === 0) return
+  if (subscriptions.length === 0) {
+    console.info(`[push] pedido ${orderId}: sin suscripciones, no se envía nada`)
+    return
+  }
+
+  console.info(`[push] pedido ${orderId}: enviando a ${subscriptions.length} suscripción(es) — "${payload.body}"`)
 
   const body = JSON.stringify(payload)
   const staleIds: string[] = []
+  let sent = 0
+  let failed = 0
 
   await Promise.all(
     subscriptions.map(async (sub) => {
       try {
-        await webpush.sendNotification(
+        const result = await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
           body
         )
+        sent += 1
+        console.info(`[push]   ✓ ${sub.endpoint.slice(0, 40)}… statusCode=${result.statusCode}`)
       } catch (error) {
         const statusCode = (error as { statusCode?: number })?.statusCode
         // 404/410 = suscripción vencida o revocada: la eliminamos para no reintentar.
         if (statusCode === 404 || statusCode === 410) {
           staleIds.push(sub.id)
+          console.warn(`[push]   ⤫ ${sub.endpoint.slice(0, 40)}… vencida (statusCode=${statusCode}), se elimina`)
         } else {
-          console.error('web-push sendNotification', statusCode ?? error)
+          failed += 1
+          const detail = (error as { body?: string })?.body
+          console.error(`[push]   ✗ ${sub.endpoint.slice(0, 40)}… statusCode=${statusCode ?? 'N/A'} ${detail ?? error}`)
         }
       }
     })
   )
+
+  console.info(`[push] pedido ${orderId}: ${sent} ok, ${staleIds.length} vencida(s), ${failed} con error`)
 
   if (staleIds.length > 0) {
     await prisma.pushSubscription.deleteMany({ where: { id: { in: staleIds } } }).catch(() => {})
@@ -125,7 +142,7 @@ export async function notifyOrderStatusChanged(order: NotifiableOrder) {
   await sendOrderPush(order.id, {
     title: `Pedido ${getOrderCode(order)}`,
     body: message,
-    url: '/order-status',
+    url: `/order-status?orderId=${order.id}`,
     tag: `order-${order.id}`,
   }).catch((error) => console.error('notifyOrderStatusChanged', error))
 }
@@ -137,7 +154,7 @@ export async function notifyOrderEstimateChanged(order: NotifiableOrder) {
   await sendOrderPush(order.id, {
     title: `Pedido ${getOrderCode(order)}`,
     body: `Nuevo tiempo estimado: ${order.estimatedMinutes} min.`,
-    url: '/order-status',
+    url: `/order-status?orderId=${order.id}`,
     tag: `order-${order.id}`,
   }).catch((error) => console.error('notifyOrderEstimateChanged', error))
 }

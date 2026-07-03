@@ -1015,7 +1015,7 @@ export function CheckoutPage() {
                   className="space-y-2"
                 >
                   {[
-                    { value: 'transfer', label: 'Transferencia por WhatsApp', icon: Building2 },
+                    { value: 'transfer', label: 'Transferencia', icon: Building2 },
                     { value: 'cash', label: 'Efectivo', icon: Banknote },
                     ...(isTableMode || !mercadoPagoAvailable
                       ? []
