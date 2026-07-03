@@ -29,6 +29,7 @@ import {
   getOrderLabel,
 } from '@/components/customer/customer-order-tracking'
 import { LoadingSkeleton } from '@/components/shared/loading'
+import { OrderNotificationsButton } from '@/components/customer/order-notifications-button'
 import { getOrderEstimatedMinutes, shouldShowOrderEstimate } from '@/lib/order-estimate'
 import { ORDER_STATUS_LABELS } from '@/lib/order-labels'
 import { canApproveTransferPayment } from '@/lib/payment-flow'
@@ -312,6 +313,10 @@ export function OrderConfirmationView({
             </div>
             <ClocheIllustration />
           </section>
+        ) : null}
+
+        {order && shouldShowOrderEstimate(order.status) ? (
+          <OrderNotificationsButton orderId={order.id} />
         ) : null}
 
         {awaitingTransferProof ? (

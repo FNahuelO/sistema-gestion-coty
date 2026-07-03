@@ -22,6 +22,7 @@ import { hasPermission, type Permission, type SessionRoleContext } from '@/lib/p
 import { buildWhatsAppOrderMessage, buildWhatsAppUrl } from '@/lib/whatsapp-message'
 import { requiresTransferProofApproval } from '@/lib/payment-flow'
 import { createTrackingProof, verifyTrackingProof } from '@/lib/tracking-proof'
+import { notifyOrderStatusChanged, notifyOrderEstimateChanged } from '@/lib/push-notifications'
 import {
   buildMercadoPagoPreferenceItems,
   isMercadoPagoAvailable,
@@ -1406,7 +1407,9 @@ export async function updateOrderEstimatedMinutes(orderId: string, estimatedMinu
     include: orderInclude,
   })
 
-  return serializeOrder(order)
+  const serialized = serializeOrder(order)
+  await notifyOrderEstimateChanged(serialized)
+  return serialized
 }
 
 export async function updateOrderStatus(
@@ -1487,15 +1490,15 @@ export async function updateOrderStatus(
     return updated
   })
 
-  if (shouldApproveManualPayment) {
-    const withPayment = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: orderInclude,
-    })
-    return serializeOrder(withPayment ?? order)
-  }
+  const serialized = shouldApproveManualPayment
+    ? serializeOrder(
+        (await prisma.order.findUnique({ where: { id: orderId }, include: orderInclude })) ?? order
+      )
+    : serializeOrder(order)
 
-  return serializeOrder(order)
+  await notifyOrderStatusChanged(serialized)
+
+  return serialized
 }
 
 export async function approveOrderPayment(orderId: string, userId?: string) {

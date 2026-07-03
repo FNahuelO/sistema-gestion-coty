@@ -383,6 +383,20 @@ model Order {
   auditLogs              AuditLog[]
   deliveryAssignment     DeliveryAssignment?
   invoice                Invoice?
+  pushSubscriptions      PushSubscription[]
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  orderId   String
+  endpoint  String
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, endpoint])
+  @@index([orderId])
 }
 
 model OrderItem {

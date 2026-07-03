@@ -12,6 +12,7 @@ import {
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ORDER_STATUS_LABELS } from '@/lib/order-labels'
+import { OrderNotificationsButton } from '@/components/customer/order-notifications-button'
 import {
   getOrderEstimatedMinutes,
   shouldShowOrderEstimate,
@@ -263,6 +264,10 @@ export function CustomerOrderCard({ order }: { order: Order }) {
           <OrderTypeIcon order={order} />
           <span className="font-medium">{getOrderTypeLabel(order)}</span>
         </div>
+
+        {!isCancelled && shouldShowOrderEstimate(order.status) ? (
+          <OrderNotificationsButton orderId={order.id} />
+        ) : null}
       </div>
     </article>
   )
