@@ -367,12 +367,19 @@ export function OrdersSection({
                         exit={{ opacity: 0, scale: 0.98 }}
                         transition={{ delay: index * 0.03 }}
                       >
-                        <button
-                          type="button"
+                        <div
+                          role="button"
+                          tabIndex={0}
                           onClick={() => setSelectedOrder(order)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault()
+                              setSelectedOrder(order)
+                            }
+                          }}
                           className={cn(
                             PANEL_LIST_ROW,
-                            'w-full border-l-4 text-left transition-colors hover:bg-[#F8FBFA] dark:hover:bg-muted',
+                            'w-full cursor-pointer border-l-4 text-left transition-colors hover:bg-[#F8FBFA] dark:hover:bg-muted',
                             ORDER_TYPE_ACCENT[order.type],
                             order.status === 'pending' && 'bg-[#FFFBEB]/80 dark:bg-amber-950/30'
                           )}
@@ -474,7 +481,7 @@ export function OrdersSection({
                               </Button>
                             )}
                           </div>
-                        </button>
+                        </div>
                       </motion.div>
                     )
                   })}
