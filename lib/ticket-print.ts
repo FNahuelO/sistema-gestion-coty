@@ -19,8 +19,8 @@ const TICKET_STYLES = `
     color: #000;
     background: #fff;
     font-family: "Courier New", Courier, monospace;
-    font-size: 11px;
-    line-height: 1.35;
+    font-size: 14px;
+    line-height: 1.4;
   }
   .ticket {
     width: 76mm;
@@ -33,20 +33,21 @@ const TICKET_STYLES = `
   .bold { font-weight: 700; }
   .line {
     border-top: 1px dashed #000;
-    margin: 6px 0;
+    margin: 8px 0;
   }
   .row {
     display: flex;
     justify-content: space-between;
     gap: 8px;
   }
-  .section-title { font-weight: 700; margin-top: 4px; }
-  .item-title { margin-top: 4px; }
-  .addon { padding-left: 10px; }
-  .small { font-size: 10px; }
-  .header-title { font-size: 13px; font-weight: 700; letter-spacing: 0.5px; }
-  .business-name { font-size: 14px; font-weight: 700; margin-top: 2px; }
-  .order-code { font-size: 13px; font-weight: 700; margin-top: 4px; }
+  .section-title { font-size: 15px; font-weight: 700; margin-top: 4px; }
+  .item-title { font-size: 14px; margin-top: 5px; }
+  .addon { padding-left: 10px; font-size: 13px; }
+  .small { font-size: 12px; }
+  .header-title { font-size: 17px; font-weight: 700; letter-spacing: 0.5px; }
+  .business-name { font-size: 19px; font-weight: 700; margin-top: 2px; }
+  .order-code { font-size: 16px; font-weight: 700; margin-top: 4px; }
+  .total-row { font-size: 16px; }
 `
 
 function escapeHtml(value: string) {
@@ -139,7 +140,7 @@ function renderCustomerTicket({ order, businessName }: TicketPrintInput) {
       ${order.deliveryFee ? `<div class="row"><span>Envío:</span><span>${formatPrice(order.deliveryFee)}</span></div>` : ''}
       ${order.discountAmount ? `<div class="row"><span>Descuento:</span><span>-${formatPrice(order.discountAmount)}</span></div>` : ''}
       ${order.tip ? `<div class="row"><span>Propina:</span><span>${formatPrice(order.tip)}</span></div>` : ''}
-      <div class="row bold"><span>TOTAL:</span><span>${formatPrice(order.total)}</span></div>
+      <div class="row total-row bold"><span>TOTAL:</span><span>${formatPrice(order.total)}</span></div>
       ${showCashTender ? `<div class="row"><span>Pagará con:</span><span>${formatPrice(order.total)}</span></div>` : ''}
       ${showCashTender ? `<div class="row"><span>Vuelto:</span><span>${formatPrice(0)}</span></div>` : ''}
       <div class="line"></div>

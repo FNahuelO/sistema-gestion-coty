@@ -30,11 +30,12 @@ import {
 } from '@/components/customer/customer-order-tracking'
 import { LoadingSkeleton } from '@/components/shared/loading'
 import { OrderNotificationsButton } from '@/components/customer/order-notifications-button'
+import { TransferPaymentDetails } from '@/components/customer/transfer-payment-details'
 import { shouldShowOrderEstimate } from '@/lib/order-estimate'
 import { useOrderCountdown } from '@/hooks/use-order-countdown'
 import { ORDER_STATUS_LABELS } from '@/lib/order-labels'
 import { canApproveTransferPayment } from '@/lib/payment-flow'
-import { useTrackedOrders } from '@/lib/store'
+import { useBusiness, useTrackedOrders } from '@/lib/store'
 import type { Order, OrderType } from '@/lib/types'
 
 function getStatusHighlight(order: Order) {
@@ -199,6 +200,7 @@ export function OrderConfirmationView({
   whatsappCheckoutUrl?: string
 }) {
   const [calling, setCalling] = useState(false)
+  const { settings } = useBusiness()
   const { orders, isLoading } = useTrackedOrders('', orderId)
   const order = orders.find((candidate) => candidate.id === orderId) ?? orders[0]
 
@@ -327,32 +329,39 @@ export function OrderConfirmationView({
         ) : null}
 
         {awaitingTransferProof ? (
-          <section className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-                <MessageCircle className="h-5 w-5" />
+          <div className="mt-4 space-y-3">
+            <TransferPaymentDetails
+              transferAlias={settings?.transferAlias}
+              transferCbu={settings?.transferCbu}
+              total={order?.total}
+            />
+            <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                  <MessageCircle className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-foreground">Completá el pago por WhatsApp</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Enviá el comprobante de transferencia al negocio. Tu pedido se confirmará cuando el
+                    local verifique el pago.
+                  </p>
+                  {whatsappCheckoutUrl ? (
+                    <a
+                      href={whatsappCheckoutUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-bold text-white transition-opacity hover:opacity-95"
+                      style={{ backgroundColor: '#25D366' }}
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      Enviar pedido por WhatsApp
+                    </a>
+                  ) : null}
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-bold text-foreground">Completá el pago por WhatsApp</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Enviá el detalle del pedido y el comprobante de transferencia al negocio. Tu pedido se
-                  confirmará cuando el local verifique el pago.
-                </p>
-                {whatsappCheckoutUrl ? (
-                  <a
-                    href={whatsappCheckoutUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-bold text-white transition-opacity hover:opacity-95"
-                    style={{ backgroundColor: '#25D366' }}
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                    Enviar pedido por WhatsApp
-                  </a>
-                ) : null}
-              </div>
-            </div>
-          </section>
+            </section>
+          </div>
         ) : null}
 
         <div className="mt-6 space-y-3">

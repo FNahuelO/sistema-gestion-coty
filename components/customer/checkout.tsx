@@ -27,6 +27,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { SimpleModal } from '@/components/ui/simple-modal'
+import { TransferPaymentDetails } from '@/components/customer/transfer-payment-details'
 import { useCart, useBusiness, useCatalog, useOrders, useTableSession, rememberOrderTracking } from '@/lib/store'
 import {
   buildCleanUrlWithoutMpReturn,
@@ -1032,6 +1033,14 @@ export function CheckoutPage() {
                     </label>
                   ))}
                 </RadioGroup>
+                {paymentMethod === 'transfer' && !isTableMode ? (
+                  <TransferPaymentDetails
+                    transferAlias={settings.transferAlias}
+                    transferCbu={settings.transferCbu}
+                    total={finalTotal}
+                    className="mt-3"
+                  />
+                ) : null}
               </div>
               <Button
                 type="submit"

@@ -61,6 +61,46 @@ export function SettingsSection() {
       />
       <div className="space-y-6">
         {canWriteSettings ? (
+        <Card className={PANEL_CARD}>
+          <CardHeader>
+            <CardTitle className={PANEL_TITLE}>Transferencias</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Estos datos se muestran al cliente cuando elige pagar por transferencia.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="Alias / CVU">
+                <Input
+                  value={settingsDraft?.transferAlias ?? ''}
+                  onChange={(event) =>
+                    setSettingsDraft((previous) =>
+                      previous ? { ...previous, transferAlias: event.target.value } : previous
+                    )
+                  }
+                  placeholder="ej. coty.cafe.mp"
+                />
+              </Field>
+              <Field label="CBU (opcional)">
+                <Input
+                  value={settingsDraft?.transferCbu ?? ''}
+                  onChange={(event) =>
+                    setSettingsDraft((previous) =>
+                      previous ? { ...previous, transferCbu: event.target.value } : previous
+                    )
+                  }
+                  placeholder="22 dígitos"
+                />
+              </Field>
+            </div>
+            <Button className={cn('w-full sm:w-auto', PANEL_PRIMARY_BTN)} onClick={() => saveSettings()}>
+              Guardar datos de transferencia
+            </Button>
+          </CardContent>
+        </Card>
+        ) : null}
+
+        {canWriteSettings ? (
         <AdminFormPanel
           panelId="settings"
           title="Datos del negocio"
@@ -87,29 +127,6 @@ export function SettingsSection() {
           </div>
           <Field label="Tasa impositiva"><Input type="number" step="0.01" value={settingsDraft?.taxRate ?? 0} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, taxRate: Number(event.target.value) } : previous)} /></Field>
           <Field label="WhatsApp"><Input value={settingsDraft?.whatsapp ?? ''} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, whatsapp: event.target.value } : previous)} /></Field>
-          <div className="grid gap-3 md:grid-cols-2">
-            <Field label="Alias / CVU para transferencias">
-              <Input
-                value={settingsDraft?.transferAlias ?? ''}
-                onChange={(event) =>
-                  setSettingsDraft((previous) =>
-                    previous ? { ...previous, transferAlias: event.target.value } : previous
-                  )
-                }
-                placeholder="ej. coty.cafe.mp"
-              />
-            </Field>
-            <Field label="CBU (opcional)">
-              <Input
-                value={settingsDraft?.transferCbu ?? ''}
-                onChange={(event) =>
-                  setSettingsDraft((previous) =>
-                    previous ? { ...previous, transferCbu: event.target.value } : previous
-                  )
-                }
-              />
-            </Field>
-          </div>
           <Field label="Instagram"><Input value={settingsDraft?.instagram ?? ''} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, instagram: event.target.value } : previous)} /></Field>
           <Field label="Facebook"><Input value={settingsDraft?.facebook ?? ''} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, facebook: event.target.value } : previous)} /></Field>
           <div className={PANEL_TOGGLE_ROW}>
@@ -136,6 +153,12 @@ export function SettingsSection() {
               <p><span className="font-medium text-foreground">Dirección:</span> {admin.settings?.address}</p>
               <p><span className="font-medium text-foreground">Horario:</span> {admin.settings?.openTime} – {admin.settings?.closeTime}</p>
               <p><span className="font-medium text-foreground">Estado:</span> {admin.settings?.isOpen ? 'Abierto' : 'Cerrado'}</p>
+              {admin.settings?.transferAlias ? (
+                <p><span className="font-medium text-foreground">Alias / CVU:</span> {admin.settings.transferAlias}</p>
+              ) : null}
+              {admin.settings?.transferCbu ? (
+                <p><span className="font-medium text-foreground">CBU:</span> {admin.settings.transferCbu}</p>
+              ) : null}
             </CardContent>
           </Card>
         )}
