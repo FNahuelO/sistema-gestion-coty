@@ -10,90 +10,45 @@ export type TicketPrintInput = {
   businessName: string
 }
 
-/** Impresora del cliente: Nexuspös X-NX 58II UB (papel 58 mm). */
-const TICKET_PAPER_MM = 58
-const TICKET_CONTENT_MM = 48
-const SEPARATOR_LINE = '--------------------------'
+/** Nexuspös X-NX 58II UB — 58 mm ≈ 32 caracteres por línea. */
+const LINE_WIDTH = 32
+const SEPARATOR = '-'.repeat(26)
 
 const TICKET_STYLES = `
-  @page {
-    size: ${TICKET_PAPER_MM}mm auto;
-    margin: 0;
-  }
+  @page { size: 58mm auto; margin: 0; }
 
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-  body {
+  html, body {
+    width: 58mm;
     margin: 0;
     padding: 0;
-    color: #000;
     background: #fff;
-    font-family: "Courier New", Courier, monospace;
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 1.3;
+    color: #000;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  .ticket {
+    width: ${LINE_WIDTH}ch;
+    max-width: ${LINE_WIDTH}ch;
+    margin: 0 auto;
+    padding: 2mm 0;
+    page-break-after: always;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: pre;
+    overflow: hidden;
     -webkit-font-smoothing: none;
     font-smooth: never;
   }
 
-  .ticket {
-    width: ${TICKET_CONTENT_MM}mm;
-    max-width: ${TICKET_CONTENT_MM}mm;
-    margin: 0 auto;
-    padding: 2mm 1mm;
-    page-break-after: always;
-    overflow: hidden;
-  }
-
   .ticket:last-child { page-break-after: auto; }
 
-  .center { text-align: center; }
-  .bold { font-weight: 700; }
-  .separator {
-    margin: 2mm 0;
-    font-size: 11px;
-    letter-spacing: 0;
-    overflow: hidden;
-    white-space: nowrap;
-  }
-  .row {
-    display: table;
-    width: 100%;
-    table-layout: fixed;
-    margin: 1px 0;
-  }
-  .row > span {
-    display: table-cell;
-    vertical-align: top;
-  }
-  .row-left {
-    width: 62%;
-    word-break: break-word;
-    overflow-wrap: break-word;
-    padding-right: 1mm;
-  }
-  .row-right {
-    width: 38%;
-    text-align: right;
-    white-space: nowrap;
-  }
-  .section-title { font-weight: 700; margin-top: 1mm; }
-  .item-line { margin-top: 1mm; }
-  .addon { padding-left: 2mm; font-size: 10px; }
-  .header-title { font-size: 12px; font-weight: 700; }
-  .business-name { font-size: 13px; font-weight: 700; margin-top: 1mm; }
-  .order-code { font-size: 11px; font-weight: 700; margin-top: 1mm; }
-  .field {
-    margin: 1px 0;
-    word-break: break-word;
-    overflow-wrap: break-word;
-  }
-
   @media print {
-    body { background: #fff; color: #000; }
-    .ticket { width: ${TICKET_CONTENT_MM}mm; max-width: ${TICKET_CONTENT_MM}mm; }
+    html, body { background: #fff; color: #000; }
   }
 `
 
@@ -123,126 +78,169 @@ function getItemUnitPrice(item: Order['items'][number]) {
   return item.unitPrice ?? item.product.price
 }
 
-function separator() {
-  return `<div class="separator">${SEPARATOR_LINE}</div>`
+function center(text: string, width = LINE_WIDTH): string {
+  const trimmed = text.slice(0, width)
+  if (trimmed.length >= width) return trimmed
+  const pad = width - trimmed.length
+  const left = Math.floor(pad / 2)
+  return ' '.repeat(left) + trimmed + ' '.repeat(pad - left)
 }
 
-function row(left: string, right?: string) {
-  if (!right) return `<div class="field">${left}</div>`
-  return `<div class="row"><span class="row-left">${left}</span><span class="row-right">${right}</span></div>`
+function line(text: string, width = LINE_WIDTH): string {
+  return text.slice(0, width)
 }
 
-function renderItemLines(order: Order, showPrices: boolean) {
-  return order.items
-    .map((item) => {
-      const unitPrice = getItemUnitPrice(item)
-      const lineTotal = unitPrice * item.quantity
-      const addons = item.selectionLines?.length
-        ? item.selectionLines
-            .map((selection) => {
-              const addonPrice = selection.priceModifier * item.quantity
-              const priceLabel = showPrices ? ` ${formatPrice(addonPrice)}` : ''
-              return `<div class="addon">• ${escapeHtml(selection.choiceName)} (x${item.quantity})${priceLabel}</div>`
-            })
-            .join('')
-        : ''
-
-      const priceLabel = showPrices ? formatPrice(lineTotal) : ''
-      const addonsTitle = addons ? '<div class="addon section-title">Adicionales:</div>' : ''
-      const itemName = `• ${escapeHtml(item.product.name)} (x${item.quantity})`
-
-      return `
-        ${showPrices ? row(itemName, priceLabel) : `<div class="item-line field">${itemName}</div>`}
-        ${addonsTitle}
-        ${addons}
-        ${item.notes ? `<div class="addon">Nota: ${escapeHtml(item.notes)}</div>` : ''}
-      `
-    })
-    .join('')
+function twoColumns(left: string, right: string, width = LINE_WIDTH): string {
+  const rightText = right.slice(0, width)
+  const maxLeft = Math.max(1, width - rightText.length)
+  const leftText = left.length > maxLeft ? left.slice(0, maxLeft) : left
+  return leftText.padEnd(width - rightText.length) + rightText
 }
 
-function renderCustomerTicket({ order, businessName }: TicketPrintInput) {
+function wrapPrefixed(prefix: string, value: string, width = LINE_WIDTH): string[] {
+  const words = value.split(/\s+/)
+  const lines: string[] = []
+  let current = prefix
+
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word
+    if (candidate.length <= width) {
+      current = candidate
+      continue
+    }
+
+    if (current) lines.push(line(current, width))
+    current = word
+  }
+
+  if (current) lines.push(line(current, width))
+  return lines.length ? lines : [line(prefix, width)]
+}
+
+function renderItemLines(order: Order, showPrices: boolean): string[] {
+  const lines: string[] = []
+
+  for (const item of order.items) {
+    const unitPrice = getItemUnitPrice(item)
+    const lineTotal = unitPrice * item.quantity
+    const itemLabel = `• ${item.product.name} (x${item.quantity})`
+
+    if (showPrices) {
+      lines.push(twoColumns(itemLabel, formatPrice(lineTotal)))
+    } else {
+      lines.push(line(itemLabel))
+    }
+
+    if (item.selectionLines?.length) {
+      for (const selection of item.selectionLines) {
+        const addonLabel = `  • ${selection.choiceName} (x${item.quantity})`
+        if (showPrices) {
+          lines.push(twoColumns(addonLabel, formatPrice(selection.priceModifier * item.quantity)))
+        } else {
+          lines.push(line(addonLabel))
+        }
+      }
+    }
+
+    if (item.notes) {
+      lines.push(...wrapPrefixed('  Nota:', item.notes))
+    }
+  }
+
+  return lines
+}
+
+function renderCustomerTicketText({ order, businessName }: TicketPrintInput): string {
   const createdAt = order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt)
   const productsTotal = order.items.reduce(
     (sum, item) => sum + getItemUnitPrice(item) * item.quantity,
     0
   )
 
-  return `
-    <section class="ticket">
-      <div class="center header-title">*** TICKET ***</div>
-      <div class="center business-name">${escapeHtml(businessName)}</div>
-      <div class="center order-code">${escapeHtml(formatOrderNumber(order))}</div>
-      ${separator()}
+  const lines: string[] = [
+    center('*** TICKET ***'),
+    center(businessName),
+    center(formatOrderNumber(order)),
+    SEPARATOR,
+    line(`Modalidad: ${ORDER_TYPE_LABELS[order.type]}`),
+    line(`Medio de pago: ${PAYMENT_METHOD_LABELS[order.paymentMethod]}`),
+    line(`Estado: ${getTicketPaymentStatus(order)}`),
+    line(`Fecha: ${formatDateAR(createdAt)}`),
+    line(`Hora: ${formatTimeAR(createdAt)}`),
+    SEPARATOR,
+    line('Datos del cliente:'),
+    line(`-Nombre: ${order.customerName}`),
+  ]
 
-      <div class="field">Modalidad: ${escapeHtml(ORDER_TYPE_LABELS[order.type])}</div>
-      <div class="field">Medio de pago: ${escapeHtml(PAYMENT_METHOD_LABELS[order.paymentMethod])}</div>
-      <div class="field">Estado: ${escapeHtml(getTicketPaymentStatus(order))}</div>
-      <div class="field">Fecha: ${formatDateAR(createdAt)}</div>
-      <div class="field">Hora: ${formatTimeAR(createdAt)}</div>
-      ${separator()}
+  if (order.customerAddress) {
+    lines.push(...wrapPrefixed('-Dirección:', order.customerAddress))
+  }
+  if (order.deliveryZoneName) {
+    lines.push(line(`-Zona de envío: ${order.deliveryZoneName}`))
+  }
+  if (order.customerPhone && order.customerPhone !== 'mesa') {
+    lines.push(line(`-Teléfono: ${order.customerPhone}`))
+  }
+  if (order.tableNumber) {
+    lines.push(line(`-Mesa: ${order.tableNumber}`))
+  }
 
-      <div class="section-title">Datos del cliente:</div>
-      <div class="field">-Nombre: ${escapeHtml(order.customerName)}</div>
-      ${order.customerAddress ? `<div class="field">-Dirección: ${escapeHtml(order.customerAddress)}</div>` : ''}
-      ${order.deliveryZoneName ? `<div class="field">-Zona de envío: ${escapeHtml(order.deliveryZoneName)}</div>` : ''}
-      ${order.customerPhone && order.customerPhone !== 'mesa' ? `<div class="field">-Teléfono: ${escapeHtml(order.customerPhone)}</div>` : ''}
-      ${order.tableNumber ? `<div class="field">-Mesa: ${order.tableNumber}</div>` : ''}
-      ${separator()}
+  lines.push(
+    SEPARATOR,
+    twoColumns('Items:', 'Precio Unit.'),
+    ...renderItemLines(order, true),
+    SEPARATOR,
+    line(`Total de productos: ${formatPrice(productsTotal)}`)
+  )
 
-      ${row('Items:', 'Precio Unit.')}
-      ${renderItemLines(order, true)}
-      ${separator()}
+  if (order.deliveryFee) lines.push(line(`Envío: ${formatPrice(order.deliveryFee)}`))
+  if (order.discountAmount) lines.push(line(`Descuento: -${formatPrice(order.discountAmount)}`))
+  if (order.tip) lines.push(line(`Propina: ${formatPrice(order.tip)}`))
 
-      <div class="field">Total de productos: ${formatPrice(productsTotal)}</div>
-      ${order.deliveryFee ? `<div class="field">Envío: ${formatPrice(order.deliveryFee)}</div>` : ''}
-      ${order.discountAmount ? `<div class="field">Descuento: -${formatPrice(order.discountAmount)}</div>` : ''}
-      ${order.tip ? `<div class="field">Propina: ${formatPrice(order.tip)}</div>` : ''}
-      <div class="field bold">TOTAL: ${formatPrice(order.total)}</div>
-      ${separator()}
-      <div class="center">${escapeHtml(businessName)}</div>
-    </section>
-  `
+  lines.push(line(`TOTAL: ${formatPrice(order.total)}`), SEPARATOR, center(businessName))
+
+  return lines.join('\n')
 }
 
-function renderKitchenTicket({ order, businessName }: TicketPrintInput) {
+function renderKitchenTicketText({ order, businessName }: TicketPrintInput): string {
   const createdAt = order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt)
 
-  return `
-    <section class="ticket">
-      <div class="center header-title">*** COCINA ***</div>
-      <div class="center business-name">${escapeHtml(businessName)}</div>
-      <div class="center order-code">${escapeHtml(formatOrderNumber(order))}</div>
-      ${separator()}
+  const lines: string[] = [
+    center('*** COCINA ***'),
+    center(businessName),
+    center(formatOrderNumber(order)),
+    SEPARATOR,
+    line(`${ORDER_TYPE_LABELS[order.type]}${order.tableNumber ? ` · Mesa ${order.tableNumber}` : ''}`),
+    line(`Hora: ${formatDateTimeAR(createdAt)}`),
+    line(`Cliente: ${order.customerName}`),
+  ]
 
-      <div class="field bold">${escapeHtml(ORDER_TYPE_LABELS[order.type])}${order.tableNumber ? ` · Mesa ${order.tableNumber}` : ''}</div>
-      <div class="field">Hora: ${formatDateTimeAR(createdAt)}</div>
-      <div class="field">Cliente: ${escapeHtml(order.customerName)}</div>
-      ${order.customerAddress ? `<div class="field">Dirección: ${escapeHtml(order.customerAddress)}</div>` : ''}
-      ${order.deliveryZoneName ? `<div class="field">Zona: ${escapeHtml(order.deliveryZoneName)}</div>` : ''}
-      ${order.notes ? `<div class="field">Notas: ${escapeHtml(order.notes)}</div>` : ''}
-      ${separator()}
+  if (order.customerAddress) lines.push(line(`Dirección: ${order.customerAddress}`))
+  if (order.deliveryZoneName) lines.push(line(`Zona: ${order.deliveryZoneName}`))
+  if (order.notes) lines.push(...wrapPrefixed('Notas:', order.notes))
 
-      <div class="section-title">Items:</div>
-      ${renderItemLines(order, false)}
-      ${separator()}
-      <div class="center">Comanda de cocina · ${escapeHtml(businessName)}</div>
-    </section>
-  `
+  lines.push(SEPARATOR, line('Items:'), ...renderItemLines(order, false), SEPARATOR)
+  lines.push(center(`Comanda de cocina · ${businessName}`))
+
+  return lines.join('\n')
 }
 
 export function buildTicketPrintDocument(input: TicketPrintInput, variants: TicketVariant[]) {
   const body = variants
-    .map((variant) =>
-      variant === 'kitchen' ? renderKitchenTicket(input) : renderCustomerTicket(input)
-    )
+    .map((variant) => {
+      const text =
+        variant === 'kitchen'
+          ? renderKitchenTicketText(input)
+          : renderCustomerTicketText(input)
+      return `<pre class="ticket">${escapeHtml(text)}</pre>`
+    })
     .join('')
 
   return `<!DOCTYPE html>
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=${TICKET_PAPER_MM * 3.78}" />
+    <meta name="viewport" content="width=${LINE_WIDTH}ch" />
     <title>Ticket ${escapeHtml(getOrderLabel(input.order))}</title>
     <style>${TICKET_STYLES}</style>
   </head>
@@ -260,12 +258,14 @@ export function printOrderTickets(
   const iframe = document.createElement('iframe')
   iframe.setAttribute('aria-hidden', 'true')
   iframe.style.position = 'fixed'
-  iframe.style.left = '-10000px'
+  iframe.style.left = '0'
   iframe.style.top = '0'
-  iframe.style.width = `${TICKET_PAPER_MM}mm`
+  iframe.style.width = '58mm'
   iframe.style.height = '100vh'
   iframe.style.border = '0'
-  iframe.style.visibility = 'hidden'
+  iframe.style.opacity = '0'
+  iframe.style.pointerEvents = 'none'
+  iframe.style.zIndex = '-1'
   document.body.appendChild(iframe)
 
   const frameWindow = iframe.contentWindow
@@ -279,22 +279,17 @@ export function printOrderTickets(
 
   const cleanup = () => {
     window.setTimeout(() => {
-      if (iframe.parentNode) {
-        iframe.parentNode.removeChild(iframe)
-      }
-    }, 1500)
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe)
+    }, 2000)
   }
 
   const triggerPrint = () => {
     if (printed) return
     printed = true
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        frameWindow.focus()
-        frameWindow.print()
-      })
-    })
+    window.setTimeout(() => {
+      frameWindow.focus()
+      frameWindow.print()
+    }, 150)
   }
 
   frameWindow.addEventListener('afterprint', cleanup, { once: true })
@@ -304,6 +299,6 @@ export function printOrderTickets(
   frameDocument.write(html)
   frameDocument.close()
 
-  window.setTimeout(triggerPrint, 400)
-  window.setTimeout(cleanup, 15000)
+  window.setTimeout(triggerPrint, 800)
+  window.setTimeout(cleanup, 20000)
 }
