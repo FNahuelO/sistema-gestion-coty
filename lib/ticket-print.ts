@@ -26,26 +26,48 @@ const TICKET_PAYMENT_LABELS: Record<Order['paymentMethod'], string> = {
 }
 
 const TICKET_STYLES = `
-  @page { size: 58mm auto; margin: 0; }
+  @page {
+    size: 58mm 297mm portrait;
+    margin: 0;
+  }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   html, body {
+    display: block;
     width: 58mm;
+    max-width: 58mm;
+    min-width: 58mm;
+    height: auto;
     margin: 0;
     padding: 0 1.5mm 0 0.5mm;
     background: #fff;
     color: #000;
+    writing-mode: horizontal-tb;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
+  .print-root {
+    display: block;
+    width: 58mm;
+    max-width: 58mm;
+    column-count: 1;
+    columns: auto;
+  }
+
   .ticket {
+    display: block;
     width: ${LINE_WIDTH}ch;
     max-width: ${LINE_WIDTH}ch;
     margin: 0;
     padding: 2mm 0;
     page-break-after: always;
+    break-after: page;
+    column-count: 1;
+    columns: auto;
+    float: none;
+    clear: both;
     font-family: "Courier New", Courier, monospace;
     font-size: 11px;
     font-weight: 700;
@@ -56,10 +78,39 @@ const TICKET_STYLES = `
     font-smooth: never;
   }
 
-  .ticket:last-child { page-break-after: auto; }
+  .ticket:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
 
   @media print {
-    html, body { background: #fff; color: #000; }
+    @page {
+      size: 58mm 297mm portrait;
+      margin: 0;
+    }
+
+    html, body {
+      width: 58mm !important;
+      max-width: 58mm !important;
+      min-width: 58mm !important;
+      height: auto !important;
+      background: #fff;
+      color: #000;
+    }
+
+    .print-root {
+      width: 58mm !important;
+      max-width: 58mm !important;
+      column-count: 1 !important;
+    }
+
+    .ticket {
+      display: block !important;
+      float: none !important;
+      column-count: 1 !important;
+      width: ${LINE_WIDTH}ch !important;
+      max-width: ${LINE_WIDTH}ch !important;
+    }
   }
 `
 
@@ -282,11 +333,11 @@ export function buildTicketPrintDocument(input: TicketPrintInput, variants: Tick
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=${LINE_WIDTH}ch" />
+    <meta name="viewport" content="width=58mm, initial-scale=1" />
     <title>Ticket ${escapeHtml(getOrderLabel(input.order))}</title>
     <style>${TICKET_STYLES}</style>
   </head>
-  <body>${body}</body>
+  <body><div class="print-root">${body}</div></body>
 </html>`
 }
 
@@ -303,7 +354,8 @@ export function printOrderTickets(
   iframe.style.left = '0'
   iframe.style.top = '0'
   iframe.style.width = '58mm'
-  iframe.style.height = '100vh'
+  iframe.style.height = 'auto'
+  iframe.style.minHeight = '200mm'
   iframe.style.border = '0'
   iframe.style.opacity = '0'
   iframe.style.pointerEvents = 'none'
