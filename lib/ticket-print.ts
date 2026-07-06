@@ -11,43 +11,82 @@ export type TicketPrintInput = {
 }
 
 const TICKET_STYLES = `
-  @page { size: 80mm auto; margin: 2mm; }
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+
   * { box-sizing: border-box; }
+
   body {
     margin: 0;
     padding: 0;
     color: #000;
     background: #fff;
     font-family: "Courier New", Courier, monospace;
-    font-size: 14px;
-    line-height: 1.4;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.35;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
+
   .ticket {
-    width: 76mm;
+    width: 72mm;
+    max-width: 72mm;
     margin: 0 auto;
-    padding: 2mm 0;
+    padding: 3mm 2mm;
     page-break-after: always;
+    overflow: hidden;
   }
+
   .ticket:last-child { page-break-after: auto; }
+
   .center { text-align: center; }
   .bold { font-weight: 700; }
-  .line {
-    border-top: 1px dashed #000;
-    margin: 8px 0;
+  .separator {
+    text-align: center;
+    margin: 2mm 0;
+    font-size: 11px;
+    letter-spacing: -0.5px;
+    overflow: hidden;
+    white-space: nowrap;
   }
   .row {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+    margin: 1px 0;
   }
-  .section-title { font-size: 15px; font-weight: 700; margin-top: 4px; }
-  .item-title { font-size: 14px; margin-top: 5px; }
-  .addon { padding-left: 10px; font-size: 13px; }
-  .small { font-size: 12px; }
-  .header-title { font-size: 17px; font-weight: 700; letter-spacing: 0.5px; }
-  .business-name { font-size: 19px; font-weight: 700; margin-top: 2px; }
-  .order-code { font-size: 16px; font-weight: 700; margin-top: 4px; }
-  .total-row { font-size: 16px; }
+  .row > span {
+    display: table-cell;
+    vertical-align: top;
+  }
+  .row-left {
+    width: 68%;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    padding-right: 2mm;
+  }
+  .row-right {
+    width: 32%;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .section-title { font-size: 12px; font-weight: 700; margin-top: 2mm; }
+  .item-title { margin-top: 2mm; }
+  .addon { padding-left: 3mm; font-size: 11px; }
+  .small { font-size: 11px; }
+  .header-title { font-size: 14px; font-weight: 700; }
+  .business-name { font-size: 15px; font-weight: 700; margin-top: 1mm; }
+  .order-code { font-size: 13px; font-weight: 700; margin-top: 1mm; }
+  .total-row { font-size: 13px; }
+  .field { margin: 1px 0; word-break: break-word; overflow-wrap: break-word; }
+
+  @media print {
+    body { background: #fff; }
+    .ticket { width: 72mm; max-width: 72mm; }
+  }
 `
 
 function escapeHtml(value: string) {
@@ -64,6 +103,15 @@ function getOrderLabel(order: Order) {
 
 function getItemUnitPrice(item: Order['items'][number]) {
   return item.unitPrice ?? item.product.price
+}
+
+function separator() {
+  return '<div class="separator">----------------------------</div>'
+}
+
+function row(left: string, right?: string) {
+  if (!right) return `<div class="field">${left}</div>`
+  return `<div class="row"><span class="row-left">${left}</span><span class="row-right">${right}</span></div>`
 }
 
 function renderItemLines(order: Order, showPrices: boolean) {
@@ -83,12 +131,10 @@ function renderItemLines(order: Order, showPrices: boolean) {
 
       const priceLabel = showPrices ? formatPrice(lineTotal) : ''
       const addonsTitle = addons ? '<div class="addon section-title">Adicionales:</div>' : ''
+      const itemName = `• ${escapeHtml(item.product.name)} (x${item.quantity})`
 
       return `
-        <div class="item-title row">
-          <span>• ${escapeHtml(item.product.name)} (x${item.quantity})</span>
-          ${showPrices ? `<span>${priceLabel}</span>` : ''}
-        </div>
+        ${showPrices ? row(itemName, priceLabel) : `<div class="item-title field">${itemName}</div>`}
         ${addonsTitle}
         ${addons}
         ${item.notes ? `<div class="addon small">Nota: ${escapeHtml(item.notes)}</div>` : ''}
@@ -111,39 +157,36 @@ function renderCustomerTicket({ order, businessName }: TicketPrintInput) {
       <div class="center header-title">*** TICKET ***</div>
       <div class="center business-name">${escapeHtml(businessName)}</div>
       <div class="center order-code">Orden ${escapeHtml(getOrderLabel(order))}</div>
-      <div class="line"></div>
+      ${separator()}
 
-      <div>Modalidad: ${escapeHtml(ORDER_TYPE_LABELS[order.type])}</div>
-      <div>Medio de pago: ${escapeHtml(PAYMENT_METHOD_LABELS[order.paymentMethod])}</div>
-      <div>Estado: ${escapeHtml(paymentStatus)}</div>
-      <div>Fecha: ${formatDateAR(createdAt)}</div>
-      <div>Hora: ${formatTimeAR(createdAt)}</div>
-      <div class="line"></div>
+      <div class="field">Modalidad: ${escapeHtml(ORDER_TYPE_LABELS[order.type])}</div>
+      <div class="field">Medio de pago: ${escapeHtml(PAYMENT_METHOD_LABELS[order.paymentMethod])}</div>
+      <div class="field">Estado: ${escapeHtml(paymentStatus)}</div>
+      <div class="field">Fecha: ${formatDateAR(createdAt)}</div>
+      <div class="field">Hora: ${formatTimeAR(createdAt)}</div>
+      ${separator()}
 
       <div class="section-title">Datos del cliente:</div>
-      <div>Nombre: ${escapeHtml(order.customerName)}</div>
-      ${order.customerAddress ? `<div>Dirección: ${escapeHtml(order.customerAddress)}</div>` : ''}
-      ${order.deliveryZoneName ? `<div>Zona de envío: ${escapeHtml(order.deliveryZoneName)}</div>` : ''}
-      ${order.notes ? `<div>Información adicional: ${escapeHtml(order.notes)}</div>` : ''}
-      ${order.customerPhone && order.customerPhone !== 'mesa' ? `<div>Teléfono: ${escapeHtml(order.customerPhone)}</div>` : ''}
-      ${order.tableNumber ? `<div>Mesa: ${order.tableNumber}</div>` : ''}
-      <div class="line"></div>
+      <div class="field">-Nombre: ${escapeHtml(order.customerName)}</div>
+      ${order.customerAddress ? `<div class="field">-Dirección: ${escapeHtml(order.customerAddress)}</div>` : ''}
+      ${order.deliveryZoneName ? `<div class="field">-Zona de envío: ${escapeHtml(order.deliveryZoneName)}</div>` : ''}
+      ${order.notes ? `<div class="field">-Información adicional: ${escapeHtml(order.notes)}</div>` : ''}
+      ${order.customerPhone && order.customerPhone !== 'mesa' ? `<div class="field">-Teléfono: ${escapeHtml(order.customerPhone)}</div>` : ''}
+      ${order.tableNumber ? `<div class="field">-Mesa: ${order.tableNumber}</div>` : ''}
+      ${separator()}
 
-      <div class="row bold">
-        <span>Items:</span>
-        <span>Precio Unit.</span>
-      </div>
+      ${row('<span class="bold">Items:</span>', '<span class="bold">Precio Unit.</span>')}
       ${renderItemLines(order, true)}
-      <div class="line"></div>
+      ${separator()}
 
-      <div class="row"><span>Total de productos:</span><span>${formatPrice(productsTotal)}</span></div>
-      ${order.deliveryFee ? `<div class="row"><span>Envío:</span><span>${formatPrice(order.deliveryFee)}</span></div>` : ''}
-      ${order.discountAmount ? `<div class="row"><span>Descuento:</span><span>-${formatPrice(order.discountAmount)}</span></div>` : ''}
-      ${order.tip ? `<div class="row"><span>Propina:</span><span>${formatPrice(order.tip)}</span></div>` : ''}
-      <div class="row total-row bold"><span>TOTAL:</span><span>${formatPrice(order.total)}</span></div>
-      ${showCashTender ? `<div class="row"><span>Pagará con:</span><span>${formatPrice(order.total)}</span></div>` : ''}
-      ${showCashTender ? `<div class="row"><span>Vuelto:</span><span>${formatPrice(0)}</span></div>` : ''}
-      <div class="line"></div>
+      ${row('Total de productos:', formatPrice(productsTotal))}
+      ${order.deliveryFee ? row('Envío:', formatPrice(order.deliveryFee)) : ''}
+      ${order.discountAmount ? row('Descuento:', `-${formatPrice(order.discountAmount)}`) : ''}
+      ${order.tip ? row('Propina:', formatPrice(order.tip)) : ''}
+      ${row('<span class="bold">TOTAL:</span>', `<span class="bold">${formatPrice(order.total)}</span>`)}
+      ${showCashTender ? row('Pagará con:', formatPrice(order.total)) : ''}
+      ${showCashTender ? row('Vuelto:', formatPrice(0)) : ''}
+      ${separator()}
       <div class="center small">${escapeHtml(businessName)}</div>
     </section>
   `
@@ -157,19 +200,19 @@ function renderKitchenTicket({ order, businessName }: TicketPrintInput) {
       <div class="center header-title">*** COCINA ***</div>
       <div class="center business-name">${escapeHtml(businessName)}</div>
       <div class="center order-code">Orden ${escapeHtml(getOrderLabel(order))}</div>
-      <div class="line"></div>
+      ${separator()}
 
-      <div class="bold">${escapeHtml(ORDER_TYPE_LABELS[order.type])}${order.tableNumber ? ` · Mesa ${order.tableNumber}` : ''}</div>
-      <div>Hora: ${formatDateTimeAR(createdAt)}</div>
-      <div>Cliente: ${escapeHtml(order.customerName)}</div>
-      ${order.customerAddress ? `<div>Dirección: ${escapeHtml(order.customerAddress)}</div>` : ''}
-      ${order.deliveryZoneName ? `<div>Zona: ${escapeHtml(order.deliveryZoneName)}</div>` : ''}
-      ${order.notes ? `<div>Notas del pedido: ${escapeHtml(order.notes)}</div>` : ''}
-      <div class="line"></div>
+      <div class="field bold">${escapeHtml(ORDER_TYPE_LABELS[order.type])}${order.tableNumber ? ` · Mesa ${order.tableNumber}` : ''}</div>
+      <div class="field">Hora: ${formatDateTimeAR(createdAt)}</div>
+      <div class="field">Cliente: ${escapeHtml(order.customerName)}</div>
+      ${order.customerAddress ? `<div class="field">Dirección: ${escapeHtml(order.customerAddress)}</div>` : ''}
+      ${order.deliveryZoneName ? `<div class="field">Zona: ${escapeHtml(order.deliveryZoneName)}</div>` : ''}
+      ${order.notes ? `<div class="field">Notas del pedido: ${escapeHtml(order.notes)}</div>` : ''}
+      ${separator()}
 
       <div class="section-title">Items:</div>
       ${renderItemLines(order, false)}
-      <div class="line"></div>
+      ${separator()}
       <div class="center small">Comanda de cocina · ${escapeHtml(businessName)}</div>
     </section>
   `
@@ -186,6 +229,7 @@ export function buildTicketPrintDocument(input: TicketPrintInput, variants: Tick
 <html lang="es">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=302" />
     <title>Ticket ${escapeHtml(getOrderLabel(input.order))}</title>
     <style>${TICKET_STYLES}</style>
   </head>
@@ -203,11 +247,12 @@ export function printOrderTickets(
   const iframe = document.createElement('iframe')
   iframe.setAttribute('aria-hidden', 'true')
   iframe.style.position = 'fixed'
-  iframe.style.right = '0'
-  iframe.style.bottom = '0'
-  iframe.style.width = '0'
-  iframe.style.height = '0'
+  iframe.style.left = '-10000px'
+  iframe.style.top = '0'
+  iframe.style.width = '80mm'
+  iframe.style.height = '100vh'
   iframe.style.border = '0'
+  iframe.style.visibility = 'hidden'
   document.body.appendChild(iframe)
 
   const frameWindow = iframe.contentWindow
@@ -217,19 +262,37 @@ export function printOrderTickets(
     return
   }
 
-  frameDocument.open()
-  frameDocument.write(html)
-  frameDocument.close()
+  let printed = false
 
   const cleanup = () => {
     window.setTimeout(() => {
       if (iframe.parentNode) {
         iframe.parentNode.removeChild(iframe)
       }
-    }, 500)
+    }, 1000)
   }
 
-  frameWindow.focus()
-  frameWindow.print()
-  cleanup()
+  const triggerPrint = () => {
+    if (printed) return
+    printed = true
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        frameWindow.focus()
+        frameWindow.print()
+        cleanup()
+      })
+    })
+  }
+
+  frameWindow.addEventListener('afterprint', cleanup, { once: true })
+
+  iframe.addEventListener('load', triggerPrint, { once: true })
+
+  frameDocument.open()
+  frameDocument.write(html)
+  frameDocument.close()
+
+  // Fallback: algunos navegadores no disparan load tras document.write
+  window.setTimeout(triggerPrint, 300)
 }
