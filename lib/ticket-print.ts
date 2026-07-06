@@ -1,6 +1,6 @@
 import { formatDateAR, formatTimeAR, formatDateTimeAR } from '@/lib/datetime'
 import { formatPrice } from '@/lib/coty-theme'
-import { getPaymentStatusLabel, ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS } from '@/lib/order-labels'
+import { getPaymentStatusLabel, ORDER_TYPE_LABELS } from '@/lib/order-labels'
 import type { Order } from '@/lib/types'
 
 export type TicketVariant = 'kitchen' | 'customer'
@@ -10,9 +10,20 @@ export type TicketPrintInput = {
   businessName: string
 }
 
-/** Nexuspös X-NX 58II UB — 58 mm ≈ 32 caracteres por línea. */
-const LINE_WIDTH = 32
-const SEPARATOR = '-'.repeat(26)
+/**
+ * Nexuspös X-NX 58II UB — área imprimible real ≈ 26-28 chars
+ * (32 cols teóricos, pero el driver recorta ~4 chars a la derecha).
+ */
+const LINE_WIDTH = 28
+const PRICE_WIDTH = 8
+const SEPARATOR = '-'.repeat(22)
+
+const TICKET_PAYMENT_LABELS: Record<Order['paymentMethod'], string> = {
+  cash: 'Efectivo',
+  card: 'Tarjeta',
+  transfer: 'Transferencia',
+  mercado_pago: 'Mercado Pago',
+}
 
 const TICKET_STYLES = `
   @page { size: 58mm auto; margin: 0; }
@@ -22,7 +33,7 @@ const TICKET_STYLES = `
   html, body {
     width: 58mm;
     margin: 0;
-    padding: 0;
+    padding: 0 1.5mm 0 0.5mm;
     background: #fff;
     color: #000;
     -webkit-print-color-adjust: exact;
@@ -32,11 +43,11 @@ const TICKET_STYLES = `
   .ticket {
     width: ${LINE_WIDTH}ch;
     max-width: ${LINE_WIDTH}ch;
-    margin: 0 auto;
+    margin: 0;
     padding: 2mm 0;
     page-break-after: always;
     font-family: "Courier New", Courier, monospace;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     line-height: 1.3;
     white-space: pre;
@@ -90,17 +101,22 @@ function line(text: string, width = LINE_WIDTH): string {
   return text.slice(0, width)
 }
 
-function twoColumns(left: string, right: string, width = LINE_WIDTH): string {
-  const rightText = right.slice(0, width)
-  const maxLeft = Math.max(1, width - rightText.length)
-  const leftText = left.length > maxLeft ? left.slice(0, maxLeft) : left
-  return leftText.padEnd(width - rightText.length) + rightText
+function formatPriceColumn(price: string): string {
+  if (price.length > PRICE_WIDTH) return price.slice(-PRICE_WIDTH)
+  return ' '.repeat(PRICE_WIDTH - price.length) + price
 }
 
-function wrapPrefixed(prefix: string, value: string, width = LINE_WIDTH): string[] {
-  const words = value.split(/\s+/)
+function twoColumns(left: string, right: string, width = LINE_WIDTH): string {
+  const rightText = formatPriceColumn(right)
+  const maxLeft = width - PRICE_WIDTH
+  const leftText = left.length > maxLeft ? left.slice(0, maxLeft) : left
+  return leftText.padEnd(maxLeft) + rightText
+}
+
+function wrapText(text: string, width = LINE_WIDTH): string[] {
+  const words = text.split(/\s+/)
   const lines: string[] = []
-  let current = prefix
+  let current = ''
 
   for (const word of words) {
     const candidate = current ? `${current} ${word}` : word
@@ -110,11 +126,36 @@ function wrapPrefixed(prefix: string, value: string, width = LINE_WIDTH): string
     }
 
     if (current) lines.push(line(current, width))
-    current = word
+    current = word.length > width ? word.slice(0, width) : word
   }
 
   if (current) lines.push(line(current, width))
-  return lines.length ? lines : [line(prefix, width)]
+  return lines.length ? lines : [line('', width)]
+}
+
+function wrapPrefixed(prefix: string, value: string, width = LINE_WIDTH): string[] {
+  return wrapText(`${prefix} ${value}`.trim(), width)
+}
+
+function renderPricedLine(label: string, price: number): string[] {
+  const priceText = formatPrice(price)
+  const available = LINE_WIDTH - PRICE_WIDTH
+
+  if (label.length <= available) {
+    return [twoColumns(label, priceText)]
+  }
+
+  const wrapped = wrapText(label, LINE_WIDTH)
+  const lastIndex = wrapped.length - 1
+  const lastLine = wrapped[lastIndex]
+
+  if (lastLine.length <= available) {
+    wrapped[lastIndex] = twoColumns(lastLine, priceText)
+    return wrapped
+  }
+
+  wrapped.push(formatPriceColumn(priceText))
+  return wrapped
 }
 
 function renderItemLines(order: Order, showPrices: boolean): string[] {
@@ -126,24 +167,25 @@ function renderItemLines(order: Order, showPrices: boolean): string[] {
     const itemLabel = `• ${item.product.name} (x${item.quantity})`
 
     if (showPrices) {
-      lines.push(twoColumns(itemLabel, formatPrice(lineTotal)))
+      lines.push(...renderPricedLine(itemLabel, lineTotal))
     } else {
-      lines.push(line(itemLabel))
+      lines.push(...wrapText(itemLabel))
     }
 
     if (item.selectionLines?.length) {
       for (const selection of item.selectionLines) {
         const addonLabel = `  • ${selection.choiceName} (x${item.quantity})`
+        const addonTotal = selection.priceModifier * item.quantity
         if (showPrices) {
-          lines.push(twoColumns(addonLabel, formatPrice(selection.priceModifier * item.quantity)))
+          lines.push(...renderPricedLine(addonLabel, addonTotal))
         } else {
-          lines.push(line(addonLabel))
+          lines.push(...wrapText(addonLabel))
         }
       }
     }
 
     if (item.notes) {
-      lines.push(...wrapPrefixed('  Nota:', item.notes))
+      lines.push(...wrapPrefixed('Nota:', item.notes))
     }
   }
 
@@ -163,7 +205,7 @@ function renderCustomerTicketText({ order, businessName }: TicketPrintInput): st
     center(formatOrderNumber(order)),
     SEPARATOR,
     line(`Modalidad: ${ORDER_TYPE_LABELS[order.type]}`),
-    line(`Medio de pago: ${PAYMENT_METHOD_LABELS[order.paymentMethod]}`),
+    line(`Pago: ${TICKET_PAYMENT_LABELS[order.paymentMethod]}`),
     line(`Estado: ${getTicketPaymentStatus(order)}`),
     line(`Fecha: ${formatDateAR(createdAt)}`),
     line(`Hora: ${formatTimeAR(createdAt)}`),
@@ -176,7 +218,7 @@ function renderCustomerTicketText({ order, businessName }: TicketPrintInput): st
     lines.push(...wrapPrefixed('-Dirección:', order.customerAddress))
   }
   if (order.deliveryZoneName) {
-    lines.push(line(`-Zona de envío: ${order.deliveryZoneName}`))
+    lines.push(line(`-Zona: ${order.deliveryZoneName}`))
   }
   if (order.customerPhone && order.customerPhone !== 'mesa') {
     lines.push(line(`-Teléfono: ${order.customerPhone}`))
@@ -187,10 +229,10 @@ function renderCustomerTicketText({ order, businessName }: TicketPrintInput): st
 
   lines.push(
     SEPARATOR,
-    twoColumns('Items:', 'Precio Unit.'),
+    twoColumns('Items:', 'Precio'),
     ...renderItemLines(order, true),
     SEPARATOR,
-    line(`Total de productos: ${formatPrice(productsTotal)}`)
+    line(`Total productos: ${formatPrice(productsTotal)}`)
   )
 
   if (order.deliveryFee) lines.push(line(`Envío: ${formatPrice(order.deliveryFee)}`))
@@ -210,17 +252,17 @@ function renderKitchenTicketText({ order, businessName }: TicketPrintInput): str
     center(businessName),
     center(formatOrderNumber(order)),
     SEPARATOR,
-    line(`${ORDER_TYPE_LABELS[order.type]}${order.tableNumber ? ` · Mesa ${order.tableNumber}` : ''}`),
+    line(`${ORDER_TYPE_LABELS[order.type]}${order.tableNumber ? ` M${order.tableNumber}` : ''}`),
     line(`Hora: ${formatDateTimeAR(createdAt)}`),
     line(`Cliente: ${order.customerName}`),
   ]
 
-  if (order.customerAddress) lines.push(line(`Dirección: ${order.customerAddress}`))
+  if (order.customerAddress) lines.push(...wrapText(`Dir: ${order.customerAddress}`))
   if (order.deliveryZoneName) lines.push(line(`Zona: ${order.deliveryZoneName}`))
   if (order.notes) lines.push(...wrapPrefixed('Notas:', order.notes))
 
   lines.push(SEPARATOR, line('Items:'), ...renderItemLines(order, false), SEPARATOR)
-  lines.push(center(`Comanda de cocina · ${businessName}`))
+  lines.push(center(`Cocina · ${businessName}`))
 
   return lines.join('\n')
 }
