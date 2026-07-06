@@ -14,7 +14,6 @@ export type TicketPrintInput = {
 const TICKET_PAPER_MM = 58
 const TICKET_CONTENT_MM = 48
 const SEPARATOR_LINE = '--------------------------'
-const APP_BRAND = 'ordenApp'
 
 const TICKET_STYLES = `
   @page {
@@ -201,7 +200,7 @@ function renderCustomerTicket({ order, businessName }: TicketPrintInput) {
       ${order.tip ? `<div class="field">Propina: ${formatPrice(order.tip)}</div>` : ''}
       <div class="field bold">TOTAL: ${formatPrice(order.total)}</div>
       ${separator()}
-      <div class="center">${APP_BRAND}</div>
+      <div class="center">${escapeHtml(businessName)}</div>
     </section>
   `
 }
