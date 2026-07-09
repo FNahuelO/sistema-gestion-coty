@@ -442,6 +442,15 @@ export async function requirePermission(permission: Permission) {
   return user
 }
 
+export async function requireAnyPermission(...permissions: Permission[]) {
+  const user = await requireSessionUser()
+  const context = toSessionContext(user)
+  if (!permissions.some((permission) => hasPermission(context, permission))) {
+    throw new Error('FORBIDDEN')
+  }
+  return user
+}
+
 export function serializeCategory(category: Prisma.CategoryUncheckedCreateInput & { id: string; name: string; icon: string; sortOrder: number; active?: boolean }) {
   return {
     id: category.id,

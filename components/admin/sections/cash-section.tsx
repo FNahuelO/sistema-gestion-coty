@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,8 @@ import { formatPrice } from '@/lib/coty-theme'
 import { formatDateAR, formatDateTimeAR } from '@/lib/datetime'
 import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TITLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
+import { hasPermission, type SessionRoleContext } from '@/lib/permissions'
+import { useAuth } from '@/lib/store'
 import { useFormPanel } from '../hooks/use-form-panel'
 import { AdminFormPanel } from '../ui/admin-form-panel'
 import { AdminPageHeader } from '../ui/admin-page-header'
@@ -51,6 +53,17 @@ function num(value: string | number | null | undefined) {
 }
 
 export function CashSection() {
+  const { user } = useAuth()
+  const roleContext = useMemo<SessionRoleContext>(
+    () => ({
+      role: user?.role === 'admin' ? 'admin' : 'staff',
+      staffRole: user?.staffRole ?? null,
+    }),
+    [user]
+  )
+  const canOpenClose = hasPermission(roleContext, 'cashier:close')
+  const canRegisterMovement = hasPermission(roleContext, 'cash:movement')
+
   const { open, setOpen, openPanel } = useFormPanel('cash')
   const [formMode, setFormMode] = useState<CashFormMode>('open')
 
@@ -231,30 +244,36 @@ export function CashSection() {
         description="Apertura, movimientos y cierre de turno"
         action={
           !openSession ? (
-            <Button
-              size="default"
-              className={cn('h-11 w-full sm:h-9 sm:w-auto', PANEL_PRIMARY_BTN)}
-              onClick={() => openForm('open')}
-            >
-              Abrir caja
-            </Button>
-          ) : (
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-              <Button
-                size="default"
-                variant="outline"
-                className={cn('h-11 w-full sm:h-9 sm:w-auto', PANEL_OUTLINE_BTN)}
-                onClick={() => openForm('movement')}
-              >
-                Movimiento
-              </Button>
+            canOpenClose ? (
               <Button
                 size="default"
                 className={cn('h-11 w-full sm:h-9 sm:w-auto', PANEL_PRIMARY_BTN)}
-                onClick={() => openForm('close')}
+                onClick={() => openForm('open')}
               >
-                Cerrar caja
+                Abrir caja
               </Button>
+            ) : null
+          ) : (
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              {canRegisterMovement ? (
+                <Button
+                  size="default"
+                  variant="outline"
+                  className={cn('h-11 w-full sm:h-9 sm:w-auto', PANEL_OUTLINE_BTN)}
+                  onClick={() => openForm('movement')}
+                >
+                  Movimiento
+                </Button>
+              ) : null}
+              {canOpenClose ? (
+                <Button
+                  size="default"
+                  className={cn('h-11 w-full sm:h-9 sm:w-auto', PANEL_PRIMARY_BTN)}
+                  onClick={() => openForm('close')}
+                >
+                  Cerrar caja
+                </Button>
+              ) : null}
             </div>
           )
         }

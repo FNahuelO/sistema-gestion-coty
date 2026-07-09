@@ -13,7 +13,7 @@ const movementSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requirePermission('cashier:close')
+    const user = await requirePermission('cash:movement')
     const input = movementSchema.parse(await request.json())
     const movement = await addCashMovement(input.sessionId, user.id, input)
     return NextResponse.json(movement)

@@ -10,6 +10,7 @@ import { CashSection } from '@/components/admin/sections/cash-section'
 import { StaffPageHeader, StaffShell, type StaffSection } from '@/components/staff/staff-shell'
 import { useKitchenAlert } from '@/hooks/use-kitchen-alert'
 import { useCallsAlert } from '@/hooks/use-calls-alert'
+import { canAccessCash } from '@/lib/permissions'
 import { useAuth } from '@/lib/store'
 
 const SECTION_COPY: Record<StaffSection, { title: string; description: string }> = {
@@ -22,21 +23,30 @@ const SECTION_COPY: Record<StaffSection, { title: string; description: string }>
 }
 
 // El cadete (runner) sólo opera sus entregas; cocina sólo ve la pantalla de
-// cocina; cajera/mesera y admin ven el panel completo.
+// cocina; cajera y admin ven caja; mesera y admin ven el panel operativo sin caja.
 const RUNNER_SECTIONS: StaffSection[] = ['delivery']
 const KITCHEN_SECTIONS: StaffSection[] = ['kitchen']
-const FULL_SECTIONS: StaffSection[] = ['orders', 'kitchen', 'tables', 'delivery', 'calls', 'cash']
+const BASE_STAFF_SECTIONS: StaffSection[] = ['orders', 'kitchen', 'tables', 'delivery', 'calls']
 
 export function StaffDashboard() {
   const { user } = useAuth()
   const isRunner = user?.role !== 'admin' && user?.staffRole === 'runner'
   const isKitchen = user?.role !== 'admin' && user?.staffRole === 'kitchen'
 
-  const allowedSections = isRunner
-    ? RUNNER_SECTIONS
-    : isKitchen
-      ? KITCHEN_SECTIONS
-      : FULL_SECTIONS
+  const roleContext = useMemo(
+    () => ({
+      role: user?.role === 'admin' ? 'admin' as const : 'staff' as const,
+      staffRole: user?.staffRole ?? null,
+    }),
+    [user]
+  )
+
+  const allowedSections = useMemo(() => {
+    if (isRunner) return RUNNER_SECTIONS
+    if (isKitchen) return KITCHEN_SECTIONS
+    if (canAccessCash(roleContext)) return [...BASE_STAFF_SECTIONS, 'cash']
+    return BASE_STAFF_SECTIONS
+  }, [isRunner, isKitchen, roleContext])
 
   const [activeSection, setActiveSection] = useState<StaffSection>(allowedSections[0])
 
