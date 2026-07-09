@@ -8,6 +8,7 @@ export type Permission =
   | 'schedules:manage'
   | 'staff:operate'
   | 'cashier:close'
+  | 'cash:movement'
 
 export type StaffRoleType = 'cashier' | 'waitress' | 'runner' | 'kitchen'
 
@@ -26,14 +27,20 @@ const ADMIN_PERMISSIONS: Permission[] = [
   'schedules:manage',
   'staff:operate',
   'cashier:close',
+  'cash:movement',
 ]
 
-const CASHIER_PERMISSIONS: Permission[] = [
+const WAITRESS_PERMISSIONS: Permission[] = [
   'admin:access',
   'tables:manage',
   'settings:read',
   'staff:operate',
+]
+
+const CASHIER_PERMISSIONS: Permission[] = [
+  ...WAITRESS_PERMISSIONS,
   'cashier:close',
+  'cash:movement',
 ]
 
 const RUNNER_PERMISSIONS: Permission[] = ['staff:operate']
@@ -61,7 +68,8 @@ export function mapStaffRole(value?: string | null): StaffRoleType | null {
 
 export function getPermissions(context: SessionRoleContext): Permission[] {
   if (context.role === 'admin') return ADMIN_PERMISSIONS
-  if (context.staffRole === 'cashier' || context.staffRole === 'waitress') return CASHIER_PERMISSIONS
+  if (context.staffRole === 'cashier') return CASHIER_PERMISSIONS
+  if (context.staffRole === 'waitress') return WAITRESS_PERMISSIONS
   if (context.staffRole === 'kitchen') return KITCHEN_PERMISSIONS
   return RUNNER_PERMISSIONS
 }
@@ -91,7 +99,12 @@ export const ADMIN_SECTION_PERMISSIONS: Record<string, Permission> = {
   settings: 'settings:read',
 }
 
+export function canAccessCash(context: SessionRoleContext): boolean {
+  return hasPermission(context, 'cashier:close') || hasPermission(context, 'cash:movement')
+}
+
 export function canAccessAdminSection(context: SessionRoleContext, section: string): boolean {
+  if (section === 'cash') return canAccessCash(context)
   const permission = ADMIN_SECTION_PERMISSIONS[section]
   if (!permission) return false
   return hasPermission(context, permission)

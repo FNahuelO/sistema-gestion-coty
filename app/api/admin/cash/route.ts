@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getOpenCashSession, listCashSessions, openCashSession } from '@/lib/commerce'
 import { handleRouteError } from '@/lib/api-errors'
-import { requirePermission } from '@/lib/server-data'
+import { requireAnyPermission, requirePermission } from '@/lib/server-data'
 
 export async function GET() {
   try {
-    await requirePermission('cashier:close')
+    await requireAnyPermission('cashier:close', 'cash:movement')
     const [open, sessions] = await Promise.all([getOpenCashSession(), listCashSessions()])
     return NextResponse.json({ open, sessions })
   } catch (error) {
