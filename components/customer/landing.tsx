@@ -43,6 +43,7 @@ import {
 } from '@/lib/coty-theme'
 import { LandingCarouselSkeleton, LandingFooterSkeleton, LoadingSkeleton } from '@/components/shared/loading'
 import { PromotionBanner } from '@/components/customer/promotion-banner'
+import { ProductImage } from '@/components/customer/product-image'
 import { InstallAppPrompt } from '@/components/customer/install-app-prompt'
 
 const HERO_IMAGE =
@@ -241,7 +242,7 @@ function ProductCard({
         }`}
     >
       <div className="aspect-4/3 shrink-0 overflow-hidden">
-        <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+        <ProductImage src={product.image} alt={product.name} />
       </div>
       <div className="flex flex-1 flex-col p-3 md:p-4">
         <h3 className="line-clamp-2 min-h-10 text-sm font-bold leading-tight md:min-h-11 md:text-base">
