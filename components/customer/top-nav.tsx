@@ -17,6 +17,7 @@ import { useCart, useCatalog, useTableSession } from '@/lib/store'
 import { buildCustomerPath } from '@/lib/menu-url'
 import { buildFacebookUrl, buildInstagramUrl } from '@/lib/social-links'
 import Image from 'next/image'
+import { LoadingImage } from '@/components/shared/loading-image'
 
 const NAV_ITEMS = [
   { path: '/', label: 'Inicio', icon: '/icons/inicio.svg', match: (path: string) => path === '/' },
@@ -90,10 +91,13 @@ export function CustomerTopNav() {
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <div className="flex items-center gap-6 py-4 lg:gap-8">
           <Link href="/" className="shrink-0">
-            <img
+            <LoadingImage
               src={LOGO_SRC_SVG}
               alt="Coty Café"
-              className="h-12 w-auto object-contain mix-blend-screen lg:h-14"
+              inline
+              loading="eager"
+              skeleton={false}
+              imgClassName="h-12 w-auto object-contain mix-blend-screen lg:h-14"
             />
           </Link>
 

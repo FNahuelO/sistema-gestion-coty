@@ -11,7 +11,7 @@ import type { Product, Promotion, SelectedOption } from '@/lib/types'
 import { getDiscountedUnitPrice, getProductDiscountPercent } from '@/lib/promotions'
 import { COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
 import { cn } from '@/lib/utils'
-import { ProductImage } from '@/components/customer/product-image'
+import { LoadingImage } from '@/components/shared/loading-image'
 
 interface ProductDetailModalProps {
   product: Product
@@ -161,7 +161,7 @@ export function ProductDetailModal({ product, promotions = [], onClose, onAddToC
     <SimpleModal open onClose={onClose} title={product.name} footer={addToCartFooter}>
       <div className="space-y-5">
         <div className="relative mx-auto aspect-square w-full max-w-[200px] overflow-hidden rounded-2xl">
-          <ProductImage src={product.image} alt={product.name} className="rounded-2xl" />
+          <LoadingImage src={product.image} alt={product.name} className="rounded-2xl" />
         </div>
 
         <div className="text-center">

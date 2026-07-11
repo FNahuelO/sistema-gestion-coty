@@ -3,7 +3,7 @@
 import { Minus, Plus, Trash2 } from 'lucide-react'
 import type { CartItem } from '@/lib/types'
 import { COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
-import { ProductImage } from '@/components/customer/product-image'
+import { LoadingImage } from '@/components/shared/loading-image'
 
 export function getCartItemUnitPrice(item: CartItem) {
   const optionsTotal =
@@ -56,11 +56,7 @@ export function CartProductCard({
     return (
       <article className="flex items-start gap-3 border-b border-black/8 py-3 last:border-b-0">
         <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl">
-          <img
-            src={item.product.image}
-            alt={item.product.name}
-            className="h-full w-full object-cover"
-          />
+          <LoadingImage src={item.product.image} alt={item.product.name} />
         </div>
 
         <div className="min-w-0 flex-1">
@@ -170,7 +166,7 @@ export function CartProductCard({
   return (
     <article className="flex gap-3 rounded-2xl border border-black/8 bg-white p-3 shadow-sm">
       <div className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl md:h-[96px] md:w-[96px]">
-        <ProductImage src={item.product.image} alt={item.product.name} className="rounded-xl" />
+        <LoadingImage src={item.product.image} alt={item.product.name} className="rounded-xl" />
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">

@@ -10,6 +10,7 @@ import { formatPrice } from '@/lib/coty-theme'
 import { arDayEndISO, arDayKey, arDayStartISO } from '@/lib/datetime'
 import { PANEL_CARD, PANEL_INPUT, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_SURFACE_ALT, PANEL_TITLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
+import { LoadingImage } from '@/components/shared/loading-image'
 import { useAdminData } from '@/lib/store'
 import { HourlySalesChart } from '@/components/admin/charts/hourly-sales-chart'
 import { SalesChart } from '@/components/admin/charts/sales-chart'
@@ -214,10 +215,10 @@ export function DashboardSection() {
             <div key={product.productId} className={cn(PANEL_LIST_ROW, 'flex items-center justify-between gap-3 text-sm')}>
               <div className="flex min-w-0 items-center gap-3">
                 {product.imageUrl ? (
-                  <img
+                  <LoadingImage
                     src={product.imageUrl}
                     alt={product.productName}
-                    className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                    className="h-10 w-10 shrink-0 rounded-lg"
                   />
                 ) : (
                   <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs text-muted-foreground', PANEL_SURFACE_ALT)}>

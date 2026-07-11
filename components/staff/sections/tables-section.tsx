@@ -43,6 +43,7 @@ import { COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
 import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
+import { LoadingImage } from '@/components/shared/loading-image'
 import { getDiscountedUnitPrice } from '@/lib/promotions'
 import { PAYMENT_METHOD_LABELS } from '@/lib/order-labels'
 
@@ -532,10 +533,10 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
                             onClick={() => handleProductClick(product)}
                             className="flex w-full items-center gap-3 rounded-xl border border-gray-100 dark:border-border bg-white p-2 text-left transition-colors hover:bg-[#F8FBFA] dark:bg-card dark:hover:bg-muted"
                           >
-                            <img
+                            <LoadingImage
                               src={product.image}
                               alt={product.name}
-                              className="h-12 w-12 rounded-lg object-cover"
+                              className="h-12 w-12 rounded-lg"
                             />
                             <div className="flex-1">
                               <p className="font-medium">{product.name}</p>
@@ -618,10 +619,10 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
                         className="flex items-center justify-between gap-2 rounded-xl border border-gray-100 dark:border-border bg-[#F8FBFA] p-2 dark:bg-muted"
                       >
                         <div className="flex min-w-0 items-center gap-2">
-                          <img
+                          <LoadingImage
                             src={item.product.image}
                             alt={item.product.name}
-                            className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                            className="h-10 w-10 shrink-0 rounded-lg"
                           />
                           <div className="min-w-0">
                             <p className="truncate text-sm font-medium">{item.product.name}</p>

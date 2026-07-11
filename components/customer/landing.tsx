@@ -43,7 +43,7 @@ import {
 } from '@/lib/coty-theme'
 import { LandingCarouselSkeleton, LandingFooterSkeleton, LoadingSkeleton } from '@/components/shared/loading'
 import { PromotionBanner } from '@/components/customer/promotion-banner'
-import { ProductImage } from '@/components/customer/product-image'
+import { LoadingImage } from '@/components/shared/loading-image'
 import { InstallAppPrompt } from '@/components/customer/install-app-prompt'
 
 const HERO_IMAGE =
@@ -145,10 +145,11 @@ function HeroCard({ subtitle, menuHref = '/menu' }: { subtitle: string; menuHref
           </Link>
         </div>
         <div className="relative flex-1 overflow-visible" style={{ backgroundColor: COTY_PAGE_BG }}>
-          <img
+          <LoadingImage
             src={HERO_IMAGE}
             alt="Especialidad del local"
-            className="absolute -right-3 top-1/2 h-[118%] w-[118%] max-w-none -translate-y-1/2 object-cover object-center md:-right-5"
+            className="absolute -right-3 top-1/2 h-[118%] w-[118%] max-w-none -translate-y-1/2 md:-right-5"
+            imgClassName="object-center"
           />
         </div>
       </div>
@@ -242,7 +243,7 @@ function ProductCard({
         }`}
     >
       <div className="aspect-4/3 shrink-0 overflow-hidden">
-        <ProductImage src={product.image} alt={product.name} />
+        <LoadingImage src={product.image} alt={product.name} />
       </div>
       <div className="flex flex-1 flex-col p-3 md:p-4">
         <h3 className="line-clamp-2 min-h-10 text-sm font-bold leading-tight md:min-h-11 md:text-base">
@@ -402,10 +403,13 @@ export function CustomerLanding() {
             <TablePill />
 
             <Link href="/" className="flex justify-center">
-              <img
+              <LoadingImage
                 src={LOGO_SRC_SVG}
                 alt="Coty Café"
-                className="h-16 w-auto object-contain mix-blend-screen"
+                inline
+                loading="eager"
+                skeleton={false}
+                imgClassName="h-16 w-auto object-contain mix-blend-screen"
               />
             </Link>
 
@@ -531,16 +535,19 @@ export function CustomerLanding() {
         {/* CTA */}
         <section className="pb-6 md:pb-10">
           <div className="relative overflow-hidden rounded-2xl md:rounded-3xl">
-            <img
+            <LoadingImage
               src={CTA_IMAGE}
               alt="Hacé tu pedido"
-              className="h-28 w-full object-cover md:h-40 lg:h-48"
+              className="h-28 w-full md:h-40 lg:h-48"
             />
             <div className="absolute inset-0 flex items-center justify-around gap-4 bg-black/45 px-4 md:px-8 lg:px-12">
-              <img
+              <LoadingImage
                 src={LOGO_SRC_SVG}
                 alt="Coty Café"
-                className="h-12 w-auto object-contain mix-blend-screen md:h-14"
+                inline
+                loading="eager"
+                skeleton={false}
+                imgClassName="h-12 w-auto object-contain mix-blend-screen md:h-14"
               />
               <Link
                 href="/menu"
@@ -661,10 +668,13 @@ export function CustomerLanding() {
 
       {/* Footer final */}
       <footer className="mx-auto flex max-w-6xl flex-col items-center px-4 pb-10 pt-6 md:px-8 md:pb-14 md:pt-10">
-        <img
+        <LoadingImage
           src={LOGO_SRC_SVG_NEGRO}
           alt={settings.name}
-          className="h-16 w-auto object-contain md:h-24"
+          inline
+          loading="eager"
+          skeleton={false}
+          imgClassName="h-16 w-auto object-contain md:h-24"
         />
         <p className="mt-4 text-center text-[10px] text-muted-foreground md:text-xs">
           {settings.name} © {new Date().getFullYear()}. Todos los derechos reservados.

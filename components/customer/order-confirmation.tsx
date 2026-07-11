@@ -29,6 +29,7 @@ import {
   getOrderLabel,
 } from '@/components/customer/customer-order-tracking'
 import { LoadingSkeleton } from '@/components/shared/loading'
+import { LoadingImage } from '@/components/shared/loading-image'
 import { OrderNotificationsButton } from '@/components/customer/order-notifications-button'
 import { TransferPaymentDetails } from '@/components/customer/transfer-payment-details'
 import { shouldShowOrderEstimate } from '@/lib/order-estimate'
@@ -126,10 +127,13 @@ function ConfirmationHeader({
           <>
             <div className="w-9" aria-hidden />
             <Link href="/" className="flex justify-center">
-              <img
+              <LoadingImage
                 src={LOGO_SRC_SVG}
                 alt="Coty Café"
-                className="h-11 w-auto object-contain mix-blend-screen"
+                inline
+                loading="eager"
+                skeleton={false}
+                imgClassName="h-11 w-auto object-contain mix-blend-screen"
               />
             </Link>
             <div
@@ -144,10 +148,13 @@ function ConfirmationHeader({
           </>
         ) : (
           <Link href={backHref ?? '/'} className="flex justify-center">
-            <img
+            <LoadingImage
               src={LOGO_SRC_SVG}
               alt="Coty Café"
-              className="h-11 w-auto object-contain mix-blend-screen"
+              inline
+              loading="eager"
+              skeleton={false}
+              imgClassName="h-11 w-auto object-contain mix-blend-screen"
             />
           </Link>
         )}

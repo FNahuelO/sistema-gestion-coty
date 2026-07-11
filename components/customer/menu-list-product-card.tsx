@@ -8,7 +8,7 @@ import { getDefaultCartItem } from '@/lib/menu-cart-utils'
 import { ProductPriceDisplay } from '@/components/customer/product-price-display'
 import { getProductDiscountPercent } from '@/lib/promotions'
 import { Badge } from '@/components/ui/badge'
-import { ProductImage } from '@/components/customer/product-image'
+import { LoadingImage } from '@/components/shared/loading-image'
 
 interface MenuListProductCardProps {
   product: Product
@@ -65,7 +65,7 @@ export function MenuListProductCard({
         onClick={onOpenDetail}
         className="relative h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl md:h-[96px] md:w-[96px]"
       >
-        <ProductImage src={product.image} alt={product.name} />
+        <LoadingImage src={product.image} alt={product.name} />
         {discount > 0 && (
           <Badge className="absolute left-1 top-1 bg-[#EAB308] px-1 text-[9px] text-white hover:bg-[#EAB308]">
             Promo
