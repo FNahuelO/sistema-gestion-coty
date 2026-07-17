@@ -59,7 +59,7 @@ export function getPaymentStatusLabel(order: Pick<Order, 'paymentMethod' | 'paym
   return PAYMENT_STATUS_LABELS[order.paymentStatus]
 }
 
-const INTERNAL_CUSTOMER_PHONES = new Set(['mesa', 'staff'])
+const INTERNAL_CUSTOMER_PHONES = new Set(['mesa', 'staff', 'mostrador'])
 
 export function isDisplayableCustomerPhone(phone?: string | null): boolean {
   const value = phone?.trim()

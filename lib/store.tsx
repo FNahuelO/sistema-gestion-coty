@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { SessionProvider, signIn, signOut, useSession } from 'next-auth/react'
-import type { AnalyticsOverview, BusinessSettings, CartItem, Category, ChannelSchedule, ChannelSetting, Order, OrderStatus, Product, Promotion, SelectedOption, Table, User } from '@/lib/types'
+import type { AnalyticsOverview, BusinessSettings, CartItem, Category, ChannelSchedule, ChannelSetting, Order, OrderStatus, PaymentMethod, Product, Promotion, SelectedOption, Table, User } from '@/lib/types'
 import { getOfflineCache, isBrowserOffline, OFFLINE_CACHE_KEYS, setOfflineCache } from '@/lib/offline-cache'
 import {
   enqueueOfflineOrder,
@@ -664,9 +664,31 @@ export function useOrders() {
     [mutate]
   )
 
+  const createManualOrder = useCallback(
+    async (payload: {
+      type: 'delivery' | 'pickup'
+      source: 'phone' | 'walk_in'
+      paymentMethod: Exclude<PaymentMethod, 'mercado_pago'>
+      customerName: string
+      customerPhone: string
+      customerAddress?: string
+      deliveryZoneId?: string
+      notes?: string
+      items: CreateOrderItemInput[]
+    }) => {
+      const order = parseOrder(
+        await sendJson<Order & { createdAt: string; updatedAt: string }>('/api/staff/orders', 'POST', payload)
+      )
+      await mutate()
+      return order
+    },
+    [mutate]
+  )
+
   return {
     orders,
     addOrder,
+    createManualOrder,
     updateOrderStatus,
     updateOrderEstimate,
     closeOrder,
