@@ -14,6 +14,7 @@ import {
   ChefHat,
   Package,
   ArrowUpDown,
+  Plus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -23,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useOrders, useBusiness } from '@/lib/store'
 import { usePendingAction } from '@/hooks/use-pending-action'
 import { OrderDetailSheet } from '@/components/staff/order-detail-sheet'
+import { ManualOrderDialog } from '@/components/staff/manual-order-dialog'
 import { StaffNotificationsButton } from '@/components/staff/staff-notifications-button'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
@@ -34,7 +36,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { toast } from 'sonner'
 import { COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
-import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
+import { PANEL_CARD, PANEL_LIST_ROW, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
 import { Spinner } from '@/components/ui/spinner'
 import { formatDeliveryAssignmentStatus } from '@/lib/delivery-labels'
 import { cn } from '@/lib/utils'
@@ -102,7 +104,8 @@ export function OrdersSection({
   embedded?: boolean
   onNavigateToCalls?: () => void
 }) {
-  const { orders, updateOrderStatus, updateOrderEstimate, closeOrder, approveOrderPayment } = useOrders()
+  const { orders, createManualOrder, updateOrderStatus, updateOrderEstimate, closeOrder, approveOrderPayment } =
+    useOrders()
   const { settings } = useBusiness()
   const businessName = settings?.name ?? 'Coty Café'
   const { data: deliveryQueue = [], mutate: mutateDeliveryQueue } = useSWR<DeliveryQueueEntry[]>(
@@ -121,6 +124,7 @@ export function OrdersSection({
   const [statusFilter, setStatusFilter] = useState<string>('active')
   const [sortBy, setSortBy] = useState<OrderSortKey>('status')
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [manualOrderOpen, setManualOrderOpen] = useState(false)
 
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -298,6 +302,13 @@ export function OrdersSection({
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              className={cn(PANEL_PRIMARY_BTN, 'w-full shrink-0 md:w-auto')}
+              onClick={() => setManualOrderOpen(true)}
+            >
+              <Plus className="mr-1.5 h-4 w-4" />
+              Nuevo pedido
+            </Button>
             <StaffNotificationsButton
               orders={orders}
               onSelectOrder={setSelectedOrder}
@@ -524,6 +535,14 @@ export function OrdersSection({
         onDeliveryUpdated={() => void mutateDeliveryQueue()}
         isPending={isPending}
         isBusy={isBusy}
+      />
+
+      <ManualOrderDialog
+        open={manualOrderOpen}
+        onOpenChange={setManualOrderOpen}
+        onSubmit={async (payload) => {
+          await createManualOrder(payload)
+        }}
       />
     </div>
   )

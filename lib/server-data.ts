@@ -908,7 +908,16 @@ async function applyStockDeltaForOrderItems(
   }
 }
 
-export async function createOrderFromPayload(payload: z.input<typeof createOrderSchema>, createdByUserId?: string) {
+export type CreateOrderOptions = {
+  /** Staff/caja: permite cargar pedidos aunque el canal o el local figure cerrado en la app. */
+  bypassChannelHours?: boolean
+}
+
+export async function createOrderFromPayload(
+  payload: z.input<typeof createOrderSchema>,
+  createdByUserId?: string,
+  options?: CreateOrderOptions
+) {
   const input = createOrderSchema.parse(payload)
   const settings = await prisma.businessSettings.findUnique({ where: { id: 'main' } })
 
@@ -916,7 +925,7 @@ export async function createOrderFromPayload(payload: z.input<typeof createOrder
     throw new Error('SETTINGS_NOT_FOUND')
   }
 
-  if (!settings.isOpen && input.type !== 'table') {
+  if (!options?.bypassChannelHours && !settings.isOpen && input.type !== 'table') {
     throw new Error('BUSINESS_CLOSED')
   }
 
@@ -924,7 +933,7 @@ export async function createOrderFromPayload(payload: z.input<typeof createOrder
     throw new Error('MERCADOPAGO_UNAVAILABLE')
   }
 
-  if (input.type !== 'table') {
+  if (!options?.bypassChannelHours && input.type !== 'table') {
     const availability = await getOrderChannelAvailability(input.type, settings)
     if (!availability.open) {
       throw new Error('CHANNEL_CLOSED')
