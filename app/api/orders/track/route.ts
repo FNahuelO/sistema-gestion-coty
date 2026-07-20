@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { serializePublicTrackedOrder } from '@/lib/server-data'
+import { orderDetailInclude, serializePublicTrackedOrder } from '@/lib/server-data'
 import { buildWhatsAppUrl } from '@/lib/whatsapp-message'
 
 function buildExactMatchWhere(query: string) {
@@ -38,16 +38,7 @@ export async function GET(request: NextRequest) {
             ],
           },
       orderBy: { createdAt: 'desc' },
-      include: {
-        items: {
-          include: {
-            selections: true,
-          },
-        },
-        payment: true,
-        diningTable: true,
-        createdByUser: true,
-      },
+      include: orderDetailInclude,
     })
 
     const settings = await prisma.businessSettings.findUnique({ where: { id: 'main' } })

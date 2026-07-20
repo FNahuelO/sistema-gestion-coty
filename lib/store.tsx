@@ -558,7 +558,7 @@ export function useOrders() {
     shouldFetch ? '/api/orders' : null,
     fetchJson,
     {
-      refreshInterval: shouldFetch ? 5000 : 0,
+      refreshInterval: shouldFetch ? 15000 : 0,
       revalidateOnFocus: true,
     }
   )
@@ -751,7 +751,7 @@ export function useTrackedOrders(searchId: string, paymentReturnOrderId?: string
     queryString,
     fetchJson,
     {
-      refreshInterval: queryString ? 10000 : 0,
+      refreshInterval: queryString ? 20000 : 0,
       revalidateOnFocus: true,
     }
   )
@@ -807,7 +807,7 @@ export function useTables() {
   const { user } = useAuth()
   const shouldFetch = Boolean(user?.role)
   const { data, error, isLoading, mutate } = useSWR<Table[]>(shouldFetch ? '/api/tables' : null, fetchJson, {
-    refreshInterval: shouldFetch ? 5000 : 0,
+    refreshInterval: shouldFetch ? 15000 : 0,
     revalidateOnFocus: true,
   })
 
@@ -948,7 +948,7 @@ export function useAdminData(): AdminData {
     can('analytics:read') ? '/api/admin/analytics' : null,
     fetchJson,
     {
-      refreshInterval: can('analytics:read') ? 15000 : 0,
+      refreshInterval: can('analytics:read') ? 30000 : 0,
       revalidateOnFocus: true,
     }
   )

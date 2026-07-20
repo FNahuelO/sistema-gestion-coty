@@ -35,7 +35,7 @@ export function KitchenSection() {
   const [sortBy, setSortBy] = useState<OrderSortKey>('oldest')
   const [pendingAction, setPendingAction] = useState<string | null>(null)
   const { data, mutate, isLoading } = useSWR<Order[]>('/api/staff/operations', fetchJson, {
-    refreshInterval: 8000,
+    refreshInterval: 15000,
   })
 
   const runKitchenAction = async (

@@ -192,7 +192,7 @@ export function DeliverySection({
   const { data, mutate, isLoading } = useSWR<DeliveryQueueEntry[]>(
     '/api/staff/operations?view=delivery',
     fetchJson,
-    { refreshInterval: 12000 }
+    { refreshInterval: 20000 }
   )
 
   const allEntries = data ?? []

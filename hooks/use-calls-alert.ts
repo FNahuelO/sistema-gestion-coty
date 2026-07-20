@@ -16,7 +16,7 @@ const fetchJson = async (url: string): Promise<TableCall[]> => {
  */
 export function useCallsAlert(isCallsActive: boolean) {
   const { data } = useSWR<TableCall[]>('/api/table-calls', fetchJson, {
-    refreshInterval: 5000,
+    refreshInterval: 15000,
   })
 
   const pendingCallsCount = data?.length ?? 0

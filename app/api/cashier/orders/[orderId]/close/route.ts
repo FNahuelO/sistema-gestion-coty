@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { closeTableAndOrders, requireSessionRole, serializeOrder } from '@/lib/server-data'
+import { closeTableAndOrders, orderDetailInclude, requireSessionRole, serializeOrder } from '@/lib/server-data'
 
 export async function POST(_request: NextRequest, context: { params: Promise<{ orderId: string }> }) {
   try {
@@ -9,16 +9,7 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ o
 
     const order = await prisma.order.findUnique({
       where: { id: orderId },
-      include: {
-        items: {
-          include: {
-            selections: true,
-          },
-        },
-        payment: true,
-        diningTable: true,
-        createdByUser: true,
-      },
+      select: { id: true, diningTableId: true },
     })
 
     if (!order) {
@@ -42,16 +33,7 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ o
           },
         },
       },
-      include: {
-        items: {
-          include: {
-            selections: true,
-          },
-        },
-        payment: true,
-        diningTable: true,
-        createdByUser: true,
-      },
+      include: orderDetailInclude,
     })
 
     await prisma.auditLog.create({

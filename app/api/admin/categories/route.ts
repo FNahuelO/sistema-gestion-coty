@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { revalidatePublicCatalog } from '@/lib/catalog-cache'
 import { categoryInputSchema, requireSessionRole, serializeCategory, upsertCategory } from '@/lib/server-data'
 
 export async function GET() {
@@ -79,6 +80,7 @@ export async function DELETE(request: NextRequest) {
         active: false,
       },
     })
+    revalidatePublicCatalog()
     return NextResponse.json({ ok: true })
   } catch (error) {
     if (error instanceof Error && error.message === 'UNAUTHORIZED') {

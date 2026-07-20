@@ -21,7 +21,7 @@ type TableCall = {
 
 export function CallsSection() {
   const { data, mutate, isLoading } = useSWR<TableCall[]>('/api/table-calls', fetchJson, {
-    refreshInterval: 5000,
+    refreshInterval: 15000,
   })
 
   const patch = async (id: string, action: 'acknowledge' | 'resolve') => {

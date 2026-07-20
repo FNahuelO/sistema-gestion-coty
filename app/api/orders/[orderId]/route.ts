@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireSessionRole, serializeOrder } from '@/lib/server-data'
+import { orderDetailInclude, requireSessionRole, serializeOrder } from '@/lib/server-data'
 
 export async function GET(_request: NextRequest, context: { params: Promise<{ orderId: string }> }) {
   try {
@@ -9,16 +9,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ or
 
     const order = await prisma.order.findUnique({
       where: { id: orderId },
-      include: {
-        items: {
-          include: {
-            selections: true,
-          },
-        },
-        payment: true,
-        diningTable: true,
-        createdByUser: true,
-      },
+      include: orderDetailInclude,
     })
 
     if (!order) {

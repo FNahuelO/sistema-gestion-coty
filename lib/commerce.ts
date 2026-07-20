@@ -14,6 +14,7 @@ import {
 } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { revalidatePublicCatalog } from '@/lib/catalog-cache'
 import { findMatchingZone, type LatLng, type ZoneGeometry } from '@/lib/geo'
 import type { DeliveryAssignmentStatus as DeliveryAssignmentStatusUi, DeliveryQueueEntry } from '@/lib/types'
 
@@ -175,16 +176,29 @@ export async function upsertDeliveryZone(payload: z.infer<typeof deliveryZoneSch
     centerLat: input.geoType === 'RADIUS' ? input.centerLat ?? null : null,
     centerLng: input.geoType === 'RADIUS' ? input.centerLng ?? null : null,
     radiusKm: input.geoType === 'RADIUS' ? input.radiusKm ?? null : null,
-    polygon: input.geoType === 'POLYGON' ? (input.polygon ?? null) : null,
+    polygon:
+      input.geoType === 'POLYGON'
+        ? ((input.polygon ?? null) as Prisma.InputJsonValue | null)
+        : null,
   }
   if (input.id) {
-    return prisma.deliveryZone.update({ where: { id: input.id }, data })
+    const zone = await prisma.deliveryZone.update({
+      where: { id: input.id },
+      data: data as Prisma.DeliveryZoneUncheckedUpdateInput,
+    })
+    revalidatePublicCatalog()
+    return zone
   }
-  return prisma.deliveryZone.create({ data })
+  const zone = await prisma.deliveryZone.create({
+    data: data as Prisma.DeliveryZoneUncheckedCreateInput,
+  })
+  revalidatePublicCatalog()
+  return zone
 }
 
 export async function deleteDeliveryZone(id: string) {
   await prisma.deliveryZone.delete({ where: { id } })
+  revalidatePublicCatalog()
 }
 
 /** Zonas activas con su geometría, listas para evaluar cobertura. */
@@ -293,18 +307,24 @@ export async function incrementDiscountUse(code: string) {
 // ─── Stock ───────────────────────────────────────────────────────────────────
 
 export async function decrementStockForOrder(items: Array<{ productId: string; quantity: number }>) {
+  let catalogChanged = false
   for (const item of items) {
     const product = await prisma.product.findUnique({ where: { id: item.productId } })
     if (!product?.trackStock || product.stock === null) continue
     const next = product.stock - item.quantity
+    const available = next > 0 ? product.available : false
     await prisma.product.update({
       where: { id: item.productId },
       data: {
         stock: Math.max(0, next),
-        available: next > 0 ? product.available : false,
+        available,
       },
     })
+    if (available !== product.available || next !== product.stock) {
+      catalogChanged = true
+    }
   }
+  if (catalogChanged) revalidatePublicCatalog()
 }
 
 export async function getLowStockProducts() {
@@ -741,10 +761,17 @@ export async function getKitchenOrders() {
     },
     orderBy: { createdAt: 'asc' },
     include: {
-      items: { include: { selections: true } },
-      payment: true,
-      diningTable: true,
-      createdByUser: true,
+      items: {
+        include: {
+          selections: true,
+          product: { select: { preparationTime: true } },
+        },
+      },
+      payment: {
+        select: { status: true, initPoint: true, sandboxInitPoint: true },
+      },
+      diningTable: { select: { number: true } },
+      deliveryZone: { select: { name: true } },
     },
   })
 }

@@ -11,7 +11,7 @@ import {
   updateDeliveryAssignment,
 } from '@/lib/commerce'
 import { handleRouteError } from '@/lib/api-errors'
-import { requirePermission, serializeOrder } from '@/lib/server-data'
+import { orderDetailInclude, requirePermission, serializeOrder } from '@/lib/server-data'
 import { prisma } from '@/lib/prisma'
 
 function mapAssignmentError(error: unknown) {
@@ -104,12 +104,7 @@ export async function POST(request: NextRequest) {
       await ackKitchenOrder(body.orderId, user.id)
       const order = await prisma.order.findUnique({
         where: { id: body.orderId },
-        include: {
-          items: { include: { selections: true } },
-          payment: true,
-          diningTable: true,
-          createdByUser: true,
-        },
+        include: orderDetailInclude,
       })
       return NextResponse.json(order ? serializeOrder(order) : { ok: true })
     }
@@ -118,12 +113,7 @@ export async function POST(request: NextRequest) {
       await markKitchenOrderReady(body.orderId, user.id)
       const order = await prisma.order.findUnique({
         where: { id: body.orderId },
-        include: {
-          items: { include: { selections: true } },
-          payment: true,
-          diningTable: true,
-          createdByUser: true,
-        },
+        include: orderDetailInclude,
       })
       return NextResponse.json(order ? serializeOrder(order) : { ok: true })
     }

@@ -70,7 +70,7 @@ export function CashSection() {
   const { data, mutate, isLoading } = useSWR<{ open: CashSession | null; sessions: CashSession[] }>(
     '/api/admin/cash',
     fetchJson,
-    { refreshInterval: 15000 }
+    { refreshInterval: 20000 }
   )
 
   const [openingAmount, setOpeningAmount] = useState('0')

@@ -12,8 +12,10 @@ import {
   UserRole as PrismaUserRole,
   StaffRole as PrismaStaffRole,
 } from '@prisma/client'
+import { unstable_cache } from 'next/cache'
 import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
+import { PUBLIC_CATALOG_TAG, revalidatePublicCatalog } from '@/lib/catalog-cache'
 import { prisma } from '@/lib/prisma'
 import { getProductDiscountPercent } from '@/lib/promotions'
 import type { AnalyticsOverview, BusinessSettings, CartItem, Category, ChannelSchedule, ChannelSetting, Order, PaymentMethod, Product, Promotion, SelectedOption, Table, User } from '@/lib/types'
@@ -31,7 +33,6 @@ import {
   resolveMercadoPagoPayerEmail,
 } from '@/lib/mercadopago-utils'
 import {
-  listDeliveryZones,
   upsertCustomerFromOrder,
   validateDiscountCode,
 } from '@/lib/commerce'
@@ -183,14 +184,85 @@ const orderInclude = {
   items: {
     include: {
       selections: true,
-      product: true,
+      product: {
+        select: {
+          preparationTime: true,
+        },
+      },
     },
   },
-  payment: true,
-  diningTable: true,
-  createdByUser: true,
-  deliveryZone: true,
+  payment: {
+    select: {
+      status: true,
+      initPoint: true,
+      sandboxInitPoint: true,
+    },
+  },
+  diningTable: {
+    select: {
+      number: true,
+    },
+  },
+  deliveryZone: {
+    select: {
+      name: true,
+    },
+  },
 } satisfies Prisma.OrderInclude
+
+/** Include liviano para serializar pedidos (exportado para rutas API). */
+export const orderDetailInclude = orderInclude
+
+type SerializableOrder = {
+  id: string
+  displayCode: string | null
+  publicTrackingCode: string | null
+  type: PrismaOrderType
+  status: PrismaOrderStatus
+  paymentMethod: PrismaPaymentMethod
+  customerName: string
+  customerPhone: string
+  customerAddress: string | null
+  notes: string | null
+  subtotal: Prisma.Decimal | number
+  tax: Prisma.Decimal | number
+  deliveryFee: Prisma.Decimal | number
+  tip?: Prisma.Decimal | number | null
+  discountCode?: string | null
+  discountAmount?: Prisma.Decimal | number | null
+  total: Prisma.Decimal | number
+  estimatedMinutes?: number | null
+  estimatedReadyAt?: Date | null
+  diningTableId?: string | null
+  tableSessionId?: string | null
+  createdByUserId?: string | null
+  createdAt: Date
+  updatedAt: Date
+  items: Array<{
+    id: string
+    productId: string | null
+    productName: string
+    productDescription: string | null
+    basePrice: Prisma.Decimal | number
+    imageUrl: string | null
+    quantity: number
+    notes: string | null
+    unitPrice: Prisma.Decimal | number
+    product?: { preparationTime: number } | null
+    selections: Array<{
+      optionName: string
+      choiceName: string
+      priceModifier: Prisma.Decimal | number
+    }>
+  }>
+  payment?: {
+    status: PrismaPaymentStatus
+    initPoint?: string | null
+    sandboxInitPoint?: string | null
+  } | null
+  diningTable?: { number: number } | null
+  deliveryZone?: { name: string } | null
+}
 
 const productInclude = {
   options: {
@@ -213,21 +285,26 @@ const promotionInclude = {
   categories: true,
 } satisfies Prisma.PromotionInclude
 
+/** Solo lo que necesita el board de mesas: evita traer items/productos en cada poll. */
 const tableInclude = {
   sessions: {
     where: {
       closedAt: null,
     },
     orderBy: {
-      openedAt: 'desc',
+      openedAt: 'desc' as const,
     },
     take: 1,
     include: {
       orders: {
         orderBy: {
-          createdAt: 'desc',
+          createdAt: 'desc' as const,
         },
-        include: orderInclude,
+        select: {
+          id: true,
+          status: true,
+          total: true,
+        },
       },
     },
   },
@@ -551,7 +628,7 @@ export function serializeUser(user: {
   }
 }
 
-export function serializeOrder(order: Prisma.OrderGetPayload<{ include: typeof orderInclude }>): Order {
+export function serializeOrder(order: SerializableOrder): Order {
   return {
     id: order.id,
     displayCode: order.displayCode ?? undefined,
@@ -666,7 +743,7 @@ export function buildPaymentPreferenceResponse(order: Order) {
 }
 
 /** Versión pública para seguimiento de pedido: sin PII ni URLs de pago. */
-export function serializePublicTrackedOrder(order: Prisma.OrderGetPayload<{ include: typeof orderInclude }>): Order {
+export function serializePublicTrackedOrder(order: SerializableOrder): Order {
   return stripOrderPii(serializeOrder(order))
 }
 
@@ -713,7 +790,7 @@ export async function getPublicTable(tableId: string) {
   }
 }
 
-export async function getPublicCatalog() {
+async function loadPublicCatalog() {
   const [settings, categories, products, promotions, channelSettings, schedules, deliveryZones] = await Promise.all([
     prisma.businessSettings.findUnique({ where: { id: 'main' } }),
     prisma.category.findMany({
@@ -735,7 +812,21 @@ export async function getPublicCatalog() {
     }),
     prisma.channelSettings.findMany(),
     prisma.channelSchedule.findMany({ orderBy: [{ channel: 'asc' }, { sortOrder: 'asc' }] }),
-    listDeliveryZones(),
+    prisma.deliveryZone.findMany({
+      where: { active: true },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        deliveryFee: true,
+        minOrderAmount: true,
+        geoType: true,
+        centerLat: true,
+        centerLng: true,
+        radiusKm: true,
+        polygon: true,
+      },
+    }),
   ])
 
   const serializedSettings = settings ? serializeSettings(settings) : null
@@ -754,17 +845,18 @@ export async function getPublicCatalog() {
     enabled: entry.enabled,
   }))
 
+  const now = new Date()
   const channelAvailability = serializedSettings
     ? {
         delivery: getChannelAvailability(
           'delivery',
-          new Date(),
+          now,
           serializedSettings,
           serializedChannelSettings,
           serializedSchedules
         ),
-        local: getChannelAvailability('local', new Date(), serializedSettings, serializedChannelSettings, serializedSchedules),
-        pickup: getChannelAvailability('pickup', new Date(), serializedSettings, serializedChannelSettings, serializedSchedules),
+        local: getChannelAvailability('local', now, serializedSettings, serializedChannelSettings, serializedSchedules),
+        pickup: getChannelAvailability('pickup', now, serializedSettings, serializedChannelSettings, serializedSchedules),
       }
     : null
 
@@ -776,25 +868,29 @@ export async function getPublicCatalog() {
     channelSettings: serializedChannelSettings,
     schedules: serializedSchedules,
     channelAvailability,
-    deliveryZones: deliveryZones
-      .filter((zone) => zone.active)
-      .map((zone) => {
-        const hasGeo =
-          zone.geoType === 'RADIUS'
-            ? zone.centerLat != null && zone.centerLng != null && zone.radiusKm != null
-            : Array.isArray(zone.polygon) && (zone.polygon as unknown[]).length >= 3
-        return {
-          id: zone.id,
-          name: zone.name,
-          deliveryFee: decimalToNumber(zone.deliveryFee),
-          minOrderAmount: decimalToNumber(zone.minOrderAmount),
-          geoType: zone.geoType as 'RADIUS' | 'POLYGON',
-          hasGeo,
-        }
-      }),
+    deliveryZones: deliveryZones.map((zone) => {
+      const hasGeo =
+        zone.geoType === 'RADIUS'
+          ? zone.centerLat != null && zone.centerLng != null && zone.radiusKm != null
+          : Array.isArray(zone.polygon) && (zone.polygon as unknown[]).length >= 3
+      return {
+        id: zone.id,
+        name: zone.name,
+        deliveryFee: decimalToNumber(zone.deliveryFee),
+        minOrderAmount: decimalToNumber(zone.minOrderAmount),
+        geoType: zone.geoType as 'RADIUS' | 'POLYGON',
+        hasGeo,
+      }
+    }),
     mercadoPagoAvailable: isMercadoPagoAvailable(settings),
   }
 }
+
+/** Catálogo público cacheado ~60s para no golpear Neon en cada visita/poll. */
+export const getPublicCatalog = unstable_cache(loadPublicCatalog, ['public-catalog-v1'], {
+  revalidate: 60,
+  tags: [PUBLIC_CATALOG_TAG],
+})
 
 export async function getOperationalOrders() {
   const orders = await prisma.order.findMany({
@@ -1192,7 +1288,7 @@ export async function createOrderFromPayload(
 
   const deferStockDecrement = awaitingTransferProof || awaitingMercadoPago
 
-  const createdOrder = await prisma.$transaction(async (tx) => {
+  const createdOrder = (await prisma.$transaction(async (tx) => {
     if (!deferStockDecrement) {
       await applyStockDeltaForOrderItems(tx, itemsToCreate.map((item) => ({
         productId: item.productId,
@@ -1201,7 +1297,7 @@ export async function createOrderFromPayload(
     }
 
     const order = await tx.order.create({
-      data: orderData,
+      data: orderData as Prisma.OrderUncheckedCreateInput,
       include: orderInclude,
     })
 
@@ -1219,7 +1315,7 @@ export async function createOrderFromPayload(
     }
 
     return order
-  })
+  })) as Prisma.OrderGetPayload<{ include: typeof orderInclude }>
 
   const serialized = serializeOrder(createdOrder)
 
@@ -1820,6 +1916,7 @@ export async function upsertCategory(id: string | null, payload: z.infer<typeof 
         active: input.active,
       },
     })
+    revalidatePublicCatalog()
     return serializeCategory(updated)
   }
 
@@ -1832,6 +1929,7 @@ export async function upsertCategory(id: string | null, payload: z.infer<typeof 
       active: input.active,
     },
   })
+  revalidatePublicCatalog()
   return serializeCategory(created)
 }
 
@@ -1888,6 +1986,7 @@ export async function upsertProduct(id: string | null, payload: z.infer<typeof p
       data: baseData,
       include: productInclude,
     })
+    revalidatePublicCatalog()
     return serializeProduct(updated)
   }
 
@@ -1895,6 +1994,7 @@ export async function upsertProduct(id: string | null, payload: z.infer<typeof p
     data: baseData,
     include: productInclude,
   })
+  revalidatePublicCatalog()
   return serializeProduct(created)
 }
 
@@ -1932,6 +2032,7 @@ export async function upsertPromotion(id: string | null, payload: z.infer<typeof
       data: baseData,
       include: promotionInclude,
     })
+    revalidatePublicCatalog()
     return serializePromotion(updated)
   }
 
@@ -1939,6 +2040,7 @@ export async function upsertPromotion(id: string | null, payload: z.infer<typeof
     data: baseData,
     include: promotionInclude,
   })
+  revalidatePublicCatalog()
   return serializePromotion(created)
 }
 
@@ -1954,6 +2056,7 @@ export async function updateSettings(payload: z.infer<typeof settingsInputSchema
     },
   })
 
+  revalidatePublicCatalog()
   return serializeSettings(settings)
 }
 
@@ -2181,6 +2284,7 @@ export async function upsertChannelSchedule(payload: z.infer<typeof channelSched
       where: { id: input.id },
       data,
     })
+    revalidatePublicCatalog()
     return {
       id: updated.id,
       channel: mapPrismaChannel(updated.channel),
@@ -2194,6 +2298,7 @@ export async function upsertChannelSchedule(payload: z.infer<typeof channelSched
   }
 
   const created = await prisma.channelSchedule.create({ data })
+  revalidatePublicCatalog()
   return {
     id: created.id,
     channel: mapPrismaChannel(created.channel),
@@ -2208,6 +2313,7 @@ export async function upsertChannelSchedule(payload: z.infer<typeof channelSched
 
 export async function deleteChannelSchedule(id: string) {
   await prisma.channelSchedule.delete({ where: { id } })
+  revalidatePublicCatalog()
 }
 
 export async function updateChannelSettings(channel: ChannelSetting['channel'], enabled: boolean) {
@@ -2217,6 +2323,7 @@ export async function updateChannelSettings(channel: ChannelSetting['channel'], 
     create: { channel: mapToPrismaChannel(channel), enabled },
   })
 
+  revalidatePublicCatalog()
   return {
     channel: mapPrismaChannel(updated.channel),
     enabled: updated.enabled,

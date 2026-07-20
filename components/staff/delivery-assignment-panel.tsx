@@ -29,7 +29,7 @@ export function DeliveryAssignmentPanel({
   const { data: entry, mutate } = useSWR<DeliveryQueueEntry | null>(
     shouldFetch ? `/api/staff/operations?view=delivery&orderId=${order.id}` : null,
     fetchJson,
-    { refreshInterval: shouldFetch ? 12000 : 0 }
+    { refreshInterval: shouldFetch ? 20000 : 0 }
   )
 
   if (order.type !== 'delivery' || order.status === 'cancelled') return null

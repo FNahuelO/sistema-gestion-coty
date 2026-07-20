@@ -111,7 +111,7 @@ export function OrdersSection({
   const { data: deliveryQueue = [], mutate: mutateDeliveryQueue } = useSWR<DeliveryQueueEntry[]>(
     '/api/staff/operations?view=delivery',
     fetchJson,
-    { refreshInterval: 12000 }
+    { refreshInterval: 20000 }
   )
   const deliveryByOrderId = useMemo(
     () => new Map(deliveryQueue.map((entry) => [entry.orderId, entry])),
