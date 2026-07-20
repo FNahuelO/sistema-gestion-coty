@@ -41,7 +41,7 @@ import {
   LOGO_SRC_SVG,
   LOGO_SRC_SVG_NEGRO,
 } from '@/lib/coty-theme'
-import { LandingCarouselSkeleton, LandingFooterSkeleton, LoadingSkeleton } from '@/components/shared/loading'
+import { LandingCarouselSkeleton, LandingCategoryGridSkeleton, LandingFooterSkeleton, LoadingSkeleton } from '@/components/shared/loading'
 import { PromotionBanner } from '@/components/customer/promotion-banner'
 import { InstallAppPrompt } from '@/components/customer/install-app-prompt'
 
@@ -327,7 +327,7 @@ export function CustomerLanding() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { settings, isLoading: isSettingsLoading } = useBusiness()
-  const { items, itemCount, addItem, updateQuantity } = useCart()
+  const { items, itemCount, hydrated: cartHydrated, addItem, updateQuantity } = useCart()
   const { products, categories, promotions, channelAvailability, isLoading: isCatalogLoading } =
     useCatalog()
   const { tableSession } = useTableSession()
@@ -439,29 +439,33 @@ export function CustomerLanding() {
         {/* Categorías — diseño mockup */}
         <section className="py-6 md:py-10">
           <h2 className="mb-4 text-lg font-bold text-[#1A1A1A] md:mb-6 md:text-2xl">Categorías</h2>
-          <div className="grid grid-cols-4 gap-3 md:grid-cols-8 md:gap-4 lg:gap-6">
-            {landingCategories.map((category) => {
-              const Icon = category.icon
+          {isCatalogLoading && categories.length === 0 ? (
+            <LandingCategoryGridSkeleton />
+          ) : (
+            <div className="grid grid-cols-4 gap-3 md:grid-cols-8 md:gap-4 lg:gap-6">
+              {landingCategories.map((category) => {
+                const Icon = category.icon
 
-              return (
-                <Link
-                  key={category.name}
-                  href={category.href}
-                  className="group flex flex-col items-center gap-2 transition-transform hover:-translate-y-0.5"
-                >
-                  <div
-                    className="flex h-14 w-14 items-center justify-center rounded-xl transition-shadow group-hover:shadow-md md:h-16 md:w-16 md:rounded-2xl lg:h-[4.5rem] lg:w-[4.5rem]"
-                    style={{ backgroundColor: COTY_HEADER }}
+                return (
+                  <Link
+                    key={category.href}
+                    href={category.href}
+                    className="group flex flex-col items-center gap-2 transition-transform hover:-translate-y-0.5"
                   >
-                    <Icon className="h-6 w-6 text-[#6baca5] md:h-7 md:w-7" strokeWidth={1.75} />
-                  </div>
-                  <span className="text-center text-[10px] font-medium leading-tight text-[#1A1A1A] md:text-xs lg:text-sm">
-                    {category.name}
-                  </span>
-                </Link>
-              )
-            })}
-          </div>
+                    <div
+                      className="flex h-14 w-14 items-center justify-center rounded-xl transition-shadow group-hover:shadow-md md:h-16 md:w-16 md:rounded-2xl lg:h-[4.5rem] lg:w-[4.5rem]"
+                      style={{ backgroundColor: COTY_HEADER }}
+                    >
+                      <Icon className="h-6 w-6 text-[#6baca5] md:h-7 md:w-7" strokeWidth={1.75} />
+                    </div>
+                    <span className="text-center text-[10px] font-medium leading-tight text-[#1A1A1A] md:text-xs lg:text-sm">
+                      {category.name}
+                    </span>
+                  </Link>
+                )
+              })}
+            </div>
+          )}
         </section>
 
         {/* Info card — diseño mockup */}
@@ -677,7 +681,7 @@ export function CustomerLanding() {
         </Link>
       </footer>
 
-      {itemCount > 0 && (
+      {cartHydrated && itemCount > 0 ? (
         <div className="fixed bottom-[72px] left-1/2 z-50 w-full max-w-[390px] -translate-x-1/2 px-4 md:hidden">
           <Link
             href="/checkout"
@@ -688,7 +692,7 @@ export function CustomerLanding() {
             Ver pedido ({itemCount})
           </Link>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

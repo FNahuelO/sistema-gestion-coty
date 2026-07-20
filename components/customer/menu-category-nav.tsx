@@ -28,8 +28,8 @@ export function MenuCategoryNav({ categories, selected, onSelect }: MenuCategory
   ]
 
   return (
-    <div className="-mx-1 overflow-x-auto scrollbar-hide md:mx-0 md:overflow-visible">
-      <div className="flex min-w-max px-1 md:min-w-0 md:justify-center md:gap-2 lg:gap-3">
+    <div className="w-full overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex w-max gap-1 px-1 md:gap-2 lg:gap-3">
         {items.map((category) => {
           const Icon = category.id === 'promo' ? Star : getCategoryIcon(category.icon)
           const isActive = selected === category.id
@@ -67,8 +67,8 @@ export function MenuCategoryNav({ categories, selected, onSelect }: MenuCategory
 
 export function MenuCategoryNavSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className="-mx-1 overflow-hidden md:mx-0" aria-hidden="true">
-      <div className="flex min-w-max px-1 md:min-w-0 md:justify-center md:gap-2 lg:gap-3">
+    <div className="w-full overflow-hidden" aria-hidden="true">
+      <div className="flex w-max gap-1 px-1 md:gap-2 lg:gap-3">
         {Array.from({ length: count }).map((_, index) => (
           <div
             key={index}

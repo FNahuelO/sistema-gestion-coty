@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -66,18 +66,40 @@ function HomeSearchBar() {
   )
 }
 
+/** Valores que dependen de localStorage/SWR post-Suspense: solo tras montar en cliente. */
+function useHasMounted() {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+  return mounted
+}
+
+function CartCountBadge({ count }: { count: number }) {
+  const mounted = useHasMounted()
+  if (!mounted || count < 1) return null
+
+  return (
+    <Badge className="h-5 min-w-5 rounded-full bg-[#00C9B7] px-1 text-[10px] text-white">
+      {count}
+    </Badge>
+  )
+}
+
 export function CustomerTopNav() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const mounted = useHasMounted()
   const { itemCount } = useCart()
   const { settings } = useCatalog()
   const { tableSession } = useTableSession()
-  const tableId = tableSession?.tableId
+  const tableId = mounted ? tableSession?.tableId : undefined
   const checkoutHref = buildCustomerPath('/checkout', { tableId })
   const isHome = pathname === '/'
-  const instagramUrl = buildInstagramUrl(settings?.instagram)
-  const facebookUrl = buildFacebookUrl(settings?.facebook)
-  const whatsappUrl = settings?.whatsapp ? `https://wa.me/${settings.whatsapp.replace(/\D/g, '')}` : null
+  const instagramUrl = mounted ? buildInstagramUrl(settings?.instagram) : null
+  const facebookUrl = mounted ? buildFacebookUrl(settings?.facebook) : null
+  const whatsappUrl =
+    mounted && settings?.whatsapp ? `https://wa.me/${settings.whatsapp.replace(/\D/g, '')}` : null
 
   return (
     <header
@@ -121,7 +143,7 @@ export function CustomerTopNav() {
                       : 'text-white/75 hover:bg-white/10 hover:text-white',
                   )}
                 >
-                  <Image src={Icon} alt="" width={17} height={17} />
+                  <Image src={Icon} alt="" width={17} height={17} className="size-[17px] shrink-0" />
                   {label}
                 </Link>
               )
@@ -173,11 +195,7 @@ export function CustomerTopNav() {
             >
               <ShoppingBag className="h-4 w-4" />
               Carrito
-              {itemCount > 0 && (
-                <Badge className="h-5 min-w-5 rounded-full bg-[#00C9B7] px-1 text-[10px] text-white">
-                  {itemCount}
-                </Badge>
-              )}
+              <CartCountBadge count={itemCount} />
             </Link>
           </div>
         </div>

@@ -484,12 +484,18 @@ export function useAuth() {
 }
 
 export function useBusiness() {
+  const [offlineFallback, setOfflineFallback] = useState<BusinessSettings | undefined>(undefined)
+
+  useEffect(() => {
+    setOfflineFallback(getOfflineCache<BusinessSettings>(OFFLINE_CACHE_KEYS.settings) ?? undefined)
+  }, [])
+
   const { data, error, isLoading, mutate } = useSWR<BusinessSettings>(
     '/api/settings',
     () => fetchJsonWithOfflineCache<BusinessSettings>('/api/settings', OFFLINE_CACHE_KEYS.settings),
     {
       revalidateOnFocus: false,
-      fallbackData: typeof window !== 'undefined' ? getOfflineCache<BusinessSettings>(OFFLINE_CACHE_KEYS.settings) ?? undefined : undefined,
+      fallbackData: offlineFallback,
     }
   )
 
@@ -526,12 +532,18 @@ export function useCatalog() {
     mercadoPagoAvailable?: boolean
   }
 
+  const [offlineFallback, setOfflineFallback] = useState<CatalogData | undefined>(undefined)
+
+  useEffect(() => {
+    setOfflineFallback(getOfflineCache<CatalogData>(OFFLINE_CACHE_KEYS.catalog) ?? undefined)
+  }, [])
+
   const { data, error, isLoading, mutate } = useSWR<CatalogData>(
     '/api/catalog',
     () => fetchJsonWithOfflineCache<CatalogData>('/api/catalog', OFFLINE_CACHE_KEYS.catalog),
     {
       revalidateOnFocus: false,
-      fallbackData: typeof window !== 'undefined' ? getOfflineCache<CatalogData>(OFFLINE_CACHE_KEYS.catalog) ?? undefined : undefined,
+      fallbackData: offlineFallback,
     }
   )
 

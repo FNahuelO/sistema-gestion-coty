@@ -16,6 +16,7 @@ export function CustomerLayoutShell({ children }: { children: React.ReactNode })
               <Suspense fallback={null}>
                 <TableSessionSync />
               </Suspense>
+              {/* Suspense requerido por useSearchParams en el top nav */}
               <Suspense fallback={null}>
                 <CustomerTopNav />
               </Suspense>

@@ -43,7 +43,7 @@ function HeroCardSkeleton() {
   )
 }
 
-function LandingCategoryGridSkeleton() {
+export function LandingCategoryGridSkeleton() {
   return (
     <div className="grid grid-cols-4 gap-3 md:grid-cols-8 md:gap-4 lg:gap-6">
       {Array.from({ length: 8 }).map((_, index) => (

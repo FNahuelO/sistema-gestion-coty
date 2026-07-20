@@ -95,8 +95,8 @@ export function MenuHeader({
         </header>
 
         {!isSearchMode && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 translate-y-1/2 px-4 md:px-6 lg:px-8">
-            <div className="pointer-events-auto md:mx-auto md:max-w-4xl lg:max-w-5xl">
+          <div className="pointer-events-none absolute inset-x-4 bottom-0 z-20 translate-y-1/2 md:inset-x-6 lg:inset-x-8">
+            <div className="pointer-events-auto w-full">
               {isCatalogLoading ? (
                 <MenuCategoryNavSkeleton />
               ) : (
