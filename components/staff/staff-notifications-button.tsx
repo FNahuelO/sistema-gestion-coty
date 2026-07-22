@@ -8,7 +8,9 @@ import { es } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { StatusBadge } from '@/components/shared/status-badge'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
 import { PANEL_OUTLINE_BTN } from '@/lib/panel-theme'
+import { useBusiness } from '@/lib/store'
 import type { Order } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -38,8 +40,13 @@ export function StaffNotificationsButton({
   className,
 }: StaffNotificationsButtonProps) {
   const [open, setOpen] = useState(false)
+  const { settings, isLoading: settingsLoading } = useBusiness()
+  const refreshInterval = useAdaptiveRefreshInterval<TableCall[]>(15000, {
+    isOpen: settingsLoading ? null : settings.isOpen,
+    getActiveCount: (data) => data?.length ?? 0,
+  })
   const { data: tableCalls } = useSWR<TableCall[]>('/api/table-calls', fetchJson, {
-    refreshInterval: 15000,
+    refreshInterval,
   })
 
   const pendingOrders = useMemo(

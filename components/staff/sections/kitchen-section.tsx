@@ -6,10 +6,12 @@ import { ArrowUpDown, CheckCircle, ChefHat } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
 import { ORDER_TYPE_LABELS } from '@/lib/order-labels'
 import { ORDER_SORT_OPTIONS, sortOrders, type OrderSortKey } from '@/lib/order-sort'
 import { PANEL_CARD, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
 import { StatusBadge } from '@/components/shared/status-badge'
+import { useBusiness } from '@/lib/store'
 import { cn } from '@/lib/utils'
 import type { Order } from '@/lib/types'
 import { Spinner } from '@/components/ui/spinner'
@@ -34,8 +36,13 @@ function notifyOrdersChanged() {
 export function KitchenSection() {
   const [sortBy, setSortBy] = useState<OrderSortKey>('oldest')
   const [pendingAction, setPendingAction] = useState<string | null>(null)
+  const { settings, isLoading: settingsLoading } = useBusiness()
+  const refreshInterval = useAdaptiveRefreshInterval<Order[]>(15000, {
+    isOpen: settingsLoading ? null : settings.isOpen,
+    getActiveCount: (data) => data?.length ?? 0,
+  })
   const { data, mutate, isLoading } = useSWR<Order[]>('/api/staff/operations', fetchJson, {
-    refreshInterval: 15000,
+    refreshInterval,
   })
 
   const runKitchenAction = async (

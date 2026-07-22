@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import useSWR from 'swr'
 import { SessionProvider, signIn, signOut, useSession } from 'next-auth/react'
 import type { AnalyticsOverview, BusinessSettings, CartItem, Category, ChannelSchedule, ChannelSetting, Order, OrderStatus, PaymentMethod, Product, Promotion, SelectedOption, Table, User } from '@/lib/types'
+import { countActiveOrders, countBusyTables } from '@/lib/adaptive-polling'
 import { getOfflineCache, isBrowserOffline, OFFLINE_CACHE_KEYS, setOfflineCache } from '@/lib/offline-cache'
 import {
   enqueueOfflineOrder,
@@ -14,6 +15,7 @@ import {
 } from '@/lib/offline-order-queue'
 import { getMesaIdFromSearch } from '@/lib/menu-url'
 import { hasPermission, type Permission, type SessionRoleContext } from '@/lib/permissions'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
 
 const CART_STORAGE_KEY = 'coty-cafe-cart'
 
@@ -564,13 +566,22 @@ export function useCatalog() {
 
 export function useOrders() {
   const { user } = useAuth()
+  const { settings, isLoading: settingsLoading } = useBusiness()
   const shouldFetch = Boolean(user?.role)
   const [offlineOrders, setOfflineOrders] = useState<Order[]>([])
+  const refreshInterval = useAdaptiveRefreshInterval<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
+    15000,
+    {
+      enabled: shouldFetch,
+      isOpen: settingsLoading ? null : settings.isOpen,
+      getActiveCount: countActiveOrders,
+    }
+  )
   const { data, error, isLoading, mutate } = useSWR<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
     shouldFetch ? '/api/orders' : null,
     fetchJson,
     {
-      refreshInterval: shouldFetch ? 15000 : 0,
+      refreshInterval,
       revalidateOnFocus: true,
     }
   )
@@ -759,11 +770,19 @@ export function useTrackedOrders(searchId: string, paymentReturnOrderId?: string
     return null
   }, [trackingCodes, searchId, paymentReturnOrderId])
 
+  const refreshInterval = useAdaptiveRefreshInterval<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
+    20000,
+    {
+      enabled: Boolean(queryString),
+      getActiveCount: countActiveOrders,
+    }
+  )
+
   const { data, error, isLoading, mutate } = useSWR<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
     queryString,
     fetchJson,
     {
-      refreshInterval: queryString ? 20000 : 0,
+      refreshInterval,
       revalidateOnFocus: true,
     }
   )
@@ -817,9 +836,15 @@ export function useTrackedOrders(searchId: string, paymentReturnOrderId?: string
 
 export function useTables() {
   const { user } = useAuth()
+  const { settings, isLoading: settingsLoading } = useBusiness()
   const shouldFetch = Boolean(user?.role)
+  const refreshInterval = useAdaptiveRefreshInterval<Table[]>(15000, {
+    enabled: shouldFetch,
+    isOpen: settingsLoading ? null : settings.isOpen,
+    getActiveCount: countBusyTables,
+  })
   const { data, error, isLoading, mutate } = useSWR<Table[]>(shouldFetch ? '/api/tables' : null, fetchJson, {
-    refreshInterval: shouldFetch ? 15000 : 0,
+    refreshInterval,
     revalidateOnFocus: true,
   })
 
@@ -956,11 +981,16 @@ export function useAdminData(): AdminData {
     can('staff:operate') ? '/api/orders' : null,
     fetchJson
   )
+  const analyticsRefreshInterval = useAdaptiveRefreshInterval(30000, {
+    enabled: can('analytics:read'),
+    isOpen: settingsData == null ? null : settingsData.isOpen,
+    activeCount: countActiveOrders(ordersData) + countBusyTables(tablesData),
+  })
   const { data: analyticsData, mutate: mutateAnalytics } = useSWR<AnalyticsOverview>(
     can('analytics:read') ? '/api/admin/analytics' : null,
     fetchJson,
     {
-      refreshInterval: can('analytics:read') ? 30000 : 0,
+      refreshInterval: analyticsRefreshInterval,
       revalidateOnFocus: true,
     }
   )
