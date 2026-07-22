@@ -22,7 +22,9 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useOrders, useBusiness } from '@/lib/store'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
 import { usePendingAction } from '@/hooks/use-pending-action'
+import { countActiveDeliveryEntries } from '@/lib/adaptive-polling'
 import { OrderDetailSheet } from '@/components/staff/order-detail-sheet'
 import { ManualOrderDialog } from '@/components/staff/manual-order-dialog'
 import { StaffNotificationsButton } from '@/components/staff/staff-notifications-button'
@@ -106,12 +108,16 @@ export function OrdersSection({
 }) {
   const { orders, createManualOrder, updateOrderStatus, updateOrderEstimate, closeOrder, approveOrderPayment } =
     useOrders()
-  const { settings } = useBusiness()
+  const { settings, isLoading: settingsLoading } = useBusiness()
   const businessName = settings?.name ?? 'Coty Café'
+  const deliveryRefreshInterval = useAdaptiveRefreshInterval<DeliveryQueueEntry[]>(20000, {
+    isOpen: settingsLoading ? null : settings.isOpen,
+    getActiveCount: countActiveDeliveryEntries,
+  })
   const { data: deliveryQueue = [], mutate: mutateDeliveryQueue } = useSWR<DeliveryQueueEntry[]>(
     '/api/staff/operations?view=delivery',
     fetchJson,
-    { refreshInterval: 20000 }
+    { refreshInterval: deliveryRefreshInterval }
   )
   const deliveryByOrderId = useMemo(
     () => new Map(deliveryQueue.map((entry) => [entry.orderId, entry])),

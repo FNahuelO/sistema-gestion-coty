@@ -4,7 +4,9 @@ import useSWR from 'swr'
 import { toast } from 'sonner'
 import { BellRing } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
 import { PANEL_LIST_ROW, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
+import { useBusiness } from '@/lib/store'
 import { Spinner } from '@/components/ui/spinner'
 
 const fetchJson = async (url: string) => {
@@ -20,8 +22,13 @@ type TableCall = {
 }
 
 export function CallsSection() {
+  const { settings, isLoading: settingsLoading } = useBusiness()
+  const refreshInterval = useAdaptiveRefreshInterval<TableCall[]>(15000, {
+    isOpen: settingsLoading ? null : settings.isOpen,
+    getActiveCount: (data) => data?.length ?? 0,
+  })
   const { data, mutate, isLoading } = useSWR<TableCall[]>('/api/table-calls', fetchJson, {
-    refreshInterval: 15000,
+    refreshInterval,
   })
 
   const patch = async (id: string, action: 'acknowledge' | 'resolve') => {

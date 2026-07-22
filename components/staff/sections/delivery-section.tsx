@@ -9,10 +9,13 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { AssignRunnerSelect } from '@/components/staff/assign-runner-select'
 import { StatusBadge } from '@/components/shared/status-badge'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
+import { countActiveDeliveryEntries } from '@/lib/adaptive-polling'
 import { PANEL_CARD, PANEL_LIST_ROW, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
 import { COTY_TEAL, formatPrice } from '@/lib/coty-theme'
 import { formatDeliveryAssignmentStatus } from '@/lib/delivery-labels'
 import { isDisplayableCustomerPhone } from '@/lib/order-labels'
+import { useBusiness } from '@/lib/store'
 import type { DeliveryQueueEntry } from '@/lib/types'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
@@ -189,10 +192,15 @@ export function DeliverySection({
   scopeToRunnerId?: string
   canAssign?: boolean
 } = {}) {
+  const { settings, isLoading: settingsLoading } = useBusiness()
+  const refreshInterval = useAdaptiveRefreshInterval<DeliveryQueueEntry[]>(20000, {
+    isOpen: settingsLoading ? null : settings.isOpen,
+    getActiveCount: countActiveDeliveryEntries,
+  })
   const { data, mutate, isLoading } = useSWR<DeliveryQueueEntry[]>(
     '/api/staff/operations?view=delivery',
     fetchJson,
-    { refreshInterval: 20000 }
+    { refreshInterval }
   )
 
   const allEntries = data ?? []
