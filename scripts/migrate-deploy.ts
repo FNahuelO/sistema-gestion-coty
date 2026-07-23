@@ -21,6 +21,45 @@ if (!connectionString) {
   process.exit(0)
 }
 
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  return String(error)
+}
+
+/** Drift típico: la migración no está en _prisma_migrations pero el objeto ya existe. */
+function isAlreadyAppliedDrift(error: unknown): boolean {
+  const message = errorMessage(error).toLowerCase()
+  const code =
+    typeof error === 'object' && error && 'code' in error
+      ? String((error as { code?: unknown }).code)
+      : ''
+
+  return (
+    code === '42701' || // duplicate_column
+    code === '42P07' || // duplicate_table
+    code === '42710' || // duplicate_object
+    code === '42P16' || // invalid_table_definition (rare on re-run)
+    message.includes('already exists') ||
+    message.includes('ya existe') ||
+    message.includes('duplicate')
+  )
+}
+
+async function recordMigration(
+  client: Client,
+  migrationName: string,
+  checksum: string,
+  logs: string | null = null
+) {
+  await client.query(
+    `INSERT INTO _prisma_migrations
+      (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count)
+     VALUES ($1, $2, NOW(), $3, $4, NULL, NOW(), 1)
+     ON CONFLICT DO NOTHING`,
+    [randomUUID(), checksum, migrationName, logs]
+  )
+}
+
 async function main() {
   const client = new Client({ connectionString, connectionTimeoutMillis: 30_000 })
   await client.connect()
@@ -68,16 +107,26 @@ async function main() {
       await client.query('BEGIN')
       try {
         await client.query(sql)
-        await client.query(
-          `INSERT INTO _prisma_migrations
-            (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count)
-           VALUES ($1, $2, NOW(), $3, NULL, NULL, NOW(), 1)`,
-          [randomUUID(), checksum, migrationName]
-        )
+        await recordMigration(client, migrationName, checksum)
         await client.query('COMMIT')
         console.log(`OK ${migrationName}`)
       } catch (error) {
         await client.query('ROLLBACK')
+
+        if (isAlreadyAppliedDrift(error)) {
+          console.warn(
+            `Drift detectado en ${migrationName} (${errorMessage(error)}). Se marca como aplicada.`
+          )
+          await recordMigration(
+            client,
+            migrationName,
+            checksum,
+            `Baselined due to already-applied schema drift: ${errorMessage(error)}`
+          )
+          console.log(`OK ${migrationName} (baselined)`)
+          continue
+        }
+
         throw error
       }
     }
