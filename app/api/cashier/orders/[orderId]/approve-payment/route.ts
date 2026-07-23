@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { resolveCommonRouteError } from '@/lib/api-route-errors'
 import { approveOrderPayment, requireSessionRole } from '@/lib/server-data'
 
 export async function POST(_request: NextRequest, context: { params: Promise<{ orderId: string }> }) {
@@ -8,13 +9,8 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ o
     const order = await approveOrderPayment(orderId, user.id)
     return NextResponse.json(order)
   } catch (error) {
-    if (error instanceof Error && error.message === 'UNAUTHORIZED') {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    if (error instanceof Error && error.message === 'FORBIDDEN') {
-      return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
-    }
+    const common = resolveCommonRouteError(error)
+    if (common) return common
 
     if (error instanceof Error && error.message === 'ORDER_NOT_FOUND') {
       return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 })

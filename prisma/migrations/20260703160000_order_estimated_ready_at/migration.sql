@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "Order" ADD COLUMN "estimatedReadyAt" TIMESTAMP(3);
+ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "estimatedReadyAt" TIMESTAMP(3);

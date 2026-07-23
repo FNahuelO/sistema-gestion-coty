@@ -982,20 +982,38 @@ async function allocateDailyOrderNumber(
   tx: Prisma.TransactionClient,
   dayKey = arDayKey(new Date())
 ): Promise<{ dailyNumber: number; serviceDate: Date }> {
-  const rows = await tx.$queryRaw<Array<{ lastNumber: number }>>`
-    INSERT INTO "DailyOrderCounter" ("serviceDate", "lastNumber")
-    VALUES (CAST(${dayKey} AS DATE), 1)
-    ON CONFLICT ("serviceDate")
-    DO UPDATE SET "lastNumber" = "DailyOrderCounter"."lastNumber" + 1
-    RETURNING "lastNumber"
-  `
+  try {
+    const rows = await tx.$queryRaw<Array<{ lastNumber: number }>>`
+      INSERT INTO "DailyOrderCounter" ("serviceDate", "lastNumber")
+      VALUES (CAST(${dayKey} AS DATE), 1)
+      ON CONFLICT ("serviceDate")
+      DO UPDATE SET "lastNumber" = "DailyOrderCounter"."lastNumber" + 1
+      RETURNING "lastNumber"
+    `
 
-  const dailyNumber = rows[0]?.lastNumber
-  if (!dailyNumber) {
-    throw new Error('DAILY_ORDER_NUMBER_FAILED')
+    const dailyNumber = rows[0]?.lastNumber
+    if (!dailyNumber) {
+      throw new Error('DAILY_ORDER_NUMBER_FAILED')
+    }
+
+    return { dailyNumber, serviceDate: serviceDateFromDayKey(dayKey) }
+  } catch (error) {
+    if (error instanceof Error && error.message === 'DAILY_ORDER_NUMBER_FAILED') {
+      throw error
+    }
+
+    const message = error instanceof Error ? error.message.toLowerCase() : ''
+    if (
+      message.includes('dailyordercounter') ||
+      message.includes('does not exist') ||
+      message.includes('dailynumber') ||
+      message.includes('servicedate')
+    ) {
+      throw new Error('SCHEMA_OUT_OF_DATE')
+    }
+
+    throw error
   }
-
-  return { dailyNumber, serviceDate: serviceDateFromDayKey(dayKey) }
 }
 
 async function applyStockDeltaForOrderItems(
@@ -2011,7 +2029,7 @@ export async function closeTableAndOrders(
   userId?: string,
   paymentMethod: 'cash' | 'card' | 'transfer' | 'mercado_pago' = 'cash'
 ) {
-  const session = await prisma.tableSession.findFirst({
+  let session = await prisma.tableSession.findFirst({
     where: {
       tableId,
       closedAt: null,
@@ -2024,8 +2042,49 @@ export async function closeTableAndOrders(
     },
   })
 
+  // Si la mesa quedó ocupada sin sesión (estado inconsistente), recuperamos
+  // con los pedidos abiertos de la mesa o liberamos si no hay nada que cobrar.
   if (!session) {
-    throw new Error('TABLE_SESSION_NOT_FOUND')
+    const openOrders = await prisma.order.findMany({
+      where: {
+        diningTableId: tableId,
+        status: {
+          notIn: [PrismaOrderStatus.COMPLETED, PrismaOrderStatus.CANCELLED],
+        },
+      },
+      select: { id: true, total: true },
+    })
+
+    if (openOrders.length === 0) {
+      const freed = await prisma.diningTable.update({
+        where: { id: tableId },
+        data: { status: PrismaTableStatus.FREE },
+        include: tableInclude,
+      })
+      return freed
+    }
+
+    const recovered = await prisma.$transaction(async (tx) => {
+      const created = await tx.tableSession.create({
+        data: {
+          tableId,
+          waitressId: userId,
+          accumulatedTotal: openOrders.reduce((sum, order) => sum + decimalToNumber(order.total), 0),
+        },
+      })
+
+      await tx.order.updateMany({
+        where: { id: { in: openOrders.map((order) => order.id) } },
+        data: { tableSessionId: created.id },
+      })
+
+      return tx.tableSession.findUniqueOrThrow({
+        where: { id: created.id },
+        include: { orders: true },
+      })
+    })
+
+    session = recovered
   }
 
   const prismaPaymentMethod =

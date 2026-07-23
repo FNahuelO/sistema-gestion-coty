@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
+import { isSchemaMismatchError, schemaMismatchResponse } from '@/lib/api-route-errors'
 
 const ORDER_ERROR_MESSAGES = new Map<string, [string, number]>([
   ['BUSINESS_CLOSED', ['El local se encuentra cerrado en este momento', 400]],
@@ -13,11 +14,23 @@ const ORDER_ERROR_MESSAGES = new Map<string, [string, number]>([
   ['TABLE_REQUIRED', ['Debe indicar la mesa para este pedido', 400]],
   ['TABLE_NOT_FOUND', ['La mesa seleccionada no existe', 404]],
   ['TABLE_UNAVAILABLE', ['La mesa seleccionada no está disponible', 400]],
+  ['TABLE_SESSION_NOT_FOUND', ['La mesa no tiene una sesión abierta. Ocupá la mesa o cargá un pedido antes de cobrar.', 400]],
   ['OUT_OF_STOCK', ['No hay stock suficiente para uno o más productos', 400]],
   ['SETTINGS_NOT_FOUND', ['La configuración del negocio no está lista', 500]],
   ['MIN_ORDER_AMOUNT', ['El pedido no alcanza el monto mínimo requerido', 400]],
   ['MERCADOPAGO_UNAVAILABLE', ['Mercado Pago no está disponible en este momento', 400]],
   ['PAYMENT_NOT_APPROVED', ['Debés aprobar el comprobante de transferencia antes de confirmar el pedido', 400]],
+  [
+    'DAILY_ORDER_NUMBER_FAILED',
+    ['No se pudo asignar el número de pedido del día. Revisá que las migraciones estén aplicadas.', 500],
+  ],
+  [
+    'SCHEMA_OUT_OF_DATE',
+    [
+      'La base de datos no está actualizada. Ejecutá `pnpm db:migrate:deploy` en producción y volvé a intentar.',
+      503,
+    ],
+  ],
 ])
 
 export function handleOrderRouteError(error: unknown, context: string) {
@@ -30,6 +43,11 @@ export function handleOrderRouteError(error: unknown, context: string) {
     return NextResponse.json({ error: issueMessage }, { status: 400 })
   }
 
+  if (isSchemaMismatchError(error)) {
+    console.error(`${context} SCHEMA_OUT_OF_DATE`, error)
+    return schemaMismatchResponse()
+  }
+
   if (error instanceof Error) {
     if (error.message === 'UNAUTHORIZED') {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
@@ -39,7 +57,7 @@ export function handleOrderRouteError(error: unknown, context: string) {
     }
     if (ORDER_ERROR_MESSAGES.has(error.message)) {
       const [message, status] = ORDER_ERROR_MESSAGES.get(error.message)!
-      return NextResponse.json({ error: message }, { status })
+      return NextResponse.json({ error: message, code: error.message }, { status })
     }
   }
 
