@@ -697,12 +697,35 @@ export function useOrders() {
     [mutate]
   )
 
+  const updateOrderItems = useCallback(
+    async (
+      orderId: string,
+      payload: {
+        add?: CreateOrderItemInput[]
+        updates?: Array<{ orderItemId: string; quantity: number }>
+        remove?: string[]
+      }
+    ) => {
+      const order = parseOrder(
+        await sendJson<Order & { createdAt: string; updatedAt: string }>(
+          `/api/cashier/orders/${orderId}/items`,
+          'PATCH',
+          payload
+        )
+      )
+      await mutate()
+      return order
+    },
+    [mutate]
+  )
+
   return {
     orders,
     addOrder,
     createManualOrder,
     updateOrderStatus,
     updateOrderEstimate,
+    updateOrderItems,
     closeOrder,
     approveOrderPayment,
     isLoading,
