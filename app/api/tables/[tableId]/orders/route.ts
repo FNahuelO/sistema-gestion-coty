@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { handleOrderRouteError } from '@/lib/order-route-errors'
 import { createOrderFromPayload, requireSessionRole } from '@/lib/server-data'
 
 const schema = z.object({
@@ -42,15 +43,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ta
 
     return NextResponse.json(order, { status: 201 })
   } catch (error) {
-    if (error instanceof Error && error.message === 'UNAUTHORIZED') {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    if (error instanceof Error && error.message === 'FORBIDDEN') {
-      return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
-    }
-
-    console.error('POST /api/tables/[tableId]/orders', error)
-    return NextResponse.json({ error: 'No se pudo crear el pedido de mesa' }, { status: 500 })
+    return handleOrderRouteError(error, 'POST /api/tables/[tableId]/orders')
   }
 }

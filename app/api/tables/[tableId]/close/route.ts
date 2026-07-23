@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { resolveCommonRouteError } from '@/lib/api-route-errors'
 import { closeTableAndOrders, requireSessionRole, serializeTable } from '@/lib/server-data'
 
 const closeSchema = z.object({
@@ -19,12 +20,22 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ta
 
     return NextResponse.json(serializeTable(table))
   } catch (error) {
-    if (error instanceof Error && error.message === 'UNAUTHORIZED') {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const common = resolveCommonRouteError(error)
+    if (common) return common
+
+    if (error instanceof Error && error.message === 'TABLE_SESSION_NOT_FOUND') {
+      return NextResponse.json(
+        {
+          error:
+            'La mesa no tiene una sesión abierta. Ocupá la mesa o cargá un pedido antes de cobrar.',
+          code: 'TABLE_SESSION_NOT_FOUND',
+        },
+        { status: 400 }
+      )
     }
 
-    if (error instanceof Error && error.message === 'FORBIDDEN') {
-      return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+    if (error instanceof Error && error.message === 'TABLE_NOT_FOUND') {
+      return NextResponse.json({ error: 'Mesa no encontrada' }, { status: 404 })
     }
 
     console.error('POST /api/tables/[tableId]/close', error)
