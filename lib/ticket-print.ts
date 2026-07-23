@@ -1,6 +1,6 @@
 import { formatDateAR, formatTimeAR, formatDateTimeAR } from '@/lib/datetime'
 import { formatPrice } from '@/lib/coty-theme'
-import { getPaymentStatusLabel, formatOrderNumber, getOrderChannelLabel, getOrderNumberText } from '@/lib/order-labels'
+import { getPaymentStatusLabel, formatOrderNumber, formatPublicOrderCode, getOrderChannelLabel, getOrderNumberText } from '@/lib/order-labels'
 import type { Order } from '@/lib/types'
 
 export type TicketVariant = 'kitchen' | 'customer'
@@ -122,12 +122,20 @@ function escapeHtml(value: string) {
     .replaceAll('"', '&quot;')
 }
 
-function getOrderLabel(order: Order) {
+function getKitchenOrderLabel(order: Order) {
   return formatOrderNumber(order)
 }
 
-function formatPrintedOrderNumber(order: Order) {
+function getCustomerOrderLabel(order: Order) {
+  return formatPublicOrderCode(order)
+}
+
+function formatKitchenOrderNumber(order: Order) {
   return `Orden nº ${getOrderNumberText(order)}`
+}
+
+function formatCustomerOrderNumber(order: Order) {
+  return `Orden ${formatPublicOrderCode(order)}`
 }
 
 function getTicketPaymentStatus(order: Order) {
@@ -253,7 +261,7 @@ function renderCustomerTicketText({ order, businessName }: TicketPrintInput): st
   const lines: string[] = [
     center('*** TICKET ***'),
     center(businessName),
-    center(formatPrintedOrderNumber(order)),
+    center(formatCustomerOrderNumber(order)),
     SEPARATOR,
     line(`Modalidad: ${getOrderChannelLabel(order)}`),
     line(`Pago: ${TICKET_PAYMENT_LABELS[order.paymentMethod]}`),
@@ -302,7 +310,7 @@ function renderKitchenTicketText({ order, businessName }: TicketPrintInput): str
   const lines: string[] = [
     center('*** COCINA ***'),
     center(businessName),
-    center(formatPrintedOrderNumber(order)),
+    center(formatKitchenOrderNumber(order)),
     SEPARATOR,
     center(order.type === 'table' ? `>>> ${channelLabel} · PRIORIDAD <<<` : `>>> ${channelLabel} <<<`),
     line(`Hora: ${formatDateTimeAR(createdAt)}`),
@@ -335,7 +343,7 @@ export function buildTicketPrintDocument(input: TicketPrintInput, variants: Tick
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=58mm, initial-scale=1" />
-    <title>Ticket ${escapeHtml(getOrderLabel(input.order))}</title>
+    <title>Ticket ${escapeHtml(getCustomerOrderLabel(input.order))}</title>
     <style>${TICKET_STYLES}</style>
   </head>
   <body><div class="print-root">${body}</div></body>

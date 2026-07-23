@@ -1,24 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { arDayKey } from '@/lib/datetime'
 import { orderDetailInclude, serializePublicTrackedOrder } from '@/lib/server-data'
 import { buildWhatsAppUrl } from '@/lib/whatsapp-message'
 
 function buildExactMatchWhere(query: string) {
-  const normalized = query.replace(/^#/, '').trim()
-  const dailyNumber = /^\d+$/.test(normalized) ? Number(normalized) : null
-  const dayKey = arDayKey(new Date())
-  const [year, month, day] = dayKey.split('-').map(Number)
-  const serviceDate = new Date(Date.UTC(year, month - 1, day))
-
   return {
     OR: [
       { id: { equals: query, mode: 'insensitive' as const } },
       { displayCode: { equals: query, mode: 'insensitive' as const } },
       { publicTrackingCode: { equals: query, mode: 'insensitive' as const } },
-      ...(dailyNumber != null
-        ? [{ dailyNumber, serviceDate }]
-        : []),
     ],
   }
 }

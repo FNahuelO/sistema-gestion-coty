@@ -702,6 +702,7 @@ export function stripOrderPii(order: Order): Order {
 
   return {
     ...order,
+    dailyNumber: undefined,
     customerName: isTable
       ? order.tableNumber
         ? `Mesa ${order.tableNumber}`

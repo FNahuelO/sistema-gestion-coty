@@ -99,7 +99,7 @@ export function formatTableStatus(status: TableStatus) {
   return TABLE_STATUS_LABELS[status]
 }
 
-/** Número corto de cocina del día (#12). Si no hay dailyNumber, cae al código del pedido. */
+/** Número corto interno de cocina del día (#12). Solo para staff/cocina. */
 export function formatOrderNumber(
   order: Pick<Order, 'dailyNumber' | 'displayCode' | 'publicTrackingCode' | 'id'>
 ): string {
@@ -107,10 +107,17 @@ export function formatOrderNumber(
   return order.displayCode ?? order.publicTrackingCode ?? order.id.slice(0, 8).toUpperCase()
 }
 
-/** Etiqueta legible sin # forzado (WhatsApp / tickets). */
+/** Número interno sin #. Solo para staff/cocina/tickets de cocina. */
 export function getOrderNumberText(
   order: Pick<Order, 'dailyNumber' | 'displayCode' | 'publicTrackingCode' | 'id'>
 ): string {
   if (order.dailyNumber != null) return String(order.dailyNumber)
+  return order.displayCode ?? order.publicTrackingCode ?? order.id.slice(0, 8).toUpperCase()
+}
+
+/** Código público del pedido para el cliente (nunca el número diario interno). */
+export function formatPublicOrderCode(
+  order: Pick<Order, 'displayCode' | 'publicTrackingCode' | 'id'>
+): string {
   return order.displayCode ?? order.publicTrackingCode ?? order.id.slice(0, 8).toUpperCase()
 }
