@@ -1,6 +1,6 @@
 import { formatDateAR, formatTimeAR, formatDateTimeAR } from '@/lib/datetime'
 import { formatPrice } from '@/lib/coty-theme'
-import { getPaymentStatusLabel, ORDER_TYPE_LABELS, formatOrderNumber, getOrderNumberText } from '@/lib/order-labels'
+import { getPaymentStatusLabel, formatOrderNumber, getOrderChannelLabel, getOrderNumberText } from '@/lib/order-labels'
 import type { Order } from '@/lib/types'
 
 export type TicketVariant = 'kitchen' | 'customer'
@@ -255,7 +255,7 @@ function renderCustomerTicketText({ order, businessName }: TicketPrintInput): st
     center(businessName),
     center(formatPrintedOrderNumber(order)),
     SEPARATOR,
-    line(`Modalidad: ${ORDER_TYPE_LABELS[order.type]}`),
+    line(`Modalidad: ${getOrderChannelLabel(order)}`),
     line(`Pago: ${TICKET_PAYMENT_LABELS[order.paymentMethod]}`),
     line(`Estado: ${getTicketPaymentStatus(order)}`),
     line(`Fecha: ${formatDateAR(createdAt)}`),
@@ -298,12 +298,13 @@ function renderCustomerTicketText({ order, businessName }: TicketPrintInput): st
 function renderKitchenTicketText({ order, businessName }: TicketPrintInput): string {
   const createdAt = order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt)
 
+  const channelLabel = getOrderChannelLabel(order).toUpperCase()
   const lines: string[] = [
     center('*** COCINA ***'),
     center(businessName),
     center(formatPrintedOrderNumber(order)),
     SEPARATOR,
-    line(`${ORDER_TYPE_LABELS[order.type]}${order.tableNumber ? ` M${order.tableNumber}` : ''}`),
+    center(order.type === 'table' ? `>>> ${channelLabel} · PRIORIDAD <<<` : `>>> ${channelLabel} <<<`),
     line(`Hora: ${formatDateTimeAR(createdAt)}`),
     line(`Cliente: ${order.customerName}`),
   ]

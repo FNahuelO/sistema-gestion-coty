@@ -171,9 +171,15 @@ export function OrderDetailSheet({
             <StatusBadge status={order.status} variant="onDark" />
             <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold text-white">
               <TypeIcon className="h-3.5 w-3.5" />
-              {typeMeta.label}
-              {order.tableNumber ? ` · Mesa ${order.tableNumber}` : null}
+              {order.type === 'table' && order.tableNumber
+                ? `Mesa ${order.tableNumber}`
+                : typeMeta.label}
             </span>
+            {order.type === 'table' ? (
+              <span className="rounded-full bg-amber-300/90 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-950">
+                Prioridad
+              </span>
+            ) : null}
           </div>
         </div>
 

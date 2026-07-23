@@ -28,7 +28,7 @@ import { ManualOrderDialog } from '@/components/staff/manual-order-dialog'
 import { StaffNotificationsButton } from '@/components/staff/staff-notifications-button'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
-import { formatOrderStatus, formatOrderNumber, isDisplayableCustomerPhone } from '@/lib/order-labels'
+import { formatOrderStatus, formatOrderNumber, getOrderChannelLabel, ORDER_TYPE_BADGE_CLASS, ORDER_TYPE_CARD_ACCENT, isDisplayableCustomerPhone } from '@/lib/order-labels'
 import { canApproveTransferPayment } from '@/lib/payment-flow'
 import { ORDER_SORT_OPTIONS, sortOrders, type OrderSortKey } from '@/lib/order-sort'
 import type { DeliveryQueueEntry, Order, OrderStatus, OrderType } from '@/lib/types'
@@ -52,12 +52,6 @@ const orderTypeIcons: Record<OrderType, ElementType> = {
   delivery: Truck,
   pickup: Store,
   table: Users,
-}
-
-const ORDER_TYPE_ACCENT: Record<OrderType, string> = {
-  delivery: 'border-l-[#E8A598]',
-  pickup: 'border-l-[#7EB8B3]',
-  table: 'border-l-[#2D5A57]',
 }
 
 const statusActions: Record<OrderStatus, { next: OrderStatus; label: string } | null> = {
@@ -122,7 +116,7 @@ export function OrdersSection({
   const [selectedTab, setSelectedTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('active')
-  const [sortBy, setSortBy] = useState<OrderSortKey>('number')
+  const [sortBy, setSortBy] = useState<OrderSortKey>('priority')
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [manualOrderOpen, setManualOrderOpen] = useState(false)
 
@@ -403,7 +397,7 @@ export function OrdersSection({
                           className={cn(
                             PANEL_LIST_ROW,
                             'w-full cursor-pointer border-l-4 text-left transition-colors hover:bg-[#F8FBFA] dark:hover:bg-muted',
-                            ORDER_TYPE_ACCENT[order.type],
+                            ORDER_TYPE_CARD_ACCENT[order.type],
                             order.status === 'pending' && 'bg-[#FFFBEB]/80 dark:bg-amber-950/30'
                           )}
                         >
@@ -416,6 +410,21 @@ export function OrdersSection({
                                 <TypeIcon className="h-4 w-4" style={{ color: COTY_TEAL }} />
                               </div>
                               <div className="min-w-0">
+                                <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                                  <span
+                                    className={cn(
+                                      'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                                      ORDER_TYPE_BADGE_CLASS[order.type]
+                                    )}
+                                  >
+                                    {getOrderChannelLabel(order)}
+                                  </span>
+                                  {order.type === 'table' ? (
+                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
+                                      Prioridad
+                                    </span>
+                                  ) : null}
+                                </div>
                                 <p className="text-lg font-bold tracking-tight text-foreground">
                                   {formatOrderNumber(order)}
                                 </p>
