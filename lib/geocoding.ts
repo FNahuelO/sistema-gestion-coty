@@ -2,7 +2,8 @@ import type { LatLng } from './geo'
 
 export type GeocodeResult = LatLng & { displayName: string }
 
-const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
+const NOMINATIM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search'
+const NOMINATIM_REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse'
 
 // Nominatim exige un User-Agent que identifique a la aplicación y un máximo de
 // ~1 request por segundo. Cacheamos resultados y serializamos los pedidos para
@@ -26,6 +27,10 @@ let queue: Promise<unknown> = Promise.resolve()
 
 function normalizeKey(query: string): string {
   return query.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function reverseCacheKey(lat: number, lng: number): string {
+  return `rev:${lat.toFixed(5)},${lng.toFixed(5)}`
 }
 
 async function throttle(): Promise<void> {
@@ -57,7 +62,7 @@ async function requestNominatim(query: string): Promise<GeocodeResult | null> {
     params.set('bounded', '0')
   }
 
-  const response = await fetch(`${NOMINATIM_URL}?${params.toString()}`, {
+  const response = await fetch(`${NOMINATIM_SEARCH_URL}?${params.toString()}`, {
     headers: {
       'User-Agent': USER_AGENT,
       'Accept-Language': 'es',
@@ -84,6 +89,42 @@ async function requestNominatim(query: string): Promise<GeocodeResult | null> {
   return { lat, lng, displayName: first.display_name }
 }
 
+async function requestNominatimReverse(lat: number, lng: number): Promise<GeocodeResult | null> {
+  const params = new URLSearchParams({
+    lat: String(lat),
+    lon: String(lng),
+    format: 'jsonv2',
+    addressdetails: '0',
+    zoom: '18',
+  })
+
+  const response = await fetch(`${NOMINATIM_REVERSE_URL}?${params.toString()}`, {
+    headers: {
+      'User-Agent': USER_AGENT,
+      'Accept-Language': 'es',
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(`GEOCODING_HTTP_${response.status}`)
+  }
+
+  const data = (await response.json()) as {
+    lat?: string
+    lon?: string
+    display_name?: string
+    error?: string
+  }
+
+  if (!data?.display_name) return null
+
+  const resultLat = Number(data.lat ?? lat)
+  const resultLng = Number(data.lon ?? lng)
+  if (!Number.isFinite(resultLat) || !Number.isFinite(resultLng)) return null
+
+  return { lat: resultLat, lng: resultLng, displayName: data.display_name }
+}
+
 /**
  * Geocodifica una dirección a coordenadas usando OpenStreetMap / Nominatim.
  * Devuelve `null` si no se encuentra. Cachea por 24h y respeta el rate limit.
@@ -108,6 +149,33 @@ export async function geocodeAddress(rawQuery: string): Promise<GeocodeResult | 
   })
 
   // Mantener la cadena viva aunque este request falle.
+  queue = run.catch(() => undefined)
+  return run
+}
+
+/**
+ * Convierte coordenadas en una dirección legible (reverse geocoding).
+ * Devuelve `null` si Nominatim no encuentra un resultado.
+ */
+export async function reverseGeocode(lat: number, lng: number): Promise<GeocodeResult | null> {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null
+
+  const key = reverseCacheKey(lat, lng)
+  const cached = cache.get(key)
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.result
+  }
+
+  const run = queue.then(async () => {
+    const fresh = cache.get(key)
+    if (fresh && fresh.expiresAt > Date.now()) return fresh.result
+    await throttle()
+    const result = await requestNominatimReverse(lat, lng)
+    cache.set(key, { result, expiresAt: Date.now() + CACHE_TTL_MS })
+    return result
+  })
+
   queue = run.catch(() => undefined)
   return run
 }

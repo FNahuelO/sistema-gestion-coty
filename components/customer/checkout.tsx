@@ -16,6 +16,8 @@ import {
   Users,
   Armchair,
   Info,
+  Crosshair,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -192,6 +194,8 @@ export function CheckoutPage() {
   const [completedTableNumber, setCompletedTableNumber] = useState<number | undefined>()
   const [completedWhatsappUrl, setCompletedWhatsappUrl] = useState<string | undefined>()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [deliveryCoords, setDeliveryCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [locatingAddress, setLocatingAddress] = useState(false)
   const redirectingToMpRef = useRef(false)
   const [redirectingToMp, setRedirectingToMp] = useState(false)
   const [pendingMpOrder, setPendingMpOrder] = useState<ReturnType<typeof getMpPendingOrder>>(null)
@@ -311,6 +315,51 @@ export function CheckoutPage() {
     }
   }
 
+  const useMyLocation = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      toast.error('Tu navegador no permite geolocalización')
+      return
+    }
+
+    setLocatingAddress(true)
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude
+        const lng = position.coords.longitude
+        try {
+          const response = await fetch('/api/delivery/reverse-geocode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lat, lng }),
+          })
+          const data = await response.json()
+          if (!response.ok) throw new Error(data.error ?? 'No se pudo obtener la dirección')
+
+          setCustomerAddress(data.displayName ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+          setDeliveryCoords({ lat: data.lat ?? lat, lng: data.lng ?? lng })
+          toast.success('Ubicación cargada. Podés editarla si hace falta.')
+        } catch (error) {
+          setDeliveryCoords({ lat, lng })
+          setCustomerAddress((current) =>
+            current.trim() ? current : `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+          )
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : 'No se pudo obtener la dirección. Completala manualmente.'
+          )
+        } finally {
+          setLocatingAddress(false)
+        }
+      },
+      () => {
+        setLocatingAddress(false)
+        toast.error('No se pudo obtener tu ubicación. Revisá los permisos del navegador.')
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -356,6 +405,8 @@ export function CheckoutPage() {
         customerName: isTableMode ? `Mesa ${tableSession?.tableNumber}` : customerName,
         customerPhone: isTableMode ? 'mesa' : customerPhone,
         customerAddress: activeOrderType === 'delivery' ? customerAddress : undefined,
+        deliveryLat: activeOrderType === 'delivery' && deliveryCoords ? deliveryCoords.lat : undefined,
+        deliveryLng: activeOrderType === 'delivery' && deliveryCoords ? deliveryCoords.lng : undefined,
         tableId: isTableMode ? tableSession?.tableId : undefined,
         deliveryZoneId: activeOrderType === 'delivery' && deliveryZoneId ? deliveryZoneId : undefined,
         discountCode: couponDiscount > 0 ? couponCode : undefined,
@@ -844,10 +895,30 @@ export function CheckoutPage() {
                     id="address"
                     placeholder="Calle, número, referencias..."
                     value={customerAddress}
-                    onChange={(e) => setCustomerAddress(e.target.value)}
+                    onChange={(e) => {
+                      setCustomerAddress(e.target.value)
+                      if (deliveryCoords) setDeliveryCoords(null)
+                    }}
                     rows={2}
                     required
                   />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full rounded-full"
+                    onClick={useMyLocation}
+                    disabled={locatingAddress}
+                  >
+                    {locatingAddress ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Crosshair className="mr-2 h-4 w-4" />
+                    )}
+                    {locatingAddress ? 'Obteniendo ubicación...' : 'Usar mi ubicación'}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Escribí la dirección a mano o usá tu ubicación GPS.
+                  </p>
                 </div>
               )}
               <div className="space-y-2">
