@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PANEL_BORDER, PANEL_OUTLINE_BTN, PANEL_SURFACE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
+import { LoadingImage } from '@/components/shared/loading-image'
 
 type UploadFolder = 'products' | 'promotions' | 'settings' | 'users'
 
@@ -63,7 +64,7 @@ export function ImageUploadField({ value, onChange, folder, className }: ImageUp
         <div className={cn('relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border', PANEL_BORDER, PANEL_SURFACE)}>
           {value ? (
             <>
-              <img src={value} alt="" className="h-full w-full object-cover" />
+              <LoadingImage src={value} alt="" />
               <button
                 type="button"
                 onClick={() => onChange('')}

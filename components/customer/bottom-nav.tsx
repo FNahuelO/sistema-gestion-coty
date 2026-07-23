@@ -2,6 +2,7 @@
 
 import { usePathname, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { LoadingImage } from '@/components/shared/loading-image'
 import { COTY_HEADER } from '@/lib/coty-theme'
 import { buildCustomerPath } from '@/lib/menu-url'
 import { useTableSession } from '@/lib/store'
@@ -54,11 +55,13 @@ export function CustomerBottomNav() {
               className="flex flex-1 flex-col items-center gap-1 py-1 no-underline relative"
             >
               <div className="flex flex-col items-center">
-                <img
+                <LoadingImage
                   src={icon}
                   alt=""
-                  aria-hidden
-                  className={cn('h-5 w-5', isActive ? 'opacity-100' : 'opacity-50')}
+                  inline
+                  loading="eager"
+                  skeleton={false}
+                  imgClassName={cn('h-5 w-5', isActive ? 'opacity-100' : 'opacity-50')}
                   style={
                     isActive
                       ? {

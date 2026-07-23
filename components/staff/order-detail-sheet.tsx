@@ -30,6 +30,7 @@ import { COTY_HEADER, COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-the
 import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
 import type { Order, OrderStatus, OrderType, SelectedOption } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { LoadingImage } from '@/components/shared/loading-image'
 
 import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS, formatOrderNumber, getPaymentStatusLabel, isDisplayableCustomerPhone } from '@/lib/order-labels'
 import { getOrderEstimatedMinutes } from '@/lib/order-estimate'
@@ -316,10 +317,10 @@ export function OrderDetailSheet({
                       className={cn(PANEL_LIST_ROW, 'border-l-4', typeMeta.accent, 'p-3')}
                     >
                       <div className="flex gap-3">
-                        <img
+                        <LoadingImage
                           src={item.product.image}
                           alt={item.product.name}
-                          className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                          className="h-14 w-14 shrink-0 rounded-xl"
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">

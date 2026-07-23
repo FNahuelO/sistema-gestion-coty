@@ -50,6 +50,7 @@ import { cn } from '@/lib/utils'
 import type { OrderType, PaymentMethod, Order } from '@/lib/types'
 import { toast } from 'sonner'
 import Image from 'next/image'
+import { LoadingImage } from '@/components/shared/loading-image'
 
 function CheckoutHeader({
   tableNumber,
@@ -71,10 +72,13 @@ function CheckoutHeader({
           </Link>
 
           <Link href="/" className="absolute left-1/2 -translate-x-1/2">
-            <img
+            <LoadingImage
               src={LOGO_SRC_SVG}
               alt="Coty Café"
-              className="h-10 w-auto object-contain mix-blend-screen"
+              inline
+              loading="eager"
+              skeleton={false}
+              imgClassName="h-10 w-auto object-contain mix-blend-screen"
             />
           </Link>
 

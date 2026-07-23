@@ -9,6 +9,7 @@ import { COTY_HEADER, LOGO_SRC_SVG } from '@/lib/coty-theme'
 import { PANEL_BG, PANEL_BORDER, PANEL_BTN_GHOST, PANEL_SHELL, PANEL_SHELL_BLUR } from '@/lib/panel-theme'
 import { useAuth } from '@/lib/store'
 import { cn } from '@/lib/utils'
+import { LoadingImage } from '@/components/shared/loading-image'
 import { AdminSideNav } from './ui/admin-side-nav'
 import { AdminMobileNav, getAdminSectionLabel } from './ui/admin-mobile-nav'
 import { MobileShellPadding } from './ui/mobile-shell-padding'
@@ -88,7 +89,14 @@ export function AdminShell({
                   className="mb-0.5 flex h-7 w-7 items-center justify-center rounded-full"
                   style={{ backgroundColor: COTY_HEADER }}
                 >
-                  <img src={LOGO_SRC_SVG} alt="Coty Cafe" className="h-auto w-4 object-contain" />
+                  <LoadingImage
+                    src={LOGO_SRC_SVG}
+                    alt="Coty Cafe"
+                    inline
+                    loading="eager"
+                    skeleton={false}
+                    imgClassName="h-auto w-4 object-contain"
+                  />
                 </div>
                 <p className="font-serif text-base font-bold leading-tight text-foreground">Coty Cafe</p>
               </div>

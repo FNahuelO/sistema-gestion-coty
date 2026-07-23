@@ -16,6 +16,7 @@ import {
   PANEL_SURFACE,
 } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
+import { LoadingImage } from '@/components/shared/loading-image'
 
 const QR_SIZE = 256
 const PRINT_QR_SIZE = 1024
@@ -133,7 +134,13 @@ export function QrCodeCard({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
         <div className={cn('mx-auto flex h-40 w-40 shrink-0 items-center justify-center rounded-xl p-3 shadow-sm sm:mx-0', PANEL_SHELL)}>
           {dataUrl ? (
-            <img src={dataUrl} alt={`QR ${title}`} className="h-full w-full object-contain" />
+            <LoadingImage
+              src={dataUrl}
+              alt={`QR ${title}`}
+              loading="eager"
+              skeleton={false}
+              imgClassName="object-contain"
+            />
           ) : (
             <div className={cn('h-full w-full animate-pulse rounded-lg', PANEL_PROGRESS_TRACK)} />
           )}

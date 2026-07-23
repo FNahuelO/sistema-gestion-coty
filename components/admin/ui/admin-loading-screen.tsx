@@ -3,6 +3,7 @@
 import { COTY_HEADER, LOGO_SRC_SVG } from '@/lib/coty-theme'
 import { PANEL_BG } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
+import { LoadingImage } from '@/components/shared/loading-image'
 
 export function AdminLoadingScreen() {
   return (
@@ -17,7 +18,14 @@ export function AdminLoadingScreen() {
           className="flex h-14 w-14 items-center justify-center rounded-full shadow-sm ring-4 ring-[#C5DDD9]/40 dark:ring-primary/20"
           style={{ backgroundColor: COTY_HEADER }}
         >
-          <img src={LOGO_SRC_SVG} alt="Coty Cafe" className="h-auto w-8 object-contain" />
+          <LoadingImage
+            src={LOGO_SRC_SVG}
+            alt="Coty Cafe"
+            inline
+            loading="eager"
+            skeleton={false}
+            imgClassName="h-auto w-8 object-contain"
+          />
         </div>
 
         <div className="text-center">
