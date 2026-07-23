@@ -234,6 +234,7 @@ type SerializableOrder = {
   total: Prisma.Decimal | number
   estimatedMinutes?: number | null
   estimatedReadyAt?: Date | null
+  priority?: boolean
   diningTableId?: string | null
   tableSessionId?: string | null
   createdByUserId?: string | null
@@ -654,6 +655,7 @@ export function serializeOrder(order: SerializableOrder): Order {
     total: decimalToNumber(order.total),
     estimatedMinutes: order.estimatedMinutes ?? undefined,
     estimatedReadyAt: order.estimatedReadyAt ?? undefined,
+    priority: Boolean(order.priority),
     tableId: order.diningTableId ?? undefined,
     tableNumber: order.diningTable?.number ?? undefined,
     tableSessionId: order.tableSessionId ?? undefined,
@@ -1561,6 +1563,16 @@ export async function updateOrderEstimatedMinutes(orderId: string, estimatedMinu
   const serialized = serializeOrder(order)
   await notifyOrderEstimateChanged(serialized)
   return serialized
+}
+
+export async function updateOrderPriority(orderId: string, priority: boolean) {
+  const order = await prisma.order.update({
+    where: { id: orderId },
+    data: { priority },
+    include: orderInclude,
+  })
+
+  return serializeOrder(order)
 }
 
 const ORDER_ITEM_EDITABLE_STATUSES: PrismaOrderStatus[] = [

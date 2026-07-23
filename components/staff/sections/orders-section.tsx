@@ -98,7 +98,7 @@ export function OrdersSection({
   embedded?: boolean
   onNavigateToCalls?: () => void
 }) {
-  const { orders, createManualOrder, updateOrderStatus, updateOrderEstimate, updateOrderItems, closeOrder, approveOrderPayment } =
+  const { orders, createManualOrder, updateOrderStatus, updateOrderEstimate, updateOrderPriority, updateOrderItems, closeOrder, approveOrderPayment } =
     useOrders()
   const { settings } = useBusiness()
   const businessName = settings?.name ?? 'Coty Café'
@@ -205,6 +205,20 @@ export function OrdersSection({
         toast.success(`Tiempo estimado actualizado a ${estimatedMinutes} min`)
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'No se pudo actualizar el tiempo estimado')
+        throw error
+      }
+    })
+  }
+
+  const handleUpdatePriority = async (orderId: string, priority: boolean) => {
+    await run(`priority:${orderId}`, async () => {
+      try {
+        const updated = await updateOrderPriority(orderId, priority)
+        setSelectedOrder((current) => (current && current.id === orderId ? updated : current))
+        toast.success(priority ? 'Pedido marcado como prioridad' : 'Prioridad quitada')
+        window.dispatchEvent(new Event('coty-refresh-orders'))
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'No se pudo actualizar la prioridad')
         throw error
       }
     })
@@ -443,7 +457,7 @@ export function OrdersSection({
                                   >
                                     {getOrderChannelLabel(order)}
                                   </span>
-                                  {order.type === 'table' ? (
+                                  {order.priority ? (
                                     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
                                       Prioridad
                                     </span>
@@ -566,6 +580,7 @@ export function OrdersSection({
         onAdvanceStatus={handleStatusChange}
         onApprovePayment={handleApprovePayment}
         onUpdateEstimate={handleUpdateEstimate}
+        onUpdatePriority={handleUpdatePriority}
         onUpdateItems={handleUpdateItems}
         onPrintKitchen={(order) => printOrderTickets({ order, businessName }, ['kitchen'])}
         onPrintCustomer={(order) => printOrderTickets({ order, businessName }, ['customer'])}

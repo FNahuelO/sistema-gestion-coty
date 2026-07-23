@@ -366,6 +366,7 @@ model Order {
   total                  Decimal              @db.Decimal(10, 2)
   estimatedMinutes       Int?
   estimatedReadyAt       DateTime?
+  priority               Boolean              @default(false)
   kitchenAckAt           DateTime?
   whatsappMessage        String?
   whatsappSentAt         DateTime?

@@ -20,6 +20,8 @@ export async function POST(request: NextRequest) {
       lat: result.lat,
       lng: result.lng,
       displayName: result.displayName,
+      approximate: Boolean(result.approximate),
+      provider: result.provider ?? 'nominatim',
     })
   } catch (error) {
     if (error instanceof z.ZodError) {

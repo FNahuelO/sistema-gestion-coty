@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { ArrowUpDown, CheckCircle, ChefHat, Store, Truck, Users } from 'lucide-react'
 import { toast } from 'sonner'
@@ -43,6 +43,14 @@ export function KitchenSection() {
   const { data, mutate, isLoading } = useSWR<Order[]>('/api/staff/operations', fetchJson, {
     refreshInterval: 15000,
   })
+
+  useEffect(() => {
+    const refresh = () => {
+      void mutate()
+    }
+    window.addEventListener('coty-refresh-orders', refresh)
+    return () => window.removeEventListener('coty-refresh-orders', refresh)
+  }, [mutate])
 
   const runKitchenAction = async (
     orderId: string,
@@ -88,9 +96,7 @@ export function KitchenSection() {
           <p className="text-sm text-muted-foreground">
             {sortedOrders.length === 1 ? '1 comanda' : `${sortedOrders.length} comandas`}
           </p>
-          <p className="text-[11px] text-muted-foreground">
-            Mesa tiene prioridad · Delivery y retiro van después
-          </p>
+
         </div>
         <Select value={sortBy} onValueChange={(value) => setSortBy(value as OrderSortKey)}>
           <SelectTrigger className="w-full border-gray-200 bg-[#F8FBFA] dark:border-border dark:bg-muted sm:w-56">
@@ -143,7 +149,7 @@ export function KitchenSection() {
                         <TypeIcon className="h-3.5 w-3.5" />
                         {channelLabel}
                       </span>
-                      {isTable ? (
+                      {order.priority ? (
                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
                           Prioridad
                         </span>

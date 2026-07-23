@@ -78,6 +78,8 @@ export interface Order {
   total: number
   estimatedMinutes?: number
   estimatedReadyAt?: Date
+  /** Marcado manualmente por staff (cocina/caja). */
+  priority?: boolean
   paymentMethod: PaymentMethod
   paymentStatus?: PaymentStatus
   paymentUrl?: string

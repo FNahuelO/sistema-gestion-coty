@@ -12,7 +12,7 @@ export type OrderSortKey =
   | 'items_desc'
 
 export const ORDER_SORT_OPTIONS: { value: OrderSortKey; label: string }[] = [
-  { value: 'priority', label: 'Prioridad (mesa primero)' },
+  { value: 'priority', label: 'Prioridad primero' },
   { value: 'number', label: 'Por número (#1, #2…)' },
   { value: 'oldest', label: 'Más antiguos primero' },
   { value: 'newest', label: 'Más recientes primero' },
@@ -60,8 +60,9 @@ export function sortOrders(orders: Order[], sortKey: OrderSortKey): Order[] {
   sorted.sort((a, b) => {
     switch (sortKey) {
       case 'priority': {
-        const byType = TYPE_WEIGHT[a.type] - TYPE_WEIGHT[b.type]
-        if (byType !== 0) return byType
+        const aPriority = a.priority ? 0 : 1
+        const bPriority = b.priority ? 0 : 1
+        if (aPriority !== bPriority) return aPriority - bPriority
         return compareByDailyNumber(a, b)
       }
       case 'number':

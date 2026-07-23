@@ -308,7 +308,7 @@ function renderKitchenTicketText({ order, businessName }: TicketPrintInput): str
     center(businessName),
     center(formatKitchenOrderNumber(order)),
     SEPARATOR,
-    center(order.type === 'table' ? `>>> ${channelLabel} · PRIORIDAD <<<` : `>>> ${channelLabel} <<<`),
+    center(order.priority ? `>>> ${channelLabel} · PRIORIDAD <<<` : `>>> ${channelLabel} <<<`),
     line(`Hora: ${formatDateTimeAR(createdAt)}`),
     line(`Cliente: ${order.customerName}`),
   ]

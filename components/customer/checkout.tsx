@@ -171,7 +171,7 @@ export function CheckoutPage() {
   const searchParams = useSearchParams()
   const { items, hydrated, updateQuantity, removeItem, clearCart } = useCart()
   const { settings, isLoading: isSettingsLoading } = useBusiness()
-  const { promotions, channelAvailability, deliveryZones, mercadoPagoAvailable } = useCatalog()
+  const { promotions, channelAvailability, mercadoPagoAvailable } = useCatalog()
   const { subtotal, discount, total } = useCartPricing(items, promotions)
   const { addOrder } = useOrders()
   const { tableSession, isTableMode, hydrated: tableSessionHydrated } = useTableSession()
@@ -183,7 +183,6 @@ export function CheckoutPage() {
   const [customerPhone, setCustomerPhone] = useState('')
   const [customerAddress, setCustomerAddress] = useState('')
   const [notes, setNotes] = useState('')
-  const [deliveryZoneId, setDeliveryZoneId] = useState('')
   const [couponCode, setCouponCode] = useState('')
   const [couponDiscount, setCouponDiscount] = useState(0)
   const [tip, setTip] = useState(0)
@@ -211,15 +210,8 @@ export function CheckoutPage() {
   const showingMpRedirect = redirectingToMp
   const isEmpty = items.length === 0 && !orderComplete && !showingMpRedirect
   const activeOrderType = isTableMode ? 'table' : orderType
-  const selectedZone = deliveryZones.find((zone) => zone.id === deliveryZoneId)
-  const deliveryFee =
-    activeOrderType === 'delivery'
-      ? selectedZone?.deliveryFee ?? settings.deliveryFee
-      : 0
-  const minOrderAmount =
-    activeOrderType === 'delivery' && selectedZone
-      ? Math.max(settings.minOrderAmount, selectedZone.minOrderAmount)
-      : settings.minOrderAmount
+  const deliveryFee = activeOrderType === 'delivery' ? settings.deliveryFee : 0
+  const minOrderAmount = settings.minOrderAmount
   const finalTotal = Math.max(0, total - couponDiscount) + deliveryFee + tip
   const channelKey = activeOrderType === 'delivery' ? 'delivery' : activeOrderType === 'pickup' ? 'pickup' : 'local'
   const channelStatus = activeOrderType === 'table' ? { open: true } : channelAvailability?.[channelKey]
@@ -335,14 +327,22 @@ export function CheckoutPage() {
           const data = await response.json()
           if (!response.ok) throw new Error(data.error ?? 'No se pudo obtener la dirección')
 
-          setCustomerAddress(data.displayName ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`)
-          setDeliveryCoords({ lat: data.lat ?? lat, lng: data.lng ?? lng })
-          toast.success('Ubicación cargada. Podés editarla si hace falta.')
+          // Siempre guardamos el GPS real del dispositivo (no el de Nominatim).
+          setDeliveryCoords({ lat, lng })
+          const suggestion = typeof data.displayName === 'string' ? data.displayName.trim() : ''
+          if (suggestion) {
+            setCustomerAddress(suggestion)
+            toast.success(
+              data.approximate
+                ? 'Zona detectada. Completá el número de calle y referencias.'
+                : 'Ubicación cargada. Revisá que la dirección sea correcta.'
+            )
+          } else {
+            setCustomerAddress('')
+            toast.message('Ubicación guardada. Escribí tu dirección completa.')
+          }
         } catch (error) {
           setDeliveryCoords({ lat, lng })
-          setCustomerAddress((current) =>
-            current.trim() ? current : `${lat.toFixed(5)}, ${lng.toFixed(5)}`
-          )
           toast.error(
             error instanceof Error
               ? error.message
@@ -356,7 +356,7 @@ export function CheckoutPage() {
         setLocatingAddress(false)
         toast.error('No se pudo obtener tu ubicación. Revisá los permisos del navegador.')
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     )
   }
 
@@ -408,7 +408,6 @@ export function CheckoutPage() {
         deliveryLat: activeOrderType === 'delivery' && deliveryCoords ? deliveryCoords.lat : undefined,
         deliveryLng: activeOrderType === 'delivery' && deliveryCoords ? deliveryCoords.lng : undefined,
         tableId: isTableMode ? tableSession?.tableId : undefined,
-        deliveryZoneId: activeOrderType === 'delivery' && deliveryZoneId ? deliveryZoneId : undefined,
         discountCode: couponDiscount > 0 ? couponCode : undefined,
         tip: tip > 0 ? tip : undefined,
         notes: notes || undefined,
@@ -689,22 +688,41 @@ export function CheckoutPage() {
                               )}
                             </label>
                           </RadioGroup>
-                          {orderType === 'delivery' && deliveryZones.length > 0 ? (
+                          {orderType === 'delivery' ? (
                             <div className="mt-3 space-y-2">
-                              <Label className="text-xs">Zona de entrega</Label>
-                              <RadioGroup
-                                value={deliveryZoneId}
-                                onValueChange={setDeliveryZoneId}
-                                className="space-y-2"
+                              <Label htmlFor="delivery-address" className="flex items-center gap-2 text-xs">
+                                <MapPin className="h-3.5 w-3.5" />
+                                Dirección o ubicación *
+                              </Label>
+                              <Textarea
+                                id="delivery-address"
+                                placeholder="Calle, número, referencias..."
+                                value={customerAddress}
+                                onChange={(e) => {
+                                  setCustomerAddress(e.target.value)
+                                  if (deliveryCoords) setDeliveryCoords(null)
+                                }}
+                                rows={2}
+                                required
+                                className="resize-none text-sm"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full rounded-full"
+                                onClick={useMyLocation}
+                                disabled={locatingAddress}
                               >
-                                {deliveryZones.map((zone) => (
-                                  <label key={zone.id} htmlFor={`zone-${zone.id}`} className="flex cursor-pointer items-center gap-2 text-sm">
-                                    <RadioGroupItem value={zone.id} id={`zone-${zone.id}`} />
-                                    <span>{zone.name}</span>
-                                    <span className="ml-auto text-xs text-muted-foreground">+{formatPrice(zone.deliveryFee)}</span>
-                                  </label>
-                                ))}
-                              </RadioGroup>
+                                {locatingAddress ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Crosshair className="mr-2 h-4 w-4" />
+                                )}
+                                {locatingAddress ? 'Obteniendo ubicación...' : 'Usar mi ubicación'}
+                              </Button>
+                              <p className="text-xs text-muted-foreground">
+                                El GPS sugiere la zona aproximada: completá calle, número y referencias.
+                              </p>
                             </div>
                           ) : null}
                         </CheckoutSection>
@@ -836,6 +854,10 @@ export function CheckoutPage() {
                       void handleSubmit(e as unknown as React.FormEvent)
                       return
                     }
+                    if (orderType === 'delivery' && !customerAddress.trim()) {
+                      toast.error('Por favor ingresá tu dirección de entrega')
+                      return
+                    }
                     setConfirmOpen(true)
                   }}
                   disabled={isSubmitting || isClosed || belowMinOrder}
@@ -917,7 +939,7 @@ export function CheckoutPage() {
                     {locatingAddress ? 'Obteniendo ubicación...' : 'Usar mi ubicación'}
                   </Button>
                   <p className="text-xs text-muted-foreground">
-                    Escribí la dirección a mano o usá tu ubicación GPS.
+                    El GPS sugiere la zona aproximada: completá calle, número y referencias.
                   </p>
                 </div>
               )}

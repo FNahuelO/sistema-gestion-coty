@@ -651,6 +651,21 @@ export function useOrders() {
     [mutate]
   )
 
+  const updateOrderPriority = useCallback(
+    async (orderId: string, priority: boolean) => {
+      const order = parseOrder(
+        await sendJson<Order & { createdAt: string; updatedAt: string }>(
+          `/api/cashier/orders/${orderId}/priority`,
+          'PATCH',
+          { priority }
+        )
+      )
+      await mutate()
+      return order
+    },
+    [mutate]
+  )
+
   const closeOrder = useCallback(
     async (orderId: string) => {
       const order = parseOrder(
@@ -725,6 +740,7 @@ export function useOrders() {
     createManualOrder,
     updateOrderStatus,
     updateOrderEstimate,
+    updateOrderPriority,
     updateOrderItems,
     closeOrder,
     approveOrderPayment,

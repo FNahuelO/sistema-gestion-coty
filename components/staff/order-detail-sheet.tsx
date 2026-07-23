@@ -19,6 +19,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
@@ -99,6 +100,7 @@ type OrderDetailSheetProps = {
   onAdvanceStatus: (orderId: string, status: OrderStatus, estimatedMinutes?: number) => Promise<void>
   onApprovePayment?: (orderId: string, estimatedMinutes?: number) => Promise<void>
   onUpdateEstimate?: (orderId: string, estimatedMinutes: number) => Promise<void>
+  onUpdatePriority?: (orderId: string, priority: boolean) => Promise<void>
   onUpdateItems?: (
     orderId: string,
     payload: {
@@ -136,6 +138,7 @@ export function OrderDetailSheet({
   onArchive,
   onDeliveryUpdated,
   onUpdateEstimate,
+  onUpdatePriority,
   onUpdateItems,
   isPending,
   isBusy,
@@ -171,6 +174,7 @@ export function OrderDetailSheet({
   const estimateInvalid = showEstimateInput && estimateValue === undefined
   const estimateUnchanged = estimateValue !== undefined && estimateValue === order.estimatedMinutes
   const estimatePending = isPending(`estimate:${order.id}`)
+  const priorityPending = isPending(`priority:${order.id}`)
   const statusPending = isPending(`status:${order.id}`)
   const approvePending = isPending(`approve:${order.id}`)
   const cancelPending = isPending(`cancel:${order.id}`)
@@ -207,7 +211,7 @@ export function OrderDetailSheet({
                 ? `Mesa ${order.tableNumber}`
                 : typeMeta.label}
             </span>
-            {order.type === 'table' ? (
+            {order.priority ? (
               <span className="rounded-full bg-amber-300/90 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-950">
                 Prioridad
               </span>
@@ -251,6 +255,34 @@ export function OrderDetailSheet({
 
             {order.type === 'delivery' ? (
               <DeliveryAssignmentPanel order={order} onUpdated={onDeliveryUpdated} />
+            ) : null}
+
+            {!isFinished && onUpdatePriority ? (
+              <section className={cn(PANEL_CARD, 'p-4')}>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
+                  Cocina
+                </h3>
+                <label
+                  htmlFor={`priority-${order.id}`}
+                  className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#D6E8E6] bg-[#F8FBFA] p-3 dark:border-border dark:bg-muted"
+                >
+                  <Checkbox
+                    id={`priority-${order.id}`}
+                    checked={Boolean(order.priority)}
+                    disabled={isBusy || priorityPending}
+                    onCheckedChange={(checked) => {
+                      void onUpdatePriority(order.id, checked === true)
+                    }}
+                    className="mt-0.5 border-[#2D5A57] data-[state=checked]:border-[#2D5A57] data-[state=checked]:bg-[#2D5A57]"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-foreground">Prioridad</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Marcá el pedido para destacarlo en cocina y subirlo en el orden.
+                    </span>
+                  </span>
+                </label>
+              </section>
             ) : null}
 
             <section>
