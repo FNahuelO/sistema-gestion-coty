@@ -65,6 +65,7 @@ export interface Order {
   id: string
   displayCode?: string
   publicTrackingCode?: string
+  dailyNumber?: number
   type: OrderType
   status: OrderStatus
   items: CartItem[]
@@ -105,6 +106,7 @@ export interface DeliveryQueueEntry {
   runner?: { id: string; name: string } | null
   order: {
     displayCode?: string | null
+    dailyNumber?: number | null
     customerName: string
     customerPhone?: string | null
     customerAddress?: string | null

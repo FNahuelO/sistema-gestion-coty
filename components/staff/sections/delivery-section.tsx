@@ -12,7 +12,7 @@ import { StatusBadge } from '@/components/shared/status-badge'
 import { PANEL_CARD, PANEL_LIST_ROW, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
 import { COTY_TEAL, formatPrice } from '@/lib/coty-theme'
 import { formatDeliveryAssignmentStatus } from '@/lib/delivery-labels'
-import { isDisplayableCustomerPhone } from '@/lib/order-labels'
+import { formatOrderNumber, isDisplayableCustomerPhone } from '@/lib/order-labels'
 import type { DeliveryQueueEntry } from '@/lib/types'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
@@ -73,8 +73,12 @@ function DeliveryQueueCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-semibold text-foreground">
-              {entry.order.displayCode ?? entry.orderId}
+            <p className="text-lg font-bold tracking-tight text-foreground">
+              {formatOrderNumber({
+                id: entry.orderId,
+                displayCode: entry.order.displayCode ?? undefined,
+                dailyNumber: entry.order.dailyNumber ?? undefined,
+              })}
             </p>
             <StatusBadge status={entry.orderStatus} />
             <Badge className={cn('border-0 text-[10px]', assignmentBadgeClass(entry.assignmentStatus))}>
