@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatPrice } from '@/lib/coty-theme'
 import { formatDateAR, formatDateTimeAR } from '@/lib/datetime'
-import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TITLE } from '@/lib/panel-theme'
+import { PANEL_CARD, PANEL_INTERACTIVE_HOVER, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TITLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { hasPermission, type SessionRoleContext } from '@/lib/permissions'
 import { useAuth } from '@/lib/store'
@@ -19,6 +19,8 @@ import { AdminFormPanel } from '../ui/admin-form-panel'
 import { AdminPageHeader } from '../ui/admin-page-header'
 import { Field } from '../ui/field'
 import { Spinner } from '@/components/ui/spinner'
+import { MobileBottomSheet } from '@/components/ui/mobile-bottom-sheet'
+import { ChevronRight } from 'lucide-react'
 
 type CashFormMode = 'open' | 'movement' | 'close'
 
@@ -26,6 +28,14 @@ const fetchJson = async (url: string) => {
   const res = await fetch(url, { credentials: 'include' })
   if (!res.ok) throw new Error('Error al cargar')
   return res.json()
+}
+
+type CashMovement = {
+  id: string
+  type: string
+  amount: string | number
+  description: string
+  createdAt?: string
 }
 
 type CashSession = {
@@ -39,7 +49,8 @@ type CashSession = {
   closedAt?: string | null
   notes?: string | null
   openedByUser?: { name: string }
-  movements?: Array<{ id: string; type: string; amount: string | number; description: string }>
+  closedByUser?: { name: string } | null
+  movements?: CashMovement[]
 }
 
 const FORM_TITLES: Record<CashFormMode, string> = {
@@ -48,8 +59,21 @@ const FORM_TITLES: Record<CashFormMode, string> = {
   close: 'Cerrar caja',
 }
 
+const MOVEMENT_TYPE_LABELS: Record<string, string> = {
+  expense: 'Gasto',
+  EXPENSE: 'Gasto',
+  withdrawal: 'Retiro',
+  WITHDRAWAL: 'Retiro',
+  deposit: 'Depósito',
+  DEPOSIT: 'Depósito',
+}
+
 function num(value: string | number | null | undefined) {
   return Number(value ?? 0)
+}
+
+function movementLabel(type: string) {
+  return MOVEMENT_TYPE_LABELS[type] ?? type
 }
 
 export function CashSection() {
@@ -66,11 +90,17 @@ export function CashSection() {
 
   const { open, setOpen, openPanel } = useFormPanel('cash')
   const [formMode, setFormMode] = useState<CashFormMode>('open')
+  const [selectedClosedSession, setSelectedClosedSession] = useState<CashSession | null>(null)
 
   const { data, mutate, isLoading } = useSWR<{ open: CashSession | null; sessions: CashSession[] }>(
     '/api/admin/cash',
     fetchJson,
     { refreshInterval: 20000 }
+  )
+
+  const closedSessions = useMemo(
+    () => (data?.sessions ?? []).filter((session) => session.status === 'CLOSED'),
+    [data?.sessions]
   )
 
   const [openingAmount, setOpeningAmount] = useState('0')
@@ -326,28 +356,155 @@ export function CashSection() {
             <CardTitle className={PANEL_TITLE}>Historial de cierres</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {(data?.sessions ?? [])
-              .filter((session) => session.status === 'CLOSED')
-              .slice(0, 10)
-              .map((session) => (
-                <div key={session.id} className={cn(PANEL_LIST_ROW, 'text-sm')}>
-                  <div className="flex justify-between font-medium">
-                    <span>{formatDateAR(session.openedAt)}</span>
-                    <span>{formatPrice(num(session.closingAmount))}</span>
-                  </div>
-                  {session.difference != null ? (
-                    <p className="text-xs text-muted-foreground">
-                      Diferencia: {formatPrice(num(session.difference))}
+            {closedSessions.slice(0, 15).map((session) => (
+              <button
+                key={session.id}
+                type="button"
+                onClick={() => setSelectedClosedSession(session)}
+                className={cn(
+                  PANEL_LIST_ROW,
+                  PANEL_INTERACTIVE_HOVER,
+                  'w-full cursor-pointer text-left text-sm transition-colors'
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex justify-between gap-3 font-medium">
+                      <span>{formatDateAR(session.openedAt)}</span>
+                    </div>
+                    {session.difference != null ? (
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Diferencia: {formatPrice(num(session.difference))}
+                      </p>
+                    ) : null}
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      Tocá para ver el detalle
                     </p>
-                  ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span className="font-semibold text-[#2D5A57]">
+                      {formatPrice(num(session.closingAmount))}
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
                 </div>
-              ))}
-            {(data?.sessions ?? []).filter((session) => session.status === 'CLOSED').length === 0 ? (
+              </button>
+            ))}
+            {closedSessions.length === 0 ? (
               <p className="text-sm text-muted-foreground">Sin cierres registrados</p>
             ) : null}
           </CardContent>
         </Card>
       </div>
+
+      <MobileBottomSheet
+        open={!!selectedClosedSession}
+        onOpenChange={(next) => {
+          if (!next) setSelectedClosedSession(null)
+        }}
+        title="Detalle del cierre"
+        description={
+          selectedClosedSession
+            ? formatDateAR(selectedClosedSession.openedAt)
+            : undefined
+        }
+      >
+        {selectedClosedSession ? (
+          <div className="space-y-4 pb-2">
+            <div className={cn(PANEL_LIST_ROW, 'space-y-2 text-sm')}>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Apertura</span>
+                <span className="font-medium">{formatPrice(num(selectedClosedSession.openingAmount))}</span>
+              </div>
+              {selectedClosedSession.expectedAmount != null ? (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Esperado</span>
+                  <span className="font-medium">{formatPrice(num(selectedClosedSession.expectedAmount))}</span>
+                </div>
+              ) : null}
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Contado / cierre</span>
+                <span className="font-semibold text-[#2D5A57]">
+                  {formatPrice(num(selectedClosedSession.closingAmount))}
+                </span>
+              </div>
+              {selectedClosedSession.difference != null ? (
+                <div className="flex justify-between gap-3 border-t border-gray-100 pt-2 dark:border-border">
+                  <span className="text-muted-foreground">Diferencia</span>
+                  <span
+                    className={cn(
+                      'font-semibold',
+                      num(selectedClosedSession.difference) < 0
+                        ? 'text-red-600'
+                        : num(selectedClosedSession.difference) > 0
+                          ? 'text-emerald-700'
+                          : 'text-foreground'
+                    )}
+                  >
+                    {formatPrice(num(selectedClosedSession.difference))}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-1 text-sm">
+              <p>
+                <span className="text-muted-foreground">Abierta:</span>{' '}
+                {formatDateTimeAR(selectedClosedSession.openedAt)}
+                {selectedClosedSession.openedByUser?.name
+                  ? ` · ${selectedClosedSession.openedByUser.name}`
+                  : ''}
+              </p>
+              {selectedClosedSession.closedAt ? (
+                <p>
+                  <span className="text-muted-foreground">Cerrada:</span>{' '}
+                  {formatDateTimeAR(selectedClosedSession.closedAt)}
+                  {selectedClosedSession.closedByUser?.name
+                    ? ` · ${selectedClosedSession.closedByUser.name}`
+                    : ''}
+                </p>
+              ) : null}
+            </div>
+
+            {selectedClosedSession.notes ? (
+              <div className={cn(PANEL_LIST_ROW, 'space-y-1 text-sm')}>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">Notas</p>
+                <p className="leading-relaxed">{selectedClosedSession.notes}</p>
+              </div>
+            ) : null}
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
+                Movimientos ({selectedClosedSession.movements?.length ?? 0})
+              </p>
+              {(selectedClosedSession.movements ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin movimientos en este turno</p>
+              ) : (
+                [...(selectedClosedSession.movements ?? [])]
+                  .sort((a, b) => {
+                    const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0
+                    const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0
+                    return bTime - aTime
+                  })
+                  .map((entry) => (
+                    <div key={entry.id} className={cn(PANEL_LIST_ROW, 'space-y-1 text-sm')}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-medium">{entry.description}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {movementLabel(entry.type)}
+                            {entry.createdAt ? ` · ${formatDateTimeAR(entry.createdAt)}` : ''}
+                          </p>
+                        </div>
+                        <span className="shrink-0 font-semibold">{formatPrice(num(entry.amount))}</span>
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+          </div>
+        ) : null}
+      </MobileBottomSheet>
     </div>
   )
 }
