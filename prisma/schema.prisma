@@ -344,6 +344,8 @@ model Order {
   id                     String               @id @default(cuid())
   displayCode            String               @unique
   publicTrackingCode     String               @unique
+  dailyNumber            Int?
+  serviceDate            DateTime?            @db.Date
   type                   OrderType
   status                 OrderStatus          @default(PENDING)
   paymentMethod          PaymentMethod
@@ -385,6 +387,14 @@ model Order {
   deliveryAssignment     DeliveryAssignment?
   invoice                Invoice?
   pushSubscriptions      PushSubscription[]
+
+  @@unique([serviceDate, dailyNumber])
+  @@index([serviceDate, dailyNumber])
+}
+
+model DailyOrderCounter {
+  serviceDate DateTime @id @db.Date
+  lastNumber  Int      @default(0)
 }
 
 model PushSubscription {

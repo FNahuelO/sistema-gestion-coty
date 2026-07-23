@@ -23,6 +23,27 @@ export const ORDER_TYPE_LABELS: Record<OrderType, string> = {
   table: 'Mesa',
 }
 
+/** Etiqueta corta y gritona para cocina / cards (Mesa 4, Delivery, Retiro). */
+export function getOrderChannelLabel(order: Pick<Order, 'type' | 'tableNumber'>): string {
+  if (order.type === 'table') {
+    return order.tableNumber != null ? `Mesa ${order.tableNumber}` : 'Mesa'
+  }
+  if (order.type === 'delivery') return 'Delivery'
+  return 'Retiro'
+}
+
+export const ORDER_TYPE_BADGE_CLASS: Record<OrderType, string> = {
+  table: 'border-[#2D5A57] bg-[#2D5A57] text-white',
+  delivery: 'border-[#E8A598] bg-[#FCECE8] text-[#8B4A3C]',
+  pickup: 'border-[#7EB8B3] bg-[#E7F4F2] text-[#2D5A57]',
+}
+
+export const ORDER_TYPE_CARD_ACCENT: Record<OrderType, string> = {
+  table: 'border-l-[#2D5A57] bg-[#F3F8F7]',
+  delivery: 'border-l-[#E8A598]',
+  pickup: 'border-l-[#7EB8B3]',
+}
+
 export const PAYMENT_METHOD_LABELS: Record<Order['paymentMethod'], string> = {
   cash: 'Efectivo',
   card: 'Tarjeta',
@@ -76,4 +97,27 @@ export function formatOrderStatus(status: OrderStatus) {
 
 export function formatTableStatus(status: TableStatus) {
   return TABLE_STATUS_LABELS[status]
+}
+
+/** Número corto interno de cocina del día (#12). Solo para staff/cocina. */
+export function formatOrderNumber(
+  order: Pick<Order, 'dailyNumber' | 'displayCode' | 'publicTrackingCode' | 'id'>
+): string {
+  if (order.dailyNumber != null) return `#${order.dailyNumber}`
+  return order.displayCode ?? order.publicTrackingCode ?? order.id.slice(0, 8).toUpperCase()
+}
+
+/** Número interno sin #. Solo para staff/cocina/tickets de cocina. */
+export function getOrderNumberText(
+  order: Pick<Order, 'dailyNumber' | 'displayCode' | 'publicTrackingCode' | 'id'>
+): string {
+  if (order.dailyNumber != null) return String(order.dailyNumber)
+  return order.displayCode ?? order.publicTrackingCode ?? order.id.slice(0, 8).toUpperCase()
+}
+
+/** Código público del pedido para el cliente (nunca el número diario interno). */
+export function formatPublicOrderCode(
+  order: Pick<Order, 'displayCode' | 'publicTrackingCode' | 'id'>
+): string {
+  return order.displayCode ?? order.publicTrackingCode ?? order.id.slice(0, 8).toUpperCase()
 }

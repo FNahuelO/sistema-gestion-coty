@@ -518,6 +518,7 @@ export function serializeDeliveryQueueEntry(order: DeliveryQueueOrder): Delivery
     runner: assignment?.runner ?? null,
     order: {
       displayCode: order.displayCode,
+      dailyNumber: order.dailyNumber,
       customerName: order.customerName,
       customerPhone: order.customerPhone,
       customerAddress: order.customerAddress,
