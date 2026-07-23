@@ -27,7 +27,7 @@ import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN } from
 import type { Order, OrderStatus, OrderType } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS, getPaymentStatusLabel, isDisplayableCustomerPhone } from '@/lib/order-labels'
+import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS, formatOrderNumber, getPaymentStatusLabel, isDisplayableCustomerPhone } from '@/lib/order-labels'
 import { getOrderEstimatedMinutes } from '@/lib/order-estimate'
 import { useOrderCountdown } from '@/hooks/use-order-countdown'
 import { canApproveTransferPayment } from '@/lib/payment-flow'
@@ -156,8 +156,11 @@ export function OrderDetailSheet({
         <div className="shrink-0 px-5 pb-5 pt-6 text-white" style={{ backgroundColor: COTY_HEADER }}>
           <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">Detalle del pedido</p>
           <h2 className="mt-1 font-serif text-2xl font-bold leading-tight">
-            {order.displayCode ?? `#${order.id}`}
+            {formatOrderNumber(order)}
           </h2>
+          {order.displayCode && order.dailyNumber != null ? (
+            <p className="mt-0.5 text-xs text-white/65">{order.displayCode}</p>
+          ) : null}
           <p className="mt-1 text-xs text-white/75">
             {formatDistanceToNow(order.createdAt, { addSuffix: true, locale: es })}
             {' · '}

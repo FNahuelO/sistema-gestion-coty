@@ -6,7 +6,7 @@ import { ArrowUpDown, CheckCircle, ChefHat } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ORDER_TYPE_LABELS } from '@/lib/order-labels'
+import { ORDER_TYPE_LABELS, formatOrderNumber } from '@/lib/order-labels'
 import { ORDER_SORT_OPTIONS, sortOrders, type OrderSortKey } from '@/lib/order-sort'
 import { PANEL_CARD, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
 import { StatusBadge } from '@/components/shared/status-badge'
@@ -32,7 +32,7 @@ function notifyOrdersChanged() {
 }
 
 export function KitchenSection() {
-  const [sortBy, setSortBy] = useState<OrderSortKey>('oldest')
+  const [sortBy, setSortBy] = useState<OrderSortKey>('number')
   const [pendingAction, setPendingAction] = useState<string | null>(null)
   const { data, mutate, isLoading } = useSWR<Order[]>('/api/staff/operations', fetchJson, {
     refreshInterval: 15000,
@@ -110,8 +110,13 @@ export function KitchenSection() {
               <div key={order.id} className={cn(PANEL_CARD, 'p-4', isPreparing && 'ring-1 ring-orange-200')}>
                 <div className="mb-3 flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-semibold">{order.displayCode ?? order.id.slice(0, 8)}</p>
+                    <p className="text-3xl font-bold tracking-tight text-[#053E38]">
+                      {formatOrderNumber(order)}
+                    </p>
                     <p className="text-xs text-muted-foreground">{getOrderSourceLabel(order)}</p>
+                    {order.displayCode && order.dailyNumber != null ? (
+                      <p className="text-[11px] text-muted-foreground/80">{order.displayCode}</p>
+                    ) : null}
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true, locale: es })}
                     </p>

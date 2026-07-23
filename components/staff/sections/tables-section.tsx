@@ -386,7 +386,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
                         {order.tableNumber ? `Mesa ${order.tableNumber}` : order.customerName}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {order.items.length} productos · {order.displayCode ?? order.id.slice(0, 8)}
+                        {order.items.length} productos · {order.dailyNumber != null ? `#${order.dailyNumber}` : (order.displayCode ?? order.id.slice(0, 8))}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -575,7 +575,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
                       {sessionOrders.map((order) => (
                         <div key={order.id} className="rounded-xl border border-gray-100 dark:border-border bg-[#F8FBFA] p-3 text-sm dark:bg-muted">
                           <div className="mb-2 flex items-center justify-between">
-                            <span className="font-medium">{order.displayCode ?? 'Pedido'}</span>
+                            <span className="font-medium">{order.dailyNumber != null ? `#${order.dailyNumber}` : (order.displayCode ?? 'Pedido')}</span>
                             <StatusBadge status={order.status} />
                           </div>
                           <ul className="space-y-1 text-muted-foreground">

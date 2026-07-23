@@ -793,7 +793,8 @@ export function useTrackedOrders(searchId: string, paymentReturnOrderId?: string
       return (
         order.id.toLowerCase().includes(query) ||
         order.displayCode?.toLowerCase().includes(query) ||
-        order.publicTrackingCode?.toLowerCase().includes(query)
+        order.publicTrackingCode?.toLowerCase().includes(query) ||
+        (order.dailyNumber != null && String(order.dailyNumber).includes(query.replace(/^#/, '')))
       )
     })
     const offlineIds = new Set(offlineMatches.map((order) => order.id))

@@ -1,6 +1,6 @@
 import { formatDateAR, formatTimeAR, formatDateTimeAR } from '@/lib/datetime'
 import { formatPrice } from '@/lib/coty-theme'
-import { getPaymentStatusLabel, ORDER_TYPE_LABELS } from '@/lib/order-labels'
+import { getPaymentStatusLabel, ORDER_TYPE_LABELS, formatOrderNumber, getOrderNumberText } from '@/lib/order-labels'
 import type { Order } from '@/lib/types'
 
 export type TicketVariant = 'kitchen' | 'customer'
@@ -123,11 +123,11 @@ function escapeHtml(value: string) {
 }
 
 function getOrderLabel(order: Order) {
-  return order.displayCode ?? order.id.slice(0, 8).toUpperCase()
+  return formatOrderNumber(order)
 }
 
-function formatOrderNumber(order: Order) {
-  return `Orden nº ${getOrderLabel(order)}`
+function formatPrintedOrderNumber(order: Order) {
+  return `Orden nº ${getOrderNumberText(order)}`
 }
 
 function getTicketPaymentStatus(order: Order) {
@@ -253,7 +253,7 @@ function renderCustomerTicketText({ order, businessName }: TicketPrintInput): st
   const lines: string[] = [
     center('*** TICKET ***'),
     center(businessName),
-    center(formatOrderNumber(order)),
+    center(formatPrintedOrderNumber(order)),
     SEPARATOR,
     line(`Modalidad: ${ORDER_TYPE_LABELS[order.type]}`),
     line(`Pago: ${TICKET_PAYMENT_LABELS[order.paymentMethod]}`),
@@ -301,7 +301,7 @@ function renderKitchenTicketText({ order, businessName }: TicketPrintInput): str
   const lines: string[] = [
     center('*** COCINA ***'),
     center(businessName),
-    center(formatOrderNumber(order)),
+    center(formatPrintedOrderNumber(order)),
     SEPARATOR,
     line(`${ORDER_TYPE_LABELS[order.type]}${order.tableNumber ? ` M${order.tableNumber}` : ''}`),
     line(`Hora: ${formatDateTimeAR(createdAt)}`),

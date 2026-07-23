@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
     const orders = await getOrderHistory()
 
     const orderRows = orders.map((order) => ({
+      numero: order.dailyNumber ?? '',
       codigo: order.displayCode ?? order.id,
       tracking: order.publicTrackingCode ?? '',
       tipo: order.type,
@@ -28,6 +29,7 @@ export async function GET(request: NextRequest) {
 
     const itemRows = orders.flatMap((order) =>
       order.items.map((item) => ({
+        numeroPedido: order.dailyNumber ?? '',
         codigoPedido: order.displayCode ?? order.id,
         producto: item.product.name,
         cantidad: item.quantity,

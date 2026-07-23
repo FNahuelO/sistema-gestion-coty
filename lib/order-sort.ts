@@ -1,6 +1,7 @@
 import type { Order, OrderStatus, OrderType } from '@/lib/types'
 
 export type OrderSortKey =
+  | 'number'
   | 'oldest'
   | 'newest'
   | 'status'
@@ -10,6 +11,7 @@ export type OrderSortKey =
   | 'items_desc'
 
 export const ORDER_SORT_OPTIONS: { value: OrderSortKey; label: string }[] = [
+  { value: 'number', label: 'Por número (#1, #2…)' },
   { value: 'oldest', label: 'Más antiguos primero' },
   { value: 'newest', label: 'Más recientes primero' },
   { value: 'status', label: 'Por estado' },
@@ -48,6 +50,12 @@ export function sortOrders(orders: Order[], sortKey: OrderSortKey): Order[] {
 
   sorted.sort((a, b) => {
     switch (sortKey) {
+      case 'number': {
+        const aNum = a.dailyNumber ?? Number.MAX_SAFE_INTEGER
+        const bNum = b.dailyNumber ?? Number.MAX_SAFE_INTEGER
+        if (aNum !== bNum) return aNum - bNum
+        return toTimestamp(a.createdAt) - toTimestamp(b.createdAt)
+      }
       case 'newest':
         return toTimestamp(b.createdAt) - toTimestamp(a.createdAt)
       case 'status': {

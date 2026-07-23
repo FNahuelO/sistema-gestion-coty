@@ -28,7 +28,7 @@ import { ManualOrderDialog } from '@/components/staff/manual-order-dialog'
 import { StaffNotificationsButton } from '@/components/staff/staff-notifications-button'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
-import { formatOrderStatus, isDisplayableCustomerPhone } from '@/lib/order-labels'
+import { formatOrderStatus, formatOrderNumber, isDisplayableCustomerPhone } from '@/lib/order-labels'
 import { canApproveTransferPayment } from '@/lib/payment-flow'
 import { ORDER_SORT_OPTIONS, sortOrders, type OrderSortKey } from '@/lib/order-sort'
 import type { DeliveryQueueEntry, Order, OrderStatus, OrderType } from '@/lib/types'
@@ -122,7 +122,7 @@ export function OrdersSection({
   const [selectedTab, setSelectedTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('active')
-  const [sortBy, setSortBy] = useState<OrderSortKey>('status')
+  const [sortBy, setSortBy] = useState<OrderSortKey>('number')
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [manualOrderOpen, setManualOrderOpen] = useState(false)
 
@@ -137,9 +137,12 @@ export function OrdersSection({
       }
 
       if (searchQuery) {
-        const query = searchQuery.toLowerCase()
+        const query = searchQuery.toLowerCase().replace(/^#/, '')
+        const daily = order.dailyNumber != null ? String(order.dailyNumber) : ''
         return (
           order.id.toLowerCase().includes(query) ||
+          order.displayCode?.toLowerCase().includes(query) ||
+          daily.includes(query) ||
           order.customerName.toLowerCase().includes(query) ||
           order.customerPhone?.toLowerCase().includes(query)
         )
@@ -268,7 +271,7 @@ export function OrdersSection({
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Buscar por ID, cliente o teléfono..."
+                placeholder="Buscar por #, código, cliente o teléfono..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="border-gray-200 bg-[#F8FBFA] pl-9 dark:border-border dark:bg-muted"
@@ -413,9 +416,12 @@ export function OrdersSection({
                                 <TypeIcon className="h-4 w-4" style={{ color: COTY_TEAL }} />
                               </div>
                               <div className="min-w-0">
-                                <p className="font-semibold text-foreground">
-                                  {order.displayCode ?? `#${order.id}`}
+                                <p className="text-lg font-bold tracking-tight text-foreground">
+                                  {formatOrderNumber(order)}
                                 </p>
+                                {order.displayCode && order.dailyNumber != null ? (
+                                  <p className="text-[11px] text-muted-foreground/80">{order.displayCode}</p>
+                                ) : null}
                                 <p className="text-xs text-muted-foreground">
                                   {formatDistanceToNow(order.createdAt, { addSuffix: true, locale: es })}
                                 </p>

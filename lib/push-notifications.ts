@@ -139,9 +139,10 @@ async function sendOrderPush(orderId: string, payload: PushPayload) {
   }
 }
 
-type NotifiableOrder = Pick<Order, 'id' | 'displayCode' | 'publicTrackingCode' | 'status' | 'type' | 'estimatedMinutes'>
+type NotifiableOrder = Pick<Order, 'id' | 'displayCode' | 'dailyNumber' | 'publicTrackingCode' | 'status' | 'type' | 'estimatedMinutes'>
 
 function getOrderCode(order: NotifiableOrder) {
+  if (order.dailyNumber != null) return `#${order.dailyNumber}`
   return order.displayCode ?? order.publicTrackingCode ?? order.id.slice(0, 8).toUpperCase()
 }
 

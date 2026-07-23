@@ -217,6 +217,7 @@ type SerializableOrder = {
   id: string
   displayCode: string | null
   publicTrackingCode: string | null
+  dailyNumber?: number | null
   type: PrismaOrderType
   status: PrismaOrderStatus
   paymentMethod: PrismaPaymentMethod
@@ -633,6 +634,7 @@ export function serializeOrder(order: SerializableOrder): Order {
     id: order.id,
     displayCode: order.displayCode ?? undefined,
     publicTrackingCode: order.publicTrackingCode ?? undefined,
+    dailyNumber: order.dailyNumber ?? undefined,
     type: mapOrderType(order.type),
     status: mapOrderStatus(order.status),
     paymentMethod: mapPaymentMethod(order.paymentMethod),
@@ -967,6 +969,32 @@ function buildTrackingCode() {
   return `TRK-${randomUUID().slice(0, 8).toUpperCase()}`
 }
 
+function serviceDateFromDayKey(dayKey: string): Date {
+  const [year, month, day] = dayKey.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day))
+}
+
+/** Asigna el próximo número de pedido del día (horario Argentina), atómico por fila. */
+async function allocateDailyOrderNumber(
+  tx: Prisma.TransactionClient,
+  dayKey = arDayKey(new Date())
+): Promise<{ dailyNumber: number; serviceDate: Date }> {
+  const rows = await tx.$queryRaw<Array<{ lastNumber: number }>>`
+    INSERT INTO "DailyOrderCounter" ("serviceDate", "lastNumber")
+    VALUES (CAST(${dayKey} AS DATE), 1)
+    ON CONFLICT ("serviceDate")
+    DO UPDATE SET "lastNumber" = "DailyOrderCounter"."lastNumber" + 1
+    RETURNING "lastNumber"
+  `
+
+  const dailyNumber = rows[0]?.lastNumber
+  if (!dailyNumber) {
+    throw new Error('DAILY_ORDER_NUMBER_FAILED')
+  }
+
+  return { dailyNumber, serviceDate: serviceDateFromDayKey(dayKey) }
+}
+
 async function applyStockDeltaForOrderItems(
   tx: Prisma.TransactionClient,
   items: Array<{ productId: string | null; quantity: number }>,
@@ -1204,91 +1232,11 @@ export async function createOrderFromPayload(
   const awaitingMercadoPago = input.paymentMethod === 'mercado_pago'
   const initialStatus = awaitingTransferProof || awaitingMercadoPago ? 'PENDING' : 'CONFIRMED'
 
-  const orderData = {
-    displayCode: buildDisplayCode(),
-    publicTrackingCode: buildTrackingCode(),
-    type:
-      input.type === 'delivery'
-        ? 'DELIVERY'
-        : input.type === 'pickup'
-          ? 'PICKUP'
-          : 'TABLE',
-    status: initialStatus,
-    paymentMethod:
-      input.paymentMethod === 'card'
-        ? 'CARD'
-        : input.paymentMethod === 'transfer'
-          ? 'TRANSFER'
-          : input.paymentMethod === 'mercado_pago'
-            ? 'MERCADO_PAGO'
-            : 'CASH',
-    customerName:
-      input.type === 'table' && diningTable
-        ? `Mesa ${diningTable.number}`
-        : input.customerName,
-    customerPhone: input.type === 'table' ? input.customerPhone || 'mesa' : input.customerPhone,
-    customerAddress: input.type === 'delivery' ? input.customerAddress : undefined,
-    deliveryLat: input.type === 'delivery' ? input.deliveryLat : undefined,
-    deliveryLng: input.type === 'delivery' ? input.deliveryLng : undefined,
-    notes: input.notes,
-    subtotal,
-    tax,
-    deliveryFee,
-    tip,
-    discountCode,
-    discountAmount,
-    deliveryZoneId,
-    customerId: customer?.id,
-    total,
-    diningTableId: diningTable?.id,
-    tableSessionId,
-    createdByUserId,
-    items: {
-      create: itemsToCreate.map((item) => ({
-        productId: item.productId,
-        productName: item.productName,
-        productDescription: item.productDescription,
-        basePrice: item.basePrice,
-        unitPrice: item.unitPrice,
-        imageUrl: item.imageUrl,
-        quantity: item.quantity,
-        notes: item.notes,
-        selections: {
-          create: item.selections,
-        },
-      })),
-    },
-    payment: {
-      create: {
-        provider: input.paymentMethod === 'mercado_pago' ? 'mercadopago' : 'manual',
-        method:
-          input.paymentMethod === 'card'
-            ? 'CARD'
-            : input.paymentMethod === 'transfer'
-              ? 'TRANSFER'
-              : input.paymentMethod === 'mercado_pago'
-                ? 'MERCADO_PAGO'
-                : 'CASH',
-        status: 'PENDING',
-        amount: total,
-      },
-    },
-    statusHistory: {
-      create: {
-        status: initialStatus,
-        changedByUserId: createdByUserId,
-        note: awaitingMercadoPago
-          ? 'Pedido creado, pendiente de pago online'
-          : awaitingTransferProof
-            ? 'Pedido creado, pendiente de comprobante por WhatsApp'
-            : 'Pedido creado',
-      },
-    },
-  }
-
   const deferStockDecrement = awaitingTransferProof || awaitingMercadoPago
 
   const createdOrder = (await prisma.$transaction(async (tx) => {
+    const { dailyNumber, serviceDate } = await allocateDailyOrderNumber(tx)
+
     if (!deferStockDecrement) {
       await applyStockDeltaForOrderItems(tx, itemsToCreate.map((item) => ({
         productId: item.productId,
@@ -1297,7 +1245,89 @@ export async function createOrderFromPayload(
     }
 
     const order = await tx.order.create({
-      data: orderData as Prisma.OrderUncheckedCreateInput,
+      data: {
+        displayCode: buildDisplayCode(),
+        publicTrackingCode: buildTrackingCode(),
+        dailyNumber,
+        serviceDate,
+        type:
+          input.type === 'delivery'
+            ? 'DELIVERY'
+            : input.type === 'pickup'
+              ? 'PICKUP'
+              : 'TABLE',
+        status: initialStatus,
+        paymentMethod:
+          input.paymentMethod === 'card'
+            ? 'CARD'
+            : input.paymentMethod === 'transfer'
+              ? 'TRANSFER'
+              : input.paymentMethod === 'mercado_pago'
+                ? 'MERCADO_PAGO'
+                : 'CASH',
+        customerName:
+          input.type === 'table' && diningTable
+            ? `Mesa ${diningTable.number}`
+            : input.customerName,
+        customerPhone: input.type === 'table' ? input.customerPhone || 'mesa' : input.customerPhone,
+        customerAddress: input.type === 'delivery' ? input.customerAddress : undefined,
+        deliveryLat: input.type === 'delivery' ? input.deliveryLat : undefined,
+        deliveryLng: input.type === 'delivery' ? input.deliveryLng : undefined,
+        notes: input.notes,
+        subtotal,
+        tax,
+        deliveryFee,
+        tip,
+        discountCode,
+        discountAmount,
+        deliveryZoneId,
+        customerId: customer?.id,
+        total,
+        diningTableId: diningTable?.id,
+        tableSessionId,
+        createdByUserId,
+        items: {
+          create: itemsToCreate.map((item) => ({
+            productId: item.productId,
+            productName: item.productName,
+            productDescription: item.productDescription,
+            basePrice: item.basePrice,
+            unitPrice: item.unitPrice,
+            imageUrl: item.imageUrl,
+            quantity: item.quantity,
+            notes: item.notes,
+            selections: {
+              create: item.selections,
+            },
+          })),
+        },
+        payment: {
+          create: {
+            provider: input.paymentMethod === 'mercado_pago' ? 'mercadopago' : 'manual',
+            method:
+              input.paymentMethod === 'card'
+                ? 'CARD'
+                : input.paymentMethod === 'transfer'
+                  ? 'TRANSFER'
+                  : input.paymentMethod === 'mercado_pago'
+                    ? 'MERCADO_PAGO'
+                    : 'CASH',
+            status: 'PENDING',
+            amount: total,
+          },
+        },
+        statusHistory: {
+          create: {
+            status: initialStatus,
+            changedByUserId: createdByUserId,
+            note: awaitingMercadoPago
+              ? 'Pedido creado, pendiente de pago online'
+              : awaitingTransferProof
+                ? 'Pedido creado, pendiente de comprobante por WhatsApp'
+                : 'Pedido creado',
+          },
+        },
+      } as Prisma.OrderUncheckedCreateInput,
       include: orderInclude,
     })
 

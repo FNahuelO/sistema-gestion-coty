@@ -1,11 +1,11 @@
-import { PAYMENT_METHOD_LABELS, ORDER_TYPE_LABELS } from '@/lib/order-labels'
+import { PAYMENT_METHOD_LABELS, ORDER_TYPE_LABELS, getOrderNumberText } from '@/lib/order-labels'
 import type { CartItem, Order, PaymentMethod } from '@/lib/types'
 
 type OrderMessageItem = Pick<CartItem, 'quantity' | 'product' | 'selectedOptions'>
 
 type OrderMessageInput = Pick<
   Order,
-  'displayCode' | 'id' | 'customerName' | 'customerPhone' | 'customerAddress' | 'total' | 'paymentMethod' | 'type' | 'notes' | 'tableNumber'
+  'displayCode' | 'dailyNumber' | 'id' | 'customerName' | 'customerPhone' | 'customerAddress' | 'total' | 'paymentMethod' | 'type' | 'notes' | 'tableNumber'
 > & {
   items: OrderMessageItem[]
 }
@@ -48,7 +48,7 @@ export function buildWhatsAppOrderMessage(
   businessName: string,
   options?: WhatsAppMessageOptions
 ) {
-  const code = order.displayCode ?? order.id
+  const code = getOrderNumberText(order)
   const itemsList = order.items
     .map((item) => {
       const optionsLabel = formatItemOptions(item)
@@ -64,7 +64,7 @@ export function buildWhatsAppOrderMessage(
 
   return `🧾 *Nuevo Pedido - ${businessName}*
 
-📋 *Pedido ${code}*
+📋 *Pedido #${code}*
 ${order.tableNumber ? `🪑 *Mesa:* ${order.tableNumber}\n` : ''}👤 *Cliente:* ${order.customerName}
 📱 *Teléfono:* ${order.customerPhone}
 ${order.customerAddress ? `📍 *Dirección:* ${order.customerAddress}\n` : ''}🛒 *Productos:*
