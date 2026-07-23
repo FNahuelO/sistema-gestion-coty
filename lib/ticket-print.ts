@@ -1,6 +1,6 @@
 import { formatDateAR, formatTimeAR, formatDateTimeAR } from '@/lib/datetime'
 import { formatPrice } from '@/lib/coty-theme'
-import { getPaymentStatusLabel, formatOrderNumber, formatPublicOrderCode, getOrderChannelLabel, getOrderNumberText } from '@/lib/order-labels'
+import { getPaymentStatusLabel, formatPublicOrderCode, getOrderChannelLabel, getOrderNumberText } from '@/lib/order-labels'
 import type { Order } from '@/lib/types'
 
 export type TicketVariant = 'kitchen' | 'customer'
@@ -120,10 +120,6 @@ function escapeHtml(value: string) {
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
-}
-
-function getKitchenOrderLabel(order: Order) {
-  return formatOrderNumber(order)
 }
 
 function getCustomerOrderLabel(order: Order) {
