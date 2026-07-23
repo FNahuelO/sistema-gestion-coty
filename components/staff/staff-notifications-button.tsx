@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { PANEL_OUTLINE_BTN } from '@/lib/panel-theme'
+import { formatOrderNumber } from '@/lib/order-labels'
 import type { Order } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -110,7 +111,7 @@ export function StaffNotificationsButton({
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-2">
                               <p className="truncate text-sm font-medium">
-                                {order.displayCode ?? `#${order.id}`}
+                                {formatOrderNumber(order)}
                               </p>
                               <StatusBadge status={order.status} className="shrink-0 text-[10px]" />
                             </div>

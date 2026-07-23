@@ -1,17 +1,22 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
-import { ArrowUpDown, CheckCircle, ChefHat } from 'lucide-react'
+import { ArrowUpDown, CheckCircle, ChefHat, Store, Truck, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ORDER_TYPE_LABELS } from '@/lib/order-labels'
+import {
+  ORDER_TYPE_BADGE_CLASS,
+  ORDER_TYPE_CARD_ACCENT,
+  formatOrderNumber,
+  getOrderChannelLabel,
+} from '@/lib/order-labels'
 import { ORDER_SORT_OPTIONS, sortOrders, type OrderSortKey } from '@/lib/order-sort'
 import { PANEL_CARD, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { cn } from '@/lib/utils'
-import type { Order } from '@/lib/types'
+import type { Order, OrderType } from '@/lib/types'
 import { Spinner } from '@/components/ui/spinner'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -22,9 +27,10 @@ const fetchJson = async (url: string) => {
   return res.json()
 }
 
-function getOrderSourceLabel(order: Order) {
-  if (order.tableNumber) return `Mesa ${order.tableNumber}`
-  return ORDER_TYPE_LABELS[order.type]
+const TYPE_ICONS: Record<OrderType, typeof Truck> = {
+  delivery: Truck,
+  pickup: Store,
+  table: Users,
 }
 
 function notifyOrdersChanged() {
@@ -32,11 +38,19 @@ function notifyOrdersChanged() {
 }
 
 export function KitchenSection() {
-  const [sortBy, setSortBy] = useState<OrderSortKey>('oldest')
+  const [sortBy, setSortBy] = useState<OrderSortKey>('priority')
   const [pendingAction, setPendingAction] = useState<string | null>(null)
   const { data, mutate, isLoading } = useSWR<Order[]>('/api/staff/operations', fetchJson, {
     refreshInterval: 15000,
   })
+
+  useEffect(() => {
+    const refresh = () => {
+      void mutate()
+    }
+    window.addEventListener('coty-refresh-orders', refresh)
+    return () => window.removeEventListener('coty-refresh-orders', refresh)
+  }, [mutate])
 
   const runKitchenAction = async (
     orderId: string,
@@ -78,9 +92,12 @@ export function KitchenSection() {
   return (
     <div className="space-y-4">
       <div className={cn(PANEL_CARD, 'flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between')}>
-        <p className="text-sm text-muted-foreground">
-          {sortedOrders.length === 1 ? '1 comanda' : `${sortedOrders.length} comandas`}
-        </p>
+        <div className="space-y-1">
+          <p className="text-sm text-muted-foreground">
+            {sortedOrders.length === 1 ? '1 comanda' : `${sortedOrders.length} comandas`}
+          </p>
+
+        </div>
         <Select value={sortBy} onValueChange={(value) => setSortBy(value as OrderSortKey)}>
           <SelectTrigger className="w-full border-gray-200 bg-[#F8FBFA] dark:border-border dark:bg-muted sm:w-56">
             <ArrowUpDown className="mr-2 h-4 w-4 shrink-0 text-[#2D5A57]" />
@@ -102,16 +119,48 @@ export function KitchenSection() {
         ) : (
           sortedOrders.map((order) => {
             const isPreparing = order.status === 'preparing'
+            const isTable = order.type === 'table'
             const action: 'ack_kitchen' | 'mark_ready' = isPreparing ? 'mark_ready' : 'ack_kitchen'
             const actionKey = `${action}:${order.id}`
             const isPending = pendingAction === actionKey
+            const TypeIcon = TYPE_ICONS[order.type]
+            const channelLabel = getOrderChannelLabel(order)
 
             return (
-              <div key={order.id} className={cn(PANEL_CARD, 'p-4', isPreparing && 'ring-1 ring-orange-200')}>
+              <div
+                key={order.id}
+                className={cn(
+                  PANEL_CARD,
+                  'border-l-4 p-4',
+                  ORDER_TYPE_CARD_ACCENT[order.type],
+                  isPreparing && 'ring-1 ring-orange-200',
+                  isTable && 'ring-1 ring-[#2D5A57]/25'
+                )}
+              >
                 <div className="mb-3 flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-semibold">{order.displayCode ?? order.id.slice(0, 8)}</p>
-                    <p className="text-xs text-muted-foreground">{getOrderSourceLabel(order)}</p>
+                    <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide',
+                          ORDER_TYPE_BADGE_CLASS[order.type]
+                        )}
+                      >
+                        <TypeIcon className="h-3.5 w-3.5" />
+                        {channelLabel}
+                      </span>
+                      {order.priority ? (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
+                          Prioridad
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-3xl font-bold tracking-tight text-[#053E38]">
+                      {formatOrderNumber(order)}
+                    </p>
+                    {order.displayCode && order.dailyNumber != null ? (
+                      <p className="text-[11px] text-muted-foreground/80">{order.displayCode}</p>
+                    ) : null}
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true, locale: es })}
                     </p>

@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ORDER_STATUS_LABELS } from '@/lib/order-labels'
+import { ORDER_STATUS_LABELS, formatPublicOrderCode } from '@/lib/order-labels'
 import { OrderNotificationsButton } from '@/components/customer/order-notifications-button'
 import { shouldShowOrderEstimate } from '@/lib/order-estimate'
 import { useOrderCountdown } from '@/hooks/use-order-countdown'
@@ -56,7 +56,7 @@ function getStepIndex(status: OrderStatus) {
 }
 
 export function getOrderLabel(order: Order) {
-  return order.displayCode ?? order.publicTrackingCode ?? order.id.slice(0, 8).toUpperCase()
+  return formatPublicOrderCode(order)
 }
 
 function getOrderTypeLabel(order: Order) {

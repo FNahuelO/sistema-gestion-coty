@@ -1,4 +1,4 @@
-import { PAYMENT_METHOD_LABELS, ORDER_TYPE_LABELS } from '@/lib/order-labels'
+import { PAYMENT_METHOD_LABELS, ORDER_TYPE_LABELS, formatPublicOrderCode } from '@/lib/order-labels'
 import type { CartItem, Order, PaymentMethod } from '@/lib/types'
 
 type OrderMessageItem = Pick<CartItem, 'quantity' | 'product' | 'selectedOptions'>
@@ -48,7 +48,7 @@ export function buildWhatsAppOrderMessage(
   businessName: string,
   options?: WhatsAppMessageOptions
 ) {
-  const code = order.displayCode ?? order.id
+  const code = formatPublicOrderCode(order)
   const itemsList = order.items
     .map((item) => {
       const optionsLabel = formatItemOptions(item)

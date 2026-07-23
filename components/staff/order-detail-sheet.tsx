@@ -8,30 +8,35 @@ import {
   Clock,
   MapPin,
   Phone,
+  Plus,
   Store,
   Truck,
   Users,
   XCircle,
   Printer,
   MessageCircle,
+  Minus,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Spinner } from '@/components/ui/spinner'
 import { StatusBadge } from '@/components/shared/status-badge'
+import { AddOrderItemsDialog } from '@/components/staff/add-order-items-dialog'
 import { COTY_HEADER, COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
 import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
-import type { Order, OrderStatus, OrderType } from '@/lib/types'
+import type { Order, OrderStatus, OrderType, SelectedOption } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS, getPaymentStatusLabel, isDisplayableCustomerPhone } from '@/lib/order-labels'
+import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS, formatOrderNumber, getPaymentStatusLabel, isDisplayableCustomerPhone } from '@/lib/order-labels'
 import { getOrderEstimatedMinutes } from '@/lib/order-estimate'
 import { useOrderCountdown } from '@/hooks/use-order-countdown'
 import { canApproveTransferPayment } from '@/lib/payment-flow'
 import { DeliveryAssignmentPanel } from '@/components/staff/delivery-assignment-panel'
+import { toast } from 'sonner'
 
 const ORDER_TYPE_META: Record<
   OrderType,
@@ -64,15 +69,24 @@ function EstimateCountdownHint({ order }: { order: Order }) {
 
 function getItemOptionsLabel(order: Order, itemId: string) {
   const item = order.items.find((entry) => entry.id === itemId)
-  if (!item?.selectedOptions?.length) return null
+  if (!item) return null
+
+  if (item.selectionLines?.length) {
+    return item.selectionLines.map((line) => line.choiceName).filter(Boolean).join(' · ')
+  }
+
+  if (!item.selectedOptions?.length) return null
 
   return item.selectedOptions
     .map((opt) => {
       const productOpt = item.product.options?.find((candidate) => candidate.id === opt.optionId)
-      return opt.choiceIds
-        .map((choiceId) => productOpt?.choices.find((choice) => choice.id === choiceId)?.name)
-        .filter(Boolean)
-        .join(', ')
+      if (productOpt) {
+        return opt.choiceIds
+          .map((choiceId) => productOpt.choices.find((choice) => choice.id === choiceId)?.name)
+          .filter(Boolean)
+          .join(', ')
+      }
+      return opt.choiceIds.join(', ')
     })
     .filter(Boolean)
     .join(' · ')
@@ -86,6 +100,20 @@ type OrderDetailSheetProps = {
   onAdvanceStatus: (orderId: string, status: OrderStatus, estimatedMinutes?: number) => Promise<void>
   onApprovePayment?: (orderId: string, estimatedMinutes?: number) => Promise<void>
   onUpdateEstimate?: (orderId: string, estimatedMinutes: number) => Promise<void>
+  onUpdatePriority?: (orderId: string, priority: boolean) => Promise<void>
+  onUpdateItems?: (
+    orderId: string,
+    payload: {
+      add?: Array<{
+        productId: string
+        quantity: number
+        selectedOptions: SelectedOption[]
+        notes?: string
+      }>
+      updates?: Array<{ orderItemId: string; quantity: number }>
+      remove?: string[]
+    }
+  ) => Promise<Order>
   onPrintKitchen?: (order: Order) => void
   onPrintCustomer?: (order: Order) => void
   onPrintBoth?: (order: Order) => void
@@ -110,10 +138,13 @@ export function OrderDetailSheet({
   onArchive,
   onDeliveryUpdated,
   onUpdateEstimate,
+  onUpdatePriority,
+  onUpdateItems,
   isPending,
   isBusy,
 }: OrderDetailSheetProps) {
   const [estimatedInput, setEstimatedInput] = useState('')
+  const [addItemsOpen, setAddItemsOpen] = useState(false)
 
   useEffect(() => {
     if (!order || ['completed', 'cancelled'].includes(order.status)) return
@@ -127,6 +158,9 @@ export function OrderDetailSheet({
   const typeMeta = ORDER_TYPE_META[order.type]
   const TypeIcon = typeMeta.icon
   const isFinished = ['completed', 'cancelled'].includes(order.status)
+  const canEditItems =
+    !['completed', 'cancelled', 'delivered'].includes(order.status) && !!onUpdateItems
+  const itemsPending = isPending(`items:${order.id}`)
   const awaitingTransferProof = canApproveTransferPayment(order)
   const effectiveStatusAction = awaitingTransferProof ? null : statusAction
   // El tiempo estimado se ingresa al confirmar/aprobar y luego se puede reajustar
@@ -140,12 +174,14 @@ export function OrderDetailSheet({
   const estimateInvalid = showEstimateInput && estimateValue === undefined
   const estimateUnchanged = estimateValue !== undefined && estimateValue === order.estimatedMinutes
   const estimatePending = isPending(`estimate:${order.id}`)
+  const priorityPending = isPending(`priority:${order.id}`)
   const statusPending = isPending(`status:${order.id}`)
   const approvePending = isPending(`approve:${order.id}`)
   const cancelPending = isPending(`cancel:${order.id}`)
   const archivePending = isPending(`archive:${order.id}`)
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         className={cn(
@@ -156,8 +192,11 @@ export function OrderDetailSheet({
         <div className="shrink-0 px-5 pb-5 pt-6 text-white" style={{ backgroundColor: COTY_HEADER }}>
           <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">Detalle del pedido</p>
           <h2 className="mt-1 font-serif text-2xl font-bold leading-tight">
-            {order.displayCode ?? `#${order.id}`}
+            {formatOrderNumber(order)}
           </h2>
+          {order.displayCode && order.dailyNumber != null ? (
+            <p className="mt-0.5 text-xs text-white/65">{order.displayCode}</p>
+          ) : null}
           <p className="mt-1 text-xs text-white/75">
             {formatDistanceToNow(order.createdAt, { addSuffix: true, locale: es })}
             {' · '}
@@ -168,9 +207,15 @@ export function OrderDetailSheet({
             <StatusBadge status={order.status} variant="onDark" />
             <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold text-white">
               <TypeIcon className="h-3.5 w-3.5" />
-              {typeMeta.label}
-              {order.tableNumber ? ` · Mesa ${order.tableNumber}` : null}
+              {order.type === 'table' && order.tableNumber
+                ? `Mesa ${order.tableNumber}`
+                : typeMeta.label}
             </span>
+            {order.priority ? (
+              <span className="rounded-full bg-amber-300/90 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-950">
+                Prioridad
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -212,14 +257,58 @@ export function OrderDetailSheet({
               <DeliveryAssignmentPanel order={order} onUpdated={onDeliveryUpdated} />
             ) : null}
 
+            {!isFinished && onUpdatePriority ? (
+              <section className={cn(PANEL_CARD, 'p-4')}>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
+                  Cocina
+                </h3>
+                <label
+                  htmlFor={`priority-${order.id}`}
+                  className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#D6E8E6] bg-[#F8FBFA] p-3 dark:border-border dark:bg-muted"
+                >
+                  <Checkbox
+                    id={`priority-${order.id}`}
+                    checked={Boolean(order.priority)}
+                    disabled={isBusy || priorityPending}
+                    onCheckedChange={(checked) => {
+                      void onUpdatePriority(order.id, checked === true)
+                    }}
+                    className="mt-0.5 border-[#2D5A57] data-[state=checked]:border-[#2D5A57] data-[state=checked]:bg-[#2D5A57]"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-foreground">Prioridad</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Marcá el pedido para destacarlo en cocina y subirlo en el orden.
+                    </span>
+                  </span>
+                </label>
+              </section>
+            ) : null}
+
             <section>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
-                Productos ({order.items.length})
-              </h3>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
+                  Productos ({order.items.length})
+                </h3>
+                {canEditItems ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className={cn(PANEL_OUTLINE_BTN, 'h-8 gap-1 px-2.5 text-xs')}
+                    disabled={isBusy || itemsPending}
+                    onClick={() => setAddItemsOpen(true)}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Agregar
+                  </Button>
+                ) : null}
+              </div>
               <div className="space-y-2">
                 {order.items.map((item) => {
                   const optionsLabel = getItemOptionsLabel(order, item.id)
-                  const lineTotal = item.product.price * item.quantity
+                  const unitPrice = item.unitPrice ?? item.product.price
+                  const lineTotal = unitPrice * item.quantity
 
                   return (
                     <div
@@ -243,13 +332,91 @@ export function OrderDetailSheet({
                             </span>
                           </div>
                           <p className="mt-0.5 text-sm text-muted-foreground">
-                            {item.quantity} × {formatPrice(item.product.price)}
+                            {item.quantity} × {formatPrice(unitPrice)}
                           </p>
                           {optionsLabel ? (
                             <p className="mt-1 text-xs text-[#2D5A57]/80">{optionsLabel}</p>
                           ) : null}
                           {item.notes ? (
                             <p className="mt-1 text-xs italic text-muted-foreground">{item.notes}</p>
+                          ) : null}
+                          {canEditItems ? (
+                            <div className="mt-2 flex items-center gap-2">
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="outline"
+                                className="h-7 w-7"
+                                disabled={isBusy || itemsPending || item.quantity <= 1}
+                                onClick={() => {
+                                  void (async () => {
+                                    try {
+                                      await onUpdateItems?.(order.id, {
+                                        updates: [{ orderItemId: item.id, quantity: item.quantity - 1 }],
+                                      })
+                                    } catch (error) {
+                                      toast.error(
+                                        error instanceof Error
+                                          ? error.message
+                                          : 'No se pudo actualizar la cantidad'
+                                      )
+                                    }
+                                  })()
+                                }}
+                              >
+                                <Minus className="h-3.5 w-3.5" />
+                              </Button>
+                              <span className="min-w-6 text-center text-sm font-semibold tabular-nums">
+                                {item.quantity}
+                              </span>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="outline"
+                                className="h-7 w-7"
+                                disabled={isBusy || itemsPending}
+                                onClick={() => {
+                                  void (async () => {
+                                    try {
+                                      await onUpdateItems?.(order.id, {
+                                        updates: [{ orderItemId: item.id, quantity: item.quantity + 1 }],
+                                      })
+                                    } catch (error) {
+                                      toast.error(
+                                        error instanceof Error
+                                          ? error.message
+                                          : 'No se pudo actualizar la cantidad'
+                                      )
+                                    }
+                                  })()
+                                }}
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="ml-auto h-7 px-2 text-xs text-destructive"
+                                disabled={isBusy || itemsPending || order.items.length <= 1}
+                                onClick={() => {
+                                  void (async () => {
+                                    try {
+                                      await onUpdateItems?.(order.id, { remove: [item.id] })
+                                      toast.success('Producto quitado')
+                                    } catch (error) {
+                                      toast.error(
+                                        error instanceof Error
+                                          ? error.message
+                                          : 'No se pudo quitar el producto'
+                                      )
+                                    }
+                                  })()
+                                }}
+                              >
+                                Quitar
+                              </Button>
+                            </div>
                           ) : null}
                         </div>
                       </div>
@@ -508,5 +675,17 @@ export function OrderDetailSheet({
         </div>
       </SheetContent>
     </Sheet>
+
+    {canEditItems ? (
+      <AddOrderItemsDialog
+        open={addItemsOpen}
+        onOpenChange={setAddItemsOpen}
+        orderLabel={order.displayCode}
+        onSubmit={async (items) => {
+          await onUpdateItems?.(order.id, { add: items })
+        }}
+      />
+    ) : null}
+    </>
   )
 }
