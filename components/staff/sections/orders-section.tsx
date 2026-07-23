@@ -343,7 +343,7 @@ export function OrdersSection({
               className="min-h-11 shrink-0 gap-1.5 px-3 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm dark:data-[state=active]:bg-card"
             >
               <Store className="h-4 w-4" />
-              Recoger
+              Retiro en local
             </TabsTrigger>
             <TabsTrigger
               value="table"
