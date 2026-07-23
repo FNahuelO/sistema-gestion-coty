@@ -98,7 +98,7 @@ export function OrdersSection({
   embedded?: boolean
   onNavigateToCalls?: () => void
 }) {
-  const { orders, createManualOrder, updateOrderStatus, updateOrderEstimate, closeOrder, approveOrderPayment } =
+  const { orders, createManualOrder, updateOrderStatus, updateOrderEstimate, updateOrderItems, closeOrder, approveOrderPayment } =
     useOrders()
   const { settings } = useBusiness()
   const businessName = settings?.name ?? 'Coty Café'
@@ -208,6 +208,30 @@ export function OrdersSection({
         throw error
       }
     })
+  }
+
+  const handleUpdateItems = async (
+    orderId: string,
+    payload: {
+      add?: Array<{
+        productId: string
+        quantity: number
+        selectedOptions: import('@/lib/types').SelectedOption[]
+        notes?: string
+      }>
+      updates?: Array<{ orderItemId: string; quantity: number }>
+      remove?: string[]
+    }
+  ) => {
+    const updated = await run(`items:${orderId}`, async () => {
+      const next = await updateOrderItems(orderId, payload)
+      setSelectedOrder((current) => (current && current.id === orderId ? next : current))
+      return next
+    })
+    if (!updated) {
+      throw new Error('Hay otra acción en curso')
+    }
+    return updated
   }
 
   const handleApprovePayment = async (orderId: string, estimatedMinutes?: number) => {
@@ -542,6 +566,7 @@ export function OrdersSection({
         onAdvanceStatus={handleStatusChange}
         onApprovePayment={handleApprovePayment}
         onUpdateEstimate={handleUpdateEstimate}
+        onUpdateItems={handleUpdateItems}
         onPrintKitchen={(order) => printOrderTickets({ order, businessName }, ['kitchen'])}
         onPrintCustomer={(order) => printOrderTickets({ order, businessName }, ['customer'])}
         onPrintBoth={(order) => printTicketsForOrder(order)}
