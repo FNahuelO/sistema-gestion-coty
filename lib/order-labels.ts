@@ -19,7 +19,7 @@ export const TABLE_STATUS_LABELS: Record<TableStatus, string> = {
 
 export const ORDER_TYPE_LABELS: Record<OrderType, string> = {
   delivery: 'Delivery',
-  pickup: 'Recoger',
+  pickup: 'Retiro en local',
   table: 'Mesa',
 }
 
