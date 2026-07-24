@@ -58,8 +58,13 @@ export interface SelectedOption {
 // Order types
 export type OrderType = 'delivery' | 'pickup' | 'table'
 export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'completed' | 'cancelled'
-export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'mercado_pago'
+export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'mercado_pago' | 'combined'
 export type PaymentStatus = 'pending' | 'requires_action' | 'approved' | 'rejected' | 'cancelled' | 'refunded'
+
+export type PaymentSplit = {
+  method: Exclude<PaymentMethod, 'combined'>
+  amount: number
+}
 
 export interface Order {
   id: string
@@ -81,6 +86,7 @@ export interface Order {
   /** Marcado manualmente por staff (cocina/caja). */
   priority?: boolean
   paymentMethod: PaymentMethod
+  paymentSplits?: PaymentSplit[]
   paymentStatus?: PaymentStatus
   paymentUrl?: string
   whatsappCheckoutUrl?: string

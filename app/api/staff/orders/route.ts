@@ -2,35 +2,55 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createOrderFromPayload, requireSessionRole } from '@/lib/server-data'
 import { handleOrderRouteError } from '@/lib/order-route-errors'
+import { paymentSplitsSchema } from '@/lib/payment-splits'
 
-const staffManualOrderSchema = z.object({
-  type: z.enum(['delivery', 'pickup']),
-  paymentMethod: z.enum(['cash', 'card', 'transfer']),
-  customerName: z.string().trim().max(120).default(''),
-  customerPhone: z.string().trim().max(40).default(''),
-  customerAddress: z.string().trim().max(200).optional(),
-  deliveryZoneId: z.string().trim().optional(),
-  notes: z.string().trim().max(500).optional(),
-  /** Origen del pedido armado por caja: teléfono o cliente en el local. */
-  source: z.enum(['phone', 'walk_in']).default('phone'),
-  items: z
-    .array(
-      z.object({
-        productId: z.string().min(1),
-        quantity: z.number().int().positive(),
-        selectedOptions: z
-          .array(
-            z.object({
-              optionId: z.string().min(1),
-              choiceIds: z.array(z.string().min(1)).min(1),
-            })
-          )
-          .default([]),
-        notes: z.string().trim().max(500).optional(),
+const staffManualOrderSchema = z
+  .object({
+    type: z.enum(['delivery', 'pickup']),
+    paymentMethod: z.enum(['cash', 'card', 'transfer', 'combined']),
+    paymentSplits: paymentSplitsSchema.optional(),
+    customerName: z.string().trim().max(120).default(''),
+    customerPhone: z.string().trim().max(40).default(''),
+    customerAddress: z.string().trim().max(200).optional(),
+    deliveryZoneId: z.string().trim().optional(),
+    notes: z.string().trim().max(500).optional(),
+    /** Origen del pedido armado por caja: teléfono o cliente en el local. */
+    source: z.enum(['phone', 'walk_in']).default('phone'),
+    items: z
+      .array(
+        z.object({
+          productId: z.string().min(1),
+          quantity: z.number().int().positive(),
+          selectedOptions: z
+            .array(
+              z.object({
+                optionId: z.string().min(1),
+                choiceIds: z.array(z.string().min(1)).min(1),
+              })
+            )
+            .default([]),
+          notes: z.string().trim().max(500).optional(),
+        })
+      )
+      .min(1),
+  })
+  .superRefine((data, ctx) => {
+    if (data.paymentMethod === 'combined') {
+      if (!data.paymentSplits || data.paymentSplits.length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'PAYMENT_SPLITS_REQUIRED',
+          path: ['paymentSplits'],
+        })
+      }
+    } else if (data.paymentSplits?.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'PAYMENT_SPLITS_ONLY_FOR_COMBINED',
+        path: ['paymentSplits'],
       })
-    )
-    .min(1),
-})
+    }
+  })
 
 function buildStaffNotes(source: 'phone' | 'walk_in', notes?: string) {
   const prefix = source === 'walk_in' ? '[Mostrador]' : '[Teléfono]'
@@ -65,6 +85,7 @@ export async function POST(request: NextRequest) {
       {
         type: body.type,
         paymentMethod: body.paymentMethod,
+        paymentSplits: body.paymentSplits,
         customerName,
         customerPhone,
         customerAddress: body.type === 'delivery' ? body.customerAddress?.trim() : undefined,

@@ -45,6 +45,11 @@ import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { getDiscountedUnitPrice } from '@/lib/promotions'
 import { PAYMENT_METHOD_LABELS } from '@/lib/order-labels'
+import {
+  buildPaymentSplitsFromAmounts,
+  PaymentSplitsEditor,
+} from '@/components/shared/payment-splits-editor'
+import { sumSplitAmounts } from '@/lib/payment-splits'
 
 type DisplayStatus = OrderStatus | TableStatus
 
@@ -92,7 +97,13 @@ function resolveTableDisplayStatus(table: Table, tableOrders: Order[]): DisplayS
   return leastProgressedStatus(tableOrders.map((order) => order.status))
 }
 
-const CLOSE_PAYMENT_METHODS: PaymentMethod[] = ['cash', 'card', 'transfer', 'mercado_pago']
+const CLOSE_PAYMENT_METHODS: PaymentMethod[] = ['cash', 'card', 'transfer', 'mercado_pago', 'combined']
+const CLOSE_SPLIT_METHODS: Array<Exclude<PaymentMethod, 'combined'>> = [
+  'cash',
+  'card',
+  'transfer',
+  'mercado_pago',
+]
 
 function optionsKey(options: SelectedOption[], notes?: string) {
   return `${JSON.stringify(options)}|${notes ?? ''}`
@@ -111,6 +122,9 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
   const [activeTab, setActiveTab] = useState('tables')
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
   const [closePaymentMethod, setClosePaymentMethod] = useState<PaymentMethod>('cash')
+  const [closeSplitAmounts, setCloseSplitAmounts] = useState<
+    Partial<Record<Exclude<PaymentMethod, 'combined'>, string>>
+  >({})
   const [sessionOrdersOpen, setSessionOrdersOpen] = useState(false)
 
   const taxRate = settings?.taxRate ?? 0.16
@@ -292,23 +306,6 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
     })
   }
 
-  const handleConfirmClose = async () => {
-    if (!selectedTable) return
-
-    await run(`close:${selectedTable.id}`, async () => {
-      try {
-        await closeTable(selectedTable.id, closePaymentMethod)
-        toast.success(`Mesa ${selectedTable.number} cobrada y cerrada`)
-        setPaymentDialogOpen(false)
-        setSelectedTable(null)
-        setOrderItems([])
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'No se pudo cerrar la mesa')
-        throw error
-      }
-    })
-  }
-
   const filteredProducts = products.filter(
     (p) =>
       p.available &&
@@ -324,6 +321,39 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
       sessionOrders.reduce((sum, order) => sum + order.total, 0) || (selectedTable?.currentTotal ?? 0),
     [sessionOrders, selectedTable]
   )
+
+  const handleConfirmClose = async () => {
+    if (!selectedTable) return
+
+    const paymentSplits =
+      closePaymentMethod === 'combined' ? buildPaymentSplitsFromAmounts(closeSplitAmounts) : undefined
+
+    if (closePaymentMethod === 'combined') {
+      if (!paymentSplits || paymentSplits.length < 2) {
+        toast.error('En pago combinado usá al menos dos medios con monto')
+        return
+      }
+      if (Math.abs(sumSplitAmounts(paymentSplits) - accumulatedTotal) > 0.02) {
+        toast.error('La suma de los montos debe coincidir con el total a cobrar')
+        return
+      }
+    }
+
+    await run(`close:${selectedTable.id}`, async () => {
+      try {
+        await closeTable(selectedTable.id, closePaymentMethod, paymentSplits)
+        toast.success(`Mesa ${selectedTable.number} cobrada y cerrada`)
+        setPaymentDialogOpen(false)
+        setClosePaymentMethod('cash')
+        setCloseSplitAmounts({})
+        setSelectedTable(null)
+        setOrderItems([])
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'No se pudo cerrar la mesa')
+        throw error
+      }
+    })
+  }
 
   return (
     <div className={cn(!embedded && 'min-h-screen bg-[#FAFAFA] dark:bg-background')}>
@@ -785,7 +815,11 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
               <Label>Método de pago</Label>
               <RadioGroup
                 value={closePaymentMethod}
-                onValueChange={(value) => setClosePaymentMethod(value as PaymentMethod)}
+                onValueChange={(value) => {
+                  const method = value as PaymentMethod
+                  setClosePaymentMethod(method)
+                  if (method !== 'combined') setCloseSplitAmounts({})
+                }}
                 className="grid gap-2"
               >
                 {CLOSE_PAYMENT_METHODS.map((method) => (
@@ -797,6 +831,16 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
                   </div>
                 ))}
               </RadioGroup>
+              {closePaymentMethod === 'combined' ? (
+                <PaymentSplitsEditor
+                  total={accumulatedTotal}
+                  methods={CLOSE_SPLIT_METHODS}
+                  amounts={closeSplitAmounts}
+                  onChange={(method, value) =>
+                    setCloseSplitAmounts((current) => ({ ...current, [method]: value }))
+                  }
+                />
+              ) : null}
             </div>
           </div>
 

@@ -18,6 +18,7 @@ import {
   Info,
   Crosshair,
   Loader2,
+  Layers,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +27,11 @@ import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { SimpleModal } from '@/components/ui/simple-modal'
 import { TransferPaymentDetails } from '@/components/customer/transfer-payment-details'
+import {
+  buildPaymentSplitsFromAmounts,
+  PaymentSplitsEditor,
+} from '@/components/shared/payment-splits-editor'
+import { sumSplitAmounts } from '@/lib/payment-splits'
 import { useCart, useBusiness, useCatalog, useOrders, useTableSession, rememberOrderTracking } from '@/lib/store'
 import {
   buildCleanUrlWithoutMpReturn,
@@ -179,6 +185,7 @@ export function CheckoutPage() {
 
   const [orderType, setOrderType] = useState<OrderType>('pickup')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('transfer')
+  const [splitAmounts, setSplitAmounts] = useState<Partial<Record<'cash' | 'transfer', string>>>({})
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [customerAddress, setCustomerAddress] = useState('')
@@ -395,13 +402,33 @@ export function CheckoutPage() {
       return
     }
 
+    const resolvedPaymentMethod =
+      isTableMode && (paymentMethod === 'mercado_pago' || paymentMethod === 'combined')
+        ? 'cash'
+        : paymentMethod
+
+    const paymentSplits =
+      resolvedPaymentMethod === 'combined' ? buildPaymentSplitsFromAmounts(splitAmounts) : undefined
+
+    if (resolvedPaymentMethod === 'combined') {
+      if (!paymentSplits || paymentSplits.length < 2) {
+        toast.error('En pago combinado usá al menos dos medios con monto')
+        return
+      }
+      if (Math.abs(sumSplitAmounts(paymentSplits) - finalTotal) > 0.02) {
+        toast.error('La suma de los montos debe coincidir con el total')
+        return
+      }
+    }
+
     setIsSubmitting(true)
     submitLockRef.current = true
 
     try {
       const createdOrder = await addOrder({
         type: activeOrderType,
-        paymentMethod: isTableMode && paymentMethod === 'mercado_pago' ? 'cash' : paymentMethod,
+        paymentMethod: resolvedPaymentMethod,
+        paymentSplits,
         customerName: isTableMode ? `Mesa ${tableSession?.tableNumber}` : customerName,
         customerPhone: isTableMode ? 'mesa' : customerPhone,
         customerAddress: activeOrderType === 'delivery' ? customerAddress : undefined,
@@ -950,12 +977,19 @@ export function CheckoutPage() {
                 </Label>
                 <RadioGroup
                   value={paymentMethod}
-                  onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}
+                  onValueChange={(v) => {
+                    const method = v as PaymentMethod
+                    setPaymentMethod(method)
+                    if (method !== 'combined') setSplitAmounts({})
+                  }}
                   className="space-y-2"
                 >
                   {[
                     { value: 'transfer', label: 'Transferencia', icon: Building2 },
                     { value: 'cash', label: 'Efectivo', icon: Banknote },
+                    ...(isTableMode
+                      ? []
+                      : [{ value: 'combined' as const, label: 'Pago combinado', icon: Layers }]),
                     ...(isTableMode || !mercadoPagoAvailable
                       ? []
                       : [{ value: 'mercado_pago' as const, label: 'Mercado Pago', icon: CreditCard }]),
@@ -971,11 +1005,29 @@ export function CheckoutPage() {
                     </label>
                   ))}
                 </RadioGroup>
-                {paymentMethod === 'transfer' && !isTableMode ? (
+                {paymentMethod === 'combined' && !isTableMode ? (
+                  <PaymentSplitsEditor
+                    total={finalTotal}
+                    methods={['transfer', 'cash']}
+                    amounts={splitAmounts}
+                    onChange={(method, value) => {
+                      if (method !== 'transfer' && method !== 'cash') return
+                      setSplitAmounts((current) => ({ ...current, [method]: value }))
+                    }}
+                    className="mt-3"
+                  />
+                ) : null}
+                {(paymentMethod === 'transfer' ||
+                  (paymentMethod === 'combined' && Number(splitAmounts.transfer || 0) > 0)) &&
+                !isTableMode ? (
                   <TransferPaymentDetails
                     transferAlias={settings.transferAlias}
                     transferCbu={settings.transferCbu}
-                    total={finalTotal}
+                    total={
+                      paymentMethod === 'combined'
+                        ? Number(splitAmounts.transfer?.replace(',', '.') || 0)
+                        : finalTotal
+                    }
                     className="mt-3"
                   />
                 ) : null}

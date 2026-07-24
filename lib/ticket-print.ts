@@ -23,6 +23,7 @@ const TICKET_PAYMENT_LABELS: Record<Order['paymentMethod'], string> = {
   card: 'Tarjeta',
   transfer: 'Transferencia',
   mercado_pago: 'Mercado Pago',
+  combined: 'Pago combinado',
 }
 
 const TICKET_STYLES = `
@@ -261,6 +262,11 @@ function renderCustomerTicketText({ order, businessName }: TicketPrintInput): st
     SEPARATOR,
     line(`Modalidad: ${getOrderChannelLabel(order)}`),
     line(`Pago: ${TICKET_PAYMENT_LABELS[order.paymentMethod]}`),
+    ...(order.paymentMethod === 'combined' && order.paymentSplits?.length
+      ? order.paymentSplits.map(
+          (split) => line(`  ${TICKET_PAYMENT_LABELS[split.method]}: ${formatPrice(split.amount)}`)
+        )
+      : []),
     line(`Estado: ${getTicketPaymentStatus(order)}`),
     line(`Fecha: ${formatDateAR(createdAt)}`),
     line(`Hora: ${formatTimeAR(createdAt)}`),

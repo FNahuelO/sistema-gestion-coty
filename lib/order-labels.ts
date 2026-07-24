@@ -49,6 +49,7 @@ export const PAYMENT_METHOD_LABELS: Record<Order['paymentMethod'], string> = {
   card: 'Tarjeta',
   transfer: 'Transferencia (WhatsApp)',
   mercado_pago: 'Mercado Pago',
+  combined: 'Pago combinado',
 }
 
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
@@ -60,14 +61,17 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   refunded: 'Reembolsado',
 }
 
-const COLLECT_ON_DELIVERY_METHODS: Order['paymentMethod'][] = ['cash', 'card']
+const COLLECT_ON_DELIVERY_METHODS: Order['paymentMethod'][] = ['cash', 'card', 'combined']
 
-export function getPaymentStatusLabel(order: Pick<Order, 'paymentMethod' | 'paymentStatus' | 'status'>): string {
+export function getPaymentStatusLabel(
+  order: Pick<Order, 'paymentMethod' | 'paymentStatus' | 'status' | 'paymentSplits'>
+): string {
   if (!order.paymentStatus) return ''
+  const hasTransferSplit = Boolean(order.paymentSplits?.some((split) => split.method === 'transfer'))
   if (
     order.paymentStatus === 'pending' &&
-    order.paymentMethod === 'transfer' &&
-    order.status === 'pending'
+    order.status === 'pending' &&
+    (order.paymentMethod === 'transfer' || (order.paymentMethod === 'combined' && hasTransferSplit))
   ) {
     return 'Esperando comprobante'
   }

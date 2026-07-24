@@ -36,6 +36,13 @@ import {
   upsertCustomerFromOrder,
   validateDiscountCode,
 } from '@/lib/commerce'
+import {
+  allocateSplitsAcrossOrders,
+  assertPaymentSplitsMatchTotal,
+  paymentSplitsSchema,
+  uiPaymentMethodToPrisma,
+  type PaymentSplitInput,
+} from '@/lib/payment-splits'
 
 export const selectedOptionSchema = z.object({
   optionId: z.string().min(1),
@@ -52,7 +59,8 @@ export const cartItemInputSchema = z.object({
 export const createOrderSchema = z
   .object({
     type: z.enum(['delivery', 'pickup', 'table']),
-    paymentMethod: z.enum(['cash', 'card', 'transfer', 'mercado_pago']),
+    paymentMethod: z.enum(['cash', 'card', 'transfer', 'mercado_pago', 'combined']),
+    paymentSplits: paymentSplitsSchema.optional(),
     customerName: z.string().trim().max(120).default(''),
     customerPhone: z.string().trim().max(40).default(''),
     customerAddress: z.string().trim().max(200).optional(),
@@ -66,6 +74,22 @@ export const createOrderSchema = z
     items: z.array(cartItemInputSchema).min(1),
   })
   .superRefine((data, ctx) => {
+    if (data.paymentMethod === 'combined') {
+      if (!data.paymentSplits || data.paymentSplits.length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'PAYMENT_SPLITS_REQUIRED',
+          path: ['paymentSplits'],
+        })
+      }
+    } else if (data.paymentSplits?.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'PAYMENT_SPLITS_ONLY_FOR_COMBINED',
+        path: ['paymentSplits'],
+      })
+    }
+
     if (data.type === 'table') {
       if (!data.tableId?.trim()) {
         ctx.addIssue({
@@ -198,6 +222,15 @@ const orderInclude = {
       sandboxInitPoint: true,
     },
   },
+  paymentSplits: {
+    select: {
+      method: true,
+      amount: true,
+    },
+    orderBy: {
+      createdAt: 'asc' as const,
+    },
+  },
   diningTable: {
     select: {
       number: true,
@@ -262,6 +295,10 @@ type SerializableOrder = {
     initPoint?: string | null
     sandboxInitPoint?: string | null
   } | null
+  paymentSplits?: Array<{
+    method: PrismaPaymentMethod
+    amount: Prisma.Decimal | number
+  }>
   diningTable?: { number: number } | null
   deliveryZone?: { name: string } | null
 }
@@ -438,6 +475,9 @@ function mapPaymentMethod(method: PrismaPaymentMethod | string): PaymentMethod {
     case 'MERCADO_PAGO':
     case 'mercado_pago':
       return 'mercado_pago'
+    case 'COMBINED':
+    case 'combined':
+      return 'combined'
     default:
       return 'cash'
   }
@@ -639,6 +679,17 @@ export function serializeOrder(order: SerializableOrder): Order {
     type: mapOrderType(order.type),
     status: mapOrderStatus(order.status),
     paymentMethod: mapPaymentMethod(order.paymentMethod),
+    paymentSplits: order.paymentSplits?.length
+      ? order.paymentSplits
+          .map((split) => ({
+            method: mapPaymentMethod(split.method),
+            amount: decimalToNumber(split.amount),
+          }))
+          .filter(
+            (split): split is { method: Exclude<PaymentMethod, 'combined'>; amount: number } =>
+              split.method !== 'combined'
+          )
+      : undefined,
     paymentStatus: mapPaymentStatus(order.payment?.status),
     paymentUrl: resolveMercadoPagoCheckoutUrl(order.payment?.initPoint, order.payment?.sandboxInitPoint),
     customerName: order.customerName,
@@ -1078,6 +1129,14 @@ export async function createOrderFromPayload(
     throw new Error('MERCADOPAGO_UNAVAILABLE')
   }
 
+  if (
+    input.paymentMethod === 'combined' &&
+    input.paymentSplits?.some((split) => split.method === 'mercado_pago') &&
+    !isMercadoPagoAvailable(settings)
+  ) {
+    throw new Error('MERCADOPAGO_UNAVAILABLE')
+  }
+
   if (!options?.bypassChannelHours && input.type !== 'table') {
     const availability = await getOrderChannelAvailability(input.type, settings)
     if (!availability.open) {
@@ -1243,17 +1302,32 @@ export async function createOrderFromPayload(
   const tax = (subtotal - discountAmount) * decimalToNumber(settings.taxRate)
   const total = Math.max(0, subtotal - discountAmount) + tax + deliveryFee + tip
 
+  const paymentSplits =
+    input.paymentMethod === 'combined'
+      ? assertPaymentSplitsMatchTotal(total, input.paymentSplits ?? [])
+      : undefined
+  const hasTransferSplit = Boolean(paymentSplits?.some((split) => split.method === 'transfer'))
+  const hasMercadoPagoSplit = Boolean(paymentSplits?.some((split) => split.method === 'mercado_pago'))
+
+  if (hasMercadoPagoSplit && input.type !== 'table') {
+    // El checkout online de MP espera un solo cobro; en combinado se registra desde caja/mesa.
+    throw new Error('COMBINED_MERCADOPAGO_UNSUPPORTED')
+  }
+
   const customer =
     input.type !== 'table'
       ? await upsertCustomerFromOrder(input.customerPhone, input.customerName, input.customerAddress)
       : null
 
   const awaitingTransferProof =
-    input.type !== 'table' && requiresTransferProofApproval(input.paymentMethod, input.type)
+    input.type !== 'table' &&
+    requiresTransferProofApproval(input.paymentMethod, input.type, hasTransferSplit)
   const awaitingMercadoPago = input.paymentMethod === 'mercado_pago'
   const initialStatus = awaitingTransferProof || awaitingMercadoPago ? 'PENDING' : 'CONFIRMED'
 
   const deferStockDecrement = awaitingTransferProof || awaitingMercadoPago
+
+  const prismaPaymentMethod = uiPaymentMethodToPrisma(input.paymentMethod)
 
   const createdOrder = (await prisma.$transaction(async (tx) => {
     const { dailyNumber, serviceDate } = await allocateDailyOrderNumber(tx)
@@ -1278,14 +1352,7 @@ export async function createOrderFromPayload(
               ? 'PICKUP'
               : 'TABLE',
         status: initialStatus,
-        paymentMethod:
-          input.paymentMethod === 'card'
-            ? 'CARD'
-            : input.paymentMethod === 'transfer'
-              ? 'TRANSFER'
-              : input.paymentMethod === 'mercado_pago'
-                ? 'MERCADO_PAGO'
-                : 'CASH',
+        paymentMethod: prismaPaymentMethod,
         customerName:
           input.type === 'table' && diningTable
             ? `Mesa ${diningTable.number}`
@@ -1325,18 +1392,19 @@ export async function createOrderFromPayload(
         payment: {
           create: {
             provider: input.paymentMethod === 'mercado_pago' ? 'mercadopago' : 'manual',
-            method:
-              input.paymentMethod === 'card'
-                ? 'CARD'
-                : input.paymentMethod === 'transfer'
-                  ? 'TRANSFER'
-                  : input.paymentMethod === 'mercado_pago'
-                    ? 'MERCADO_PAGO'
-                    : 'CASH',
+            method: prismaPaymentMethod,
             status: 'PENDING',
             amount: total,
           },
         },
+        paymentSplits: paymentSplits
+          ? {
+              create: paymentSplits.map((split) => ({
+                method: uiPaymentMethodToPrisma(split.method),
+                amount: split.amount,
+              })),
+            }
+          : undefined,
         statusHistory: {
           create: {
             status: initialStatus,
@@ -1972,7 +2040,12 @@ export async function approveOrderPayment(orderId: string, userId?: string) {
       throw new Error('ORDER_NOT_FOUND')
     }
 
-    if (existingOrder.paymentMethod !== PrismaPaymentMethod.TRANSFER) {
+    const isTransfer = existingOrder.paymentMethod === PrismaPaymentMethod.TRANSFER
+    const isCombinedWithTransfer =
+      existingOrder.paymentMethod === PrismaPaymentMethod.COMBINED &&
+      existingOrder.paymentSplits.some((split) => split.method === PrismaPaymentMethod.TRANSFER)
+
+    if (!isTransfer && !isCombinedWithTransfer) {
       throw new Error('INVALID_PAYMENT_METHOD')
     }
 
@@ -1997,7 +2070,9 @@ export async function approveOrderPayment(orderId: string, userId?: string) {
           create: {
             status: PrismaOrderStatus.CONFIRMED,
             changedByUserId: userId,
-            note: 'Pago verificado por WhatsApp',
+            note: isCombinedWithTransfer
+              ? 'Pago combinado verificado (comprobante WhatsApp)'
+              : 'Pago verificado por WhatsApp',
           },
         },
       },
@@ -2027,7 +2102,8 @@ export async function occupyTable(tableId: string, userId?: string) {
 export async function closeTableAndOrders(
   tableId: string,
   userId?: string,
-  paymentMethod: 'cash' | 'card' | 'transfer' | 'mercado_pago' = 'cash'
+  paymentMethod: PaymentMethod = 'cash',
+  paymentSplits?: PaymentSplitInput[]
 ) {
   let session = await prisma.tableSession.findFirst({
     where: {
@@ -2087,35 +2163,56 @@ export async function closeTableAndOrders(
     session = recovered
   }
 
-  const prismaPaymentMethod =
-    paymentMethod === 'card'
-      ? 'CARD'
-      : paymentMethod === 'transfer'
-        ? 'TRANSFER'
-        : paymentMethod === 'mercado_pago'
-          ? 'MERCADO_PAGO'
-          : 'CASH'
+  const prismaPaymentMethod = uiPaymentMethodToPrisma(paymentMethod)
   const orderIds = session.orders.map((order) => order.id)
+  const sessionTotal = session.orders.reduce((sum, order) => sum + decimalToNumber(order.total), 0)
 
-  await prisma.$transaction([
-    ...(orderIds.length > 0
-      ? [
-          prisma.payment.updateMany({
-            where: { orderId: { in: orderIds } },
-            data: {
-              method: prismaPaymentMethod,
-              status: 'APPROVED',
-            },
-          }),
-          prisma.order.updateMany({
-            where: { id: { in: orderIds } },
-            data: {
-              paymentMethod: prismaPaymentMethod,
-            },
-          }),
-        ]
-      : []),
-    prisma.order.updateMany({
+  const normalizedSplits =
+    paymentMethod === 'combined'
+      ? assertPaymentSplitsMatchTotal(sessionTotal, paymentSplits ?? [])
+      : undefined
+
+  const splitsByOrder = normalizedSplits
+    ? allocateSplitsAcrossOrders(
+        session.orders.map((order) => ({ id: order.id, total: decimalToNumber(order.total) })),
+        normalizedSplits
+      )
+    : []
+
+  await prisma.$transaction(async (tx) => {
+    if (orderIds.length > 0) {
+      await tx.payment.updateMany({
+        where: { orderId: { in: orderIds } },
+        data: {
+          method: prismaPaymentMethod,
+          status: 'APPROVED',
+        },
+      })
+      await tx.order.updateMany({
+        where: { id: { in: orderIds } },
+        data: {
+          paymentMethod: prismaPaymentMethod,
+        },
+      })
+
+      await tx.orderPaymentSplit.deleteMany({
+        where: { orderId: { in: orderIds } },
+      })
+
+      if (splitsByOrder.length > 0) {
+        await tx.orderPaymentSplit.createMany({
+          data: splitsByOrder.flatMap(({ orderId, splits }) =>
+            splits.map((split) => ({
+              orderId,
+              method: uiPaymentMethodToPrisma(split.method),
+              amount: split.amount,
+            }))
+          ),
+        })
+      }
+    }
+
+    await tx.order.updateMany({
       where: {
         tableSessionId: session.id,
         status: {
@@ -2125,20 +2222,23 @@ export async function closeTableAndOrders(
       data: {
         status: PrismaOrderStatus.COMPLETED,
       },
-    }),
-    prisma.tableSession.update({
+    })
+
+    await tx.tableSession.update({
       where: { id: session.id },
       data: {
         closedAt: new Date(),
       },
-    }),
-    prisma.diningTable.update({
+    })
+
+    await tx.diningTable.update({
       where: { id: tableId },
       data: {
         status: PrismaTableStatus.FREE,
       },
-    }),
-    prisma.auditLog.create({
+    })
+
+    await tx.auditLog.create({
       data: {
         action: 'table.closed',
         entityType: 'table',
@@ -2147,15 +2247,84 @@ export async function closeTableAndOrders(
         metadata: {
           tableSessionId: session.id,
           paymentMethod,
+          paymentSplits: normalizedSplits ?? null,
         },
       },
-    }),
-  ])
+    })
+  })
 
   return prisma.diningTable.findUnique({
     where: { id: tableId },
     include: tableInclude,
   })
+}
+
+/** Actualiza el medio de pago (y splits) de un pedido ya creado — típico desde caja. */
+export async function updateOrderPaymentMethod(
+  orderId: string,
+  paymentMethod: PaymentMethod,
+  paymentSplits: PaymentSplitInput[] | undefined,
+  userId?: string
+) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { payment: true },
+  })
+  if (!order) throw new Error('ORDER_NOT_FOUND')
+  if (order.status === PrismaOrderStatus.CANCELLED) throw new Error('ORDER_CANCELLED')
+
+  const prismaPaymentMethod = uiPaymentMethodToPrisma(paymentMethod)
+  const normalizedSplits =
+    paymentMethod === 'combined'
+      ? assertPaymentSplitsMatchTotal(decimalToNumber(order.total), paymentSplits ?? [])
+      : undefined
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.orderPaymentSplit.deleteMany({ where: { orderId } })
+
+    if (normalizedSplits?.length) {
+      await tx.orderPaymentSplit.createMany({
+        data: normalizedSplits.map((split) => ({
+          orderId,
+          method: uiPaymentMethodToPrisma(split.method),
+          amount: split.amount,
+        })),
+      })
+    }
+
+    await tx.order.update({
+      where: { id: orderId },
+      data: { paymentMethod: prismaPaymentMethod },
+    })
+
+    if (order.payment) {
+      await tx.payment.update({
+        where: { id: order.payment.id },
+        data: { method: prismaPaymentMethod },
+      })
+    }
+
+    await tx.auditLog.create({
+      data: {
+        action: 'order.payment_updated',
+        entityType: 'order',
+        entityId: orderId,
+        orderId,
+        createdByUserId: userId,
+        metadata: {
+          paymentMethod,
+          paymentSplits: normalizedSplits ?? null,
+        },
+      },
+    })
+
+    return tx.order.findUniqueOrThrow({
+      where: { id: orderId },
+      include: orderInclude,
+    })
+  })
+
+  return serializeOrder(updated)
 }
 
 export async function getAnalytics(): Promise<AnalyticsOverview> {

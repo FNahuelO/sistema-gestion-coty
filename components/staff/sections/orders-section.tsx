@@ -98,7 +98,7 @@ export function OrdersSection({
   embedded?: boolean
   onNavigateToCalls?: () => void
 }) {
-  const { orders, createManualOrder, updateOrderStatus, updateOrderEstimate, updateOrderPriority, updateOrderItems, closeOrder, approveOrderPayment } =
+  const { orders, createManualOrder, updateOrderStatus, updateOrderEstimate, updateOrderPriority, updateOrderItems, updateOrderPayment, closeOrder, approveOrderPayment } =
     useOrders()
   const { settings } = useBusiness()
   const businessName = settings?.name ?? 'Coty Café'
@@ -239,6 +239,24 @@ export function OrdersSection({
   ) => {
     const updated = await run(`items:${orderId}`, async () => {
       const next = await updateOrderItems(orderId, payload)
+      setSelectedOrder((current) => (current && current.id === orderId ? next : current))
+      return next
+    })
+    if (!updated) {
+      throw new Error('Hay otra acción en curso')
+    }
+    return updated
+  }
+
+  const handleUpdatePayment = async (
+    orderId: string,
+    payload: {
+      paymentMethod: import('@/lib/types').PaymentMethod
+      paymentSplits?: Array<{ method: Exclude<import('@/lib/types').PaymentMethod, 'combined'>; amount: number }>
+    }
+  ) => {
+    const updated = await run(`payment:${orderId}`, async () => {
+      const next = await updateOrderPayment(orderId, payload)
       setSelectedOrder((current) => (current && current.id === orderId ? next : current))
       return next
     })
@@ -582,6 +600,7 @@ export function OrdersSection({
         onUpdateEstimate={handleUpdateEstimate}
         onUpdatePriority={handleUpdatePriority}
         onUpdateItems={handleUpdateItems}
+        onUpdatePayment={handleUpdatePayment}
         onPrintKitchen={(order) => printOrderTickets({ order, businessName }, ['kitchen'])}
         onPrintCustomer={(order) => printOrderTickets({ order, businessName }, ['customer'])}
         onPrintBoth={(order) => printTicketsForOrder(order)}
