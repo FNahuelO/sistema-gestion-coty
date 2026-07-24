@@ -349,7 +349,7 @@ export function buildTicketPrintDocument(input: TicketPrintInput, variants: Tick
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=58mm, initial-scale=1" />
-    <title>Ticket ${escapeHtml(getCustomerOrderLabel(input.order))}</title>
+    <title>Ticket ${escapeHtml(formatCustomerOrderNumber(input.order))}</title>
     <style>${TICKET_STYLES}</style>
   </head>
   <body><div class="print-root">${body}</div></body>
