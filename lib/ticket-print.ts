@@ -128,11 +128,11 @@ function getCustomerOrderLabel(order: Order) {
 }
 
 function formatKitchenOrderNumber(order: Order) {
-  return `Orden nº ${getOrderNumberText(order)}`
+  return `Nº pedido ${getOrderNumberText(order)}`
 }
 
 function formatCustomerOrderNumber(order: Order) {
-  return `Orden ${formatPublicOrderCode(order)}`
+  return `Nº pedido ${getOrderNumberText(order)}`
 }
 
 function getTicketPaymentStatus(order: Order) {
@@ -254,11 +254,15 @@ function renderCustomerTicketText({ order, businessName }: TicketPrintInput): st
     (sum, item) => sum + getItemUnitPrice(item) * item.quantity,
     0
   )
+  const publicCode = formatPublicOrderCode(order)
 
   const lines: string[] = [
     center('*** TICKET ***'),
     center(businessName),
     center(formatCustomerOrderNumber(order)),
+    ...(publicCode && publicCode !== getOrderNumberText(order)
+      ? [center(`Código: ${publicCode}`)]
+      : []),
     SEPARATOR,
     line(`Modalidad: ${getOrderChannelLabel(order)}`),
     line(`Pago: ${TICKET_PAYMENT_LABELS[order.paymentMethod]}`),
