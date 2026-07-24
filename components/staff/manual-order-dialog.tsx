@@ -15,6 +15,11 @@ import { ProductDetailModal } from '@/components/customer/product-detail-modal'
 import { formatPrice } from '@/lib/coty-theme'
 import { PAYMENT_METHOD_LABELS } from '@/lib/order-labels'
 import {
+  buildPaymentSplitsFromAmounts,
+  PaymentSplitsEditor,
+} from '@/components/shared/payment-splits-editor'
+import { sumSplitAmounts } from '@/lib/payment-splits'
+import {
   PANEL_INTERACTIVE_HOVER,
   PANEL_OUTLINE_BTN,
   PANEL_PRIMARY_BTN,
@@ -31,6 +36,7 @@ export type ManualOrderSubmitPayload = {
   type: ManualOrderType
   source: ManualOrderSource
   paymentMethod: Exclude<PaymentMethod, 'mercado_pago'>
+  paymentSplits?: Array<{ method: Exclude<PaymentMethod, 'combined' | 'mercado_pago'>; amount: number }>
   customerName: string
   customerPhone: string
   customerAddress?: string
@@ -50,13 +56,26 @@ type ManualOrderDialogProps = {
   onSubmit: (payload: ManualOrderSubmitPayload) => Promise<void>
 }
 
-const STAFF_PAYMENT_METHODS: Array<Exclude<PaymentMethod, 'mercado_pago'>> = ['cash', 'card', 'transfer']
+const STAFF_PAYMENT_METHODS: Array<Exclude<PaymentMethod, 'mercado_pago'>> = [
+  'cash',
+  'card',
+  'transfer',
+  'combined',
+]
+const STAFF_SPLIT_METHODS: Array<Exclude<PaymentMethod, 'combined' | 'mercado_pago'>> = [
+  'cash',
+  'card',
+  'transfer',
+]
 
 export function ManualOrderDialog({ open, onOpenChange, onSubmit }: ManualOrderDialogProps) {
   const { products: catalogProducts, deliveryZones, isLoading: catalogLoading } = useCatalog()
   const [source, setSource] = useState<ManualOrderSource>('phone')
   const [orderType, setOrderType] = useState<ManualOrderType>('pickup')
   const [paymentMethod, setPaymentMethod] = useState<Exclude<PaymentMethod, 'mercado_pago'>>('cash')
+  const [splitAmounts, setSplitAmounts] = useState<
+    Partial<Record<Exclude<PaymentMethod, 'combined' | 'mercado_pago'>, string>>
+  >({})
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [customerAddress, setCustomerAddress] = useState('')
@@ -98,6 +117,7 @@ export function ManualOrderDialog({ open, onOpenChange, onSubmit }: ManualOrderD
     setSource('phone')
     setOrderType('pickup')
     setPaymentMethod('cash')
+    setSplitAmounts({})
     setCustomerName('')
     setCustomerPhone('')
     setCustomerAddress('')
@@ -155,12 +175,32 @@ export function ManualOrderDialog({ open, onOpenChange, onSubmit }: ManualOrderD
       return
     }
 
+    const paymentSplits =
+      paymentMethod === 'combined'
+        ? (buildPaymentSplitsFromAmounts(splitAmounts).filter(
+            (split): split is { method: 'cash' | 'card' | 'transfer'; amount: number } =>
+              split.method !== 'mercado_pago'
+          ) as Array<{ method: 'cash' | 'card' | 'transfer'; amount: number }>)
+        : undefined
+
+    if (paymentMethod === 'combined') {
+      if (!paymentSplits || paymentSplits.length < 2) {
+        toast.error('En pago combinado usá al menos dos medios con monto')
+        return
+      }
+      if (Math.abs(sumSplitAmounts(paymentSplits) - cartTotal) > 0.02) {
+        toast.error('La suma de los montos debe coincidir con el total del pedido')
+        return
+      }
+    }
+
     setSubmitting(true)
     try {
       await onSubmit({
         type: orderType,
         source,
         paymentMethod,
+        paymentSplits,
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
         customerAddress: orderType === 'delivery' ? customerAddress.trim() : undefined,
@@ -331,7 +371,11 @@ export function ManualOrderDialog({ open, onOpenChange, onSubmit }: ManualOrderD
             <Label>Forma de pago</Label>
             <Select
               value={paymentMethod}
-              onValueChange={(value) => setPaymentMethod(value as Exclude<PaymentMethod, 'mercado_pago'>)}
+              onValueChange={(value) => {
+                const method = value as Exclude<PaymentMethod, 'mercado_pago'>
+                setPaymentMethod(method)
+                if (method !== 'combined') setSplitAmounts({})
+              }}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -344,6 +388,17 @@ export function ManualOrderDialog({ open, onOpenChange, onSubmit }: ManualOrderD
                 ))}
               </SelectContent>
             </Select>
+            {paymentMethod === 'combined' ? (
+              <PaymentSplitsEditor
+                total={cartTotal}
+                methods={STAFF_SPLIT_METHODS}
+                amounts={splitAmounts}
+                onChange={(method, value) => {
+                  if (method === 'mercado_pago') return
+                  setSplitAmounts((current) => ({ ...current, [method]: value }))
+                }}
+              />
+            ) : null}
           </div>
 
           <div className="relative">

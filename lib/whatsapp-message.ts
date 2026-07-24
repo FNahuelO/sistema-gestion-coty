@@ -5,7 +5,17 @@ type OrderMessageItem = Pick<CartItem, 'quantity' | 'product' | 'selectedOptions
 
 type OrderMessageInput = Pick<
   Order,
-  'displayCode' | 'id' | 'customerName' | 'customerPhone' | 'customerAddress' | 'total' | 'paymentMethod' | 'type' | 'notes' | 'tableNumber'
+  | 'displayCode'
+  | 'id'
+  | 'customerName'
+  | 'customerPhone'
+  | 'customerAddress'
+  | 'total'
+  | 'paymentMethod'
+  | 'paymentSplits'
+  | 'type'
+  | 'notes'
+  | 'tableNumber'
 > & {
   items: OrderMessageItem[]
 }
@@ -57,10 +67,19 @@ export function buildWhatsAppOrderMessage(
     .join('\n')
 
   const paymentLabel = PAYMENT_METHOD_LABELS[order.paymentMethod as PaymentMethod] ?? order.paymentMethod
+  const paymentDetail =
+    order.paymentMethod === 'combined' && order.paymentSplits?.length
+      ? order.paymentSplits
+          .map((split) => `${PAYMENT_METHOD_LABELS[split.method]} $${split.amount.toFixed(2)}`)
+          .join(' + ')
+      : null
   const typeLabel = ORDER_TYPE_LABELS[order.type] ?? order.type
   const transferDetails = formatTransferDetails(options)
+  const hasTransferSplit = Boolean(order.paymentSplits?.some((split) => split.method === 'transfer'))
   const showPaymentInstructions =
-    options?.includePaymentInstructions && order.paymentMethod === 'transfer' && order.type !== 'table'
+    options?.includePaymentInstructions &&
+    order.type !== 'table' &&
+    (order.paymentMethod === 'transfer' || (order.paymentMethod === 'combined' && hasTransferSplit))
 
   return `🧾 *Nuevo Pedido - ${businessName}*
 
@@ -71,7 +90,7 @@ ${order.customerAddress ? `📍 *Dirección:* ${order.customerAddress}\n` : ''}�
 ${itemsList}
 
 💰 *Total:* $${order.total.toFixed(2)}
-💳 *Pago:* ${paymentLabel}
+💳 *Pago:* ${paymentLabel}${paymentDetail ? `\n   (${paymentDetail})` : ''}
 ${transferDetails ? `${transferDetails}\n` : ''}📦 *Tipo:* ${typeLabel}
 ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}${
     showPaymentInstructions

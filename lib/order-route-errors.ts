@@ -20,6 +20,13 @@ const ORDER_ERROR_MESSAGES = new Map<string, [string, number]>([
   ['MIN_ORDER_AMOUNT', ['El pedido no alcanza el monto mínimo requerido', 400]],
   ['MERCADOPAGO_UNAVAILABLE', ['Mercado Pago no está disponible en este momento', 400]],
   ['PAYMENT_NOT_APPROVED', ['Debés aprobar el comprobante de transferencia antes de confirmar el pedido', 400]],
+  ['PAYMENT_SPLITS_REQUIRED', ['Indicá al menos dos medios con monto para el pago combinado', 400]],
+  ['PAYMENT_SPLITS_MISMATCH', ['La suma de los montos debe coincidir con el total del pedido', 400]],
+  ['PAYMENT_SPLITS_ONLY_FOR_COMBINED', ['Los montos parciales solo aplican al pago combinado', 400]],
+  [
+    'COMBINED_MERCADOPAGO_UNSUPPORTED',
+    ['En pago combinado online usá efectivo, transferencia o tarjeta. Mercado Pago se registra desde caja.', 400],
+  ],
   [
     'DAILY_ORDER_NUMBER_FAILED',
     ['No se pudo asignar el número de pedido del día. Revisá que las migraciones estén aplicadas.', 500],

@@ -45,6 +45,7 @@ enum PaymentMethod {
   CARD
   TRANSFER
   MERCADO_PAGO
+  COMBINED
 }
 
 enum PaymentStatus {
@@ -383,6 +384,7 @@ model Order {
   customer               Customer?            @relation(fields: [customerId], references: [id])
   items                  OrderItem[]
   payment                Payment?
+  paymentSplits          OrderPaymentSplit[]
   statusHistory          OrderStatusHistory[]
   auditLogs              AuditLog[]
   deliveryAssignment     DeliveryAssignment?
@@ -391,6 +393,19 @@ model Order {
 
   @@unique([serviceDate, dailyNumber])
   @@index([serviceDate, dailyNumber])
+}
+
+model OrderPaymentSplit {
+  id        String        @id @default(cuid())
+  orderId   String
+  method    PaymentMethod
+  amount    Decimal       @db.Decimal(10, 2)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  order     Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([method])
 }
 
 model DailyOrderCounter {

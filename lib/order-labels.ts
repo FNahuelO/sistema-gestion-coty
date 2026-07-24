@@ -1,4 +1,5 @@
 import type { Order, OrderStatus, OrderType, PaymentStatus, TableStatus } from '@/lib/types'
+import { arDayKey } from '@/lib/datetime'
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   pending: 'Pendiente',
@@ -49,6 +50,7 @@ export const PAYMENT_METHOD_LABELS: Record<Order['paymentMethod'], string> = {
   card: 'Tarjeta',
   transfer: 'Transferencia (WhatsApp)',
   mercado_pago: 'Mercado Pago',
+  combined: 'Pago combinado',
 }
 
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
@@ -60,14 +62,17 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   refunded: 'Reembolsado',
 }
 
-const COLLECT_ON_DELIVERY_METHODS: Order['paymentMethod'][] = ['cash', 'card']
+const COLLECT_ON_DELIVERY_METHODS: Order['paymentMethod'][] = ['cash', 'card', 'combined']
 
-export function getPaymentStatusLabel(order: Pick<Order, 'paymentMethod' | 'paymentStatus' | 'status'>): string {
+export function getPaymentStatusLabel(
+  order: Pick<Order, 'paymentMethod' | 'paymentStatus' | 'status' | 'paymentSplits'>
+): string {
   if (!order.paymentStatus) return ''
+  const hasTransferSplit = Boolean(order.paymentSplits?.some((split) => split.method === 'transfer'))
   if (
     order.paymentStatus === 'pending' &&
-    order.paymentMethod === 'transfer' &&
-    order.status === 'pending'
+    order.status === 'pending' &&
+    (order.paymentMethod === 'transfer' || (order.paymentMethod === 'combined' && hasTransferSplit))
   ) {
     return 'Esperando comprobante'
   }
@@ -99,7 +104,7 @@ export function formatTableStatus(status: TableStatus) {
   return TABLE_STATUS_LABELS[status]
 }
 
-/** Número corto interno de cocina del día (#12). Solo para staff/cocina. */
+/** Número corto interno del día (#12). Correlativo único mesa+delivery+retiro. Solo staff/cocina. */
 export function formatOrderNumber(
   order: Pick<Order, 'dailyNumber' | 'displayCode' | 'publicTrackingCode' | 'id'>
 ): string {
@@ -107,12 +112,35 @@ export function formatOrderNumber(
   return order.displayCode ?? order.publicTrackingCode ?? order.id.slice(0, 8).toUpperCase()
 }
 
-/** Número interno sin #. Solo para staff/cocina/tickets de cocina. */
+/** Número interno sin #. Correlativo único del día para todos los canales. */
 export function getOrderNumberText(
   order: Pick<Order, 'dailyNumber' | 'displayCode' | 'publicTrackingCode' | 'id'>
 ): string {
   if (order.dailyNumber != null) return String(order.dailyNumber)
   return order.displayCode ?? order.publicTrackingCode ?? order.id.slice(0, 8).toUpperCase()
+}
+
+/** Resumen del correlativo del día (todos los canales juntos). */
+export function getDailyOrderControlSummary(
+  orders: Array<Pick<Order, 'dailyNumber' | 'type' | 'status' | 'createdAt'>>,
+  dayKey = arDayKey(new Date())
+) {
+  const todays = orders.filter(
+    (order) => arDayKey(order.createdAt) === dayKey && order.status !== 'cancelled'
+  )
+  const lastNumber = todays.reduce(
+    (max, order) => Math.max(max, order.dailyNumber ?? 0),
+    0
+  )
+
+  return {
+    dayKey,
+    lastNumber,
+    total: todays.length,
+    table: todays.filter((order) => order.type === 'table').length,
+    delivery: todays.filter((order) => order.type === 'delivery').length,
+    pickup: todays.filter((order) => order.type === 'pickup').length,
+  }
 }
 
 /** Código público del pedido para el cliente (nunca el número diario interno). */

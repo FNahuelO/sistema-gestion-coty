@@ -28,7 +28,7 @@ import { ManualOrderDialog } from '@/components/staff/manual-order-dialog'
 import { StaffNotificationsButton } from '@/components/staff/staff-notifications-button'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
-import { formatOrderStatus, formatOrderNumber, getOrderChannelLabel, ORDER_TYPE_BADGE_CLASS, ORDER_TYPE_CARD_ACCENT, isDisplayableCustomerPhone } from '@/lib/order-labels'
+import { formatOrderStatus, formatOrderNumber, getDailyOrderControlSummary, getOrderChannelLabel, ORDER_TYPE_BADGE_CLASS, ORDER_TYPE_CARD_ACCENT, isDisplayableCustomerPhone } from '@/lib/order-labels'
 import { canApproveTransferPayment } from '@/lib/payment-flow'
 import { ORDER_SORT_OPTIONS, sortOrders, type OrderSortKey } from '@/lib/order-sort'
 import type { DeliveryQueueEntry, Order, OrderStatus, OrderType } from '@/lib/types'
@@ -98,7 +98,7 @@ export function OrdersSection({
   embedded?: boolean
   onNavigateToCalls?: () => void
 }) {
-  const { orders, createManualOrder, updateOrderStatus, updateOrderEstimate, updateOrderPriority, updateOrderItems, closeOrder, approveOrderPayment } =
+  const { orders, createManualOrder, updateOrderStatus, updateOrderEstimate, updateOrderPriority, updateOrderItems, updateOrderPayment, closeOrder, approveOrderPayment } =
     useOrders()
   const { settings } = useBusiness()
   const businessName = settings?.name ?? 'Coty Café'
@@ -116,9 +116,11 @@ export function OrdersSection({
   const [selectedTab, setSelectedTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('active')
-  const [sortBy, setSortBy] = useState<OrderSortKey>('priority')
+  const [sortBy, setSortBy] = useState<OrderSortKey>('number')
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [manualOrderOpen, setManualOrderOpen] = useState(false)
+
+  const dailyControl = useMemo(() => getDailyOrderControlSummary(orders), [orders])
 
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -248,6 +250,24 @@ export function OrdersSection({
     return updated
   }
 
+  const handleUpdatePayment = async (
+    orderId: string,
+    payload: {
+      paymentMethod: import('@/lib/types').PaymentMethod
+      paymentSplits?: Array<{ method: Exclude<import('@/lib/types').PaymentMethod, 'combined'>; amount: number }>
+    }
+  ) => {
+    const updated = await run(`payment:${orderId}`, async () => {
+      const next = await updateOrderPayment(orderId, payload)
+      setSelectedOrder((current) => (current && current.id === orderId ? next : current))
+      return next
+    })
+    if (!updated) {
+      throw new Error('Hay otra acción en curso')
+    }
+    return updated
+  }
+
   const handleApprovePayment = async (orderId: string, estimatedMinutes?: number) => {
     await run(`approve:${orderId}`, async () => {
       try {
@@ -297,6 +317,26 @@ export function OrdersSection({
           <StatCard label="Listos" value={orderStats.ready} icon={CheckCircle} iconColor="#16A34A" />
           <StatCard label="Activos" value={orderStats.total} icon={Package} iconColor={COTY_TEAL} />
         </div>
+
+        {dailyControl.total > 0 ? (
+          <div className={cn(PANEL_CARD, 'flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm')}>
+            <span className="font-semibold text-[#2D5A57]">
+              Hoy {dailyControl.lastNumber > 0 ? `#1–#${dailyControl.lastNumber}` : 'sin número'}
+            </span>
+            <span className="text-muted-foreground">·</span>
+            <span className="font-medium tabular-nums">{dailyControl.total} pedidos</span>
+            <span className="text-muted-foreground">
+              ({dailyControl.table} mesa{dailyControl.table === 1 ? '' : 's'}
+              {' · '}
+              {dailyControl.delivery} envío{dailyControl.delivery === 1 ? '' : 's'}
+              {' · '}
+              {dailyControl.pickup} retiro{dailyControl.pickup === 1 ? '' : 's'})
+            </span>
+            <span className="w-full text-xs text-muted-foreground sm:w-auto sm:ml-auto">
+              Un solo correlativo para todos los canales
+            </span>
+          </div>
+        ) : null}
 
         <div className={cn(PANEL_CARD, 'p-4')}>
           <div className="flex flex-col gap-3 md:flex-row md:items-center">
@@ -582,6 +622,7 @@ export function OrdersSection({
         onUpdateEstimate={handleUpdateEstimate}
         onUpdatePriority={handleUpdatePriority}
         onUpdateItems={handleUpdateItems}
+        onUpdatePayment={handleUpdatePayment}
         onPrintKitchen={(order) => printOrderTickets({ order, businessName }, ['kitchen'])}
         onPrintCustomer={(order) => printOrderTickets({ order, businessName }, ['customer'])}
         onPrintBoth={(order) => printTicketsForOrder(order)}

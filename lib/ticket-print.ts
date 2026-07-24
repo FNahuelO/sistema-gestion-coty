@@ -23,6 +23,7 @@ const TICKET_PAYMENT_LABELS: Record<Order['paymentMethod'], string> = {
   card: 'Tarjeta',
   transfer: 'Transferencia',
   mercado_pago: 'Mercado Pago',
+  combined: 'Pago combinado',
 }
 
 const TICKET_STYLES = `
@@ -122,16 +123,12 @@ function escapeHtml(value: string) {
     .replaceAll('"', '&quot;')
 }
 
-function getCustomerOrderLabel(order: Order) {
-  return formatPublicOrderCode(order)
-}
-
 function formatKitchenOrderNumber(order: Order) {
-  return `Orden nº ${getOrderNumberText(order)}`
+  return `Nº pedido ${getOrderNumberText(order)}`
 }
 
 function formatCustomerOrderNumber(order: Order) {
-  return `Orden ${formatPublicOrderCode(order)}`
+  return `Nº pedido ${getOrderNumberText(order)}`
 }
 
 function getTicketPaymentStatus(order: Order) {
@@ -253,14 +250,23 @@ function renderCustomerTicketText({ order, businessName }: TicketPrintInput): st
     (sum, item) => sum + getItemUnitPrice(item) * item.quantity,
     0
   )
+  const publicCode = formatPublicOrderCode(order)
 
   const lines: string[] = [
     center('*** TICKET ***'),
     center(businessName),
     center(formatCustomerOrderNumber(order)),
+    ...(publicCode && publicCode !== getOrderNumberText(order)
+      ? [center(`Código: ${publicCode}`)]
+      : []),
     SEPARATOR,
     line(`Modalidad: ${getOrderChannelLabel(order)}`),
     line(`Pago: ${TICKET_PAYMENT_LABELS[order.paymentMethod]}`),
+    ...(order.paymentMethod === 'combined' && order.paymentSplits?.length
+      ? order.paymentSplits.map(
+          (split) => line(`  ${TICKET_PAYMENT_LABELS[split.method]}: ${formatPrice(split.amount)}`)
+        )
+      : []),
     line(`Estado: ${getTicketPaymentStatus(order)}`),
     line(`Fecha: ${formatDateAR(createdAt)}`),
     line(`Hora: ${formatTimeAR(createdAt)}`),
@@ -339,7 +345,7 @@ export function buildTicketPrintDocument(input: TicketPrintInput, variants: Tick
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=58mm, initial-scale=1" />
-    <title>Ticket ${escapeHtml(getCustomerOrderLabel(input.order))}</title>
+    <title>Ticket ${escapeHtml(formatCustomerOrderNumber(input.order))}</title>
     <style>${TICKET_STYLES}</style>
   </head>
   <body><div class="print-root">${body}</div></body>

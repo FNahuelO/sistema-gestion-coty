@@ -13,11 +13,11 @@ export type OrderSortKey =
 
 export const ORDER_SORT_OPTIONS: { value: OrderSortKey; label: string }[] = [
   { value: 'priority', label: 'Prioridad primero' },
-  { value: 'number', label: 'Por número (#1, #2…)' },
+  { value: 'number', label: 'Nº del día (mesa+delivery juntos)' },
   { value: 'oldest', label: 'Más antiguos primero' },
   { value: 'newest', label: 'Más recientes primero' },
   { value: 'status', label: 'Por estado' },
-  { value: 'type', label: 'Por tipo (mesa → delivery → retiro)' },
+  { value: 'type', label: 'Agrupar por tipo' },
   { value: 'total_desc', label: 'Mayor monto primero' },
   { value: 'total_asc', label: 'Menor monto primero' },
   { value: 'items_desc', label: 'Más ítems primero' },
