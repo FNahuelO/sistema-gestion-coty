@@ -1028,7 +1028,9 @@ function serviceDateFromDayKey(dayKey: string): Date {
   return new Date(Date.UTC(year, month - 1, day))
 }
 
-/** Asigna el próximo número de pedido del día (horario Argentina), atómico por fila. */
+/** Asigna el próximo número de pedido del día (horario Argentina), atómico por fila.
+ *  Un solo correlativo para TODOS los canales (mesa, delivery y retiro): #1, #2, #3…
+ */
 async function allocateDailyOrderNumber(
   tx: Prisma.TransactionClient,
   dayKey = arDayKey(new Date())
