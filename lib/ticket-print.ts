@@ -123,10 +123,6 @@ function escapeHtml(value: string) {
     .replaceAll('"', '&quot;')
 }
 
-function getCustomerOrderLabel(order: Order) {
-  return formatPublicOrderCode(order)
-}
-
 function formatKitchenOrderNumber(order: Order) {
   return `Nº pedido ${getOrderNumberText(order)}`
 }
