@@ -44,6 +44,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label'
 import { DeliveryAssignmentPanel } from '@/components/staff/delivery-assignment-panel'
 import { toast } from 'sonner'
+import { buildWhatsAppChatUrl } from '@/lib/whatsapp-message'
 
 const ORDER_TYPE_META: Record<
   OrderType,
@@ -271,19 +272,18 @@ export function OrderDetailSheet({
               <div className="space-y-2 px-4 py-3">
                 <p className="font-semibold text-foreground">{order.customerName}</p>
                 {isDisplayableCustomerPhone(order.customerPhone) ? (
-                  <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <a
+                    href={buildWhatsAppChatUrl(order.customerPhone)}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Abrir WhatsApp con ${order.customerName}`}
+                    className="flex w-fit items-center gap-2 text-sm font-medium text-[#128C7E] hover:underline"
+                  >
                     <Phone className="h-3.5 w-3.5 shrink-0 text-[#7EB8B3]" />
                     <span>{order.customerPhone}</span>
-                    <a
-                      href={`https://wa.me/${order.customerPhone.replace(/\D/g, '')}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-[#25D366]"
-                    >
-                      <MessageCircle className="h-3.5 w-3.5" />
-                      WhatsApp
-                    </a>
-                  </p>
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    <span className="text-xs font-semibold">Abrir chat</span>
+                  </a>
                 ) : null}
                 {order.customerAddress ? (
                   <p className="flex items-start gap-2 text-sm text-muted-foreground">

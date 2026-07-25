@@ -15,6 +15,7 @@ import {
   Package,
   ArrowUpDown,
   Plus,
+  MessageCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -41,6 +42,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { formatDeliveryAssignmentStatus } from '@/lib/delivery-labels'
 import { cn } from '@/lib/utils'
 import { printOrderTickets } from '@/lib/ticket-print'
+import { buildWhatsAppChatUrl } from '@/lib/whatsapp-message'
 
 const fetchJson = async (url: string) => {
   const res = await fetch(url, { credentials: 'include' })
@@ -546,7 +548,18 @@ export function OrdersSection({
                           <div className="mt-3 space-y-1 pl-12 text-sm">
                             <p className="font-medium dark:text-white">{order.customerName}</p>
                             {isDisplayableCustomerPhone(order.customerPhone) && (
-                              <p className="text-muted-foreground">{order.customerPhone}</p>
+                              <a
+                                href={buildWhatsAppChatUrl(order.customerPhone)}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label={`Abrir WhatsApp con ${order.customerName}`}
+                                className="flex w-fit items-center gap-1.5 font-medium text-[#128C7E] hover:underline"
+                                onClick={(event) => event.stopPropagation()}
+                                onKeyDown={(event) => event.stopPropagation()}
+                              >
+                                <MessageCircle className="h-3.5 w-3.5 shrink-0" />
+                                {order.customerPhone}
+                              </a>
                             )}
                             <div className="text-xs text-muted-foreground">
                               {order.items.slice(0, 2).map((item) => (

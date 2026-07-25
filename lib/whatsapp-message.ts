@@ -26,6 +26,16 @@ export type WhatsAppMessageOptions = {
   includePaymentInstructions?: boolean
 }
 
+export function buildWhatsAppChatUrl(phone: string) {
+  const digits = phone.replace(/\D/g, '')
+
+  if (digits.startsWith('549')) return `https://wa.me/${digits}`
+  if (digits.startsWith('54')) return `https://wa.me/549${digits.slice(2)}`
+  if (digits.length === 10) return `https://wa.me/549${digits}`
+
+  return `https://wa.me/${digits}`
+}
+
 function formatItemOptions(item: OrderMessageItem) {
   return item.selectedOptions
     ?.map((opt) => {
@@ -105,7 +115,6 @@ export function buildWhatsAppUrl(
   businessName: string,
   options?: WhatsAppMessageOptions
 ) {
-  const normalizedPhone = phone.replace(/\D/g, '')
   const text = encodeURIComponent(buildWhatsAppOrderMessage(order, businessName, options))
-  return `https://wa.me/${normalizedPhone}?text=${text}`
+  return `${buildWhatsAppChatUrl(phone)}?text=${text}`
 }
