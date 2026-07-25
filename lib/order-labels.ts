@@ -87,7 +87,7 @@ export function getPaymentStatusLabel(
 
 const INTERNAL_CUSTOMER_PHONES = new Set(['mesa', 'staff', 'mostrador'])
 
-export function isDisplayableCustomerPhone(phone?: string | null): boolean {
+export function isDisplayableCustomerPhone(phone?: string | null): phone is string {
   const value = phone?.trim()
   if (!value) return false
   if (INTERNAL_CUSTOMER_PHONES.has(value.toLowerCase())) return false
