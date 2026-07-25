@@ -16,6 +16,7 @@ import { formatOrderNumber, isDisplayableCustomerPhone } from '@/lib/order-label
 import type { DeliveryQueueEntry } from '@/lib/types'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
+import { buildWhatsAppChatUrl } from '@/lib/whatsapp-message'
 
 const fetchJson = async (url: string) => {
   const res = await fetch(url, { credentials: 'include' })
@@ -89,10 +90,16 @@ function DeliveryQueueCard({
           <div className="space-y-1">
             <p className="font-medium">{entry.order.customerName}</p>
             {isDisplayableCustomerPhone(entry.order.customerPhone) ? (
-              <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <a
+                href={buildWhatsAppChatUrl(entry.order.customerPhone)}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Abrir WhatsApp con ${entry.order.customerName}`}
+                className="flex w-fit items-center gap-1.5 text-sm font-medium text-[#128C7E] hover:underline"
+              >
                 <Phone className="h-3.5 w-3.5 shrink-0" />
                 {entry.order.customerPhone}
-              </p>
+              </a>
             ) : null}
             {entry.order.customerAddress ? (
               <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
