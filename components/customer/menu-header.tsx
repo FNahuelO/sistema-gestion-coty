@@ -11,6 +11,7 @@ import { buildCustomerPath } from '@/lib/menu-url'
 import type { Category } from '@/lib/types'
 import type { MenuCategoryId } from '@/lib/menu-categories'
 import { cn } from '@/lib/utils'
+import { LoadingImage } from '@/components/shared/loading-image'
 
 interface MenuHeaderProps {
   searchQuery: string
@@ -45,10 +46,13 @@ export function MenuHeader({
       <div className="relative mx-auto w-full max-w-lg px-4 md:max-w-4xl md:px-6 lg:max-w-6xl lg:px-8">
         <header className="min-h-[207px] pt-6 md:min-h-0 md:pb-12 md:pt-8">
           <Link href="/" className="mb-4 flex justify-center md:hidden">
-            <img
+            <LoadingImage
               src={LOGO_SRC_SVG}
               alt="Coty Café"
-              className="h-16 w-auto object-contain mix-blend-screen"
+              inline
+              loading="eager"
+              skeleton={false}
+              imgClassName="h-16 w-auto object-contain mix-blend-screen"
             />
           </Link>
 

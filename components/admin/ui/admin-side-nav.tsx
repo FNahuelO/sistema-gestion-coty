@@ -7,6 +7,7 @@ import { COTY_HEADER, LOGO_SRC_SVG } from '@/lib/coty-theme'
 import { PANEL_BORDER, PANEL_ICON_ACTIVE, PANEL_ICON_IDLE, PANEL_NAV_ACTIVE, PANEL_NAV_IDLE } from '@/lib/panel-theme'
 import { AdminThemeToggle } from './theme-toggle'
 import { cn } from '@/lib/utils'
+import { LoadingImage } from '@/components/shared/loading-image'
 import { NAV_ITEMS } from '../constants'
 import type { AdminSection } from '../types'
 import { canAccessAdminSection, type SessionRoleContext } from '@/lib/permissions'
@@ -31,7 +32,14 @@ export function AdminSideNav({
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
             style={{ backgroundColor: COTY_HEADER }}
           >
-            <img src={LOGO_SRC_SVG} alt="Coty Cafe" className="h-auto w-7 object-contain" />
+            <LoadingImage
+              src={LOGO_SRC_SVG}
+              alt="Coty Cafe"
+              inline
+              loading="eager"
+              skeleton={false}
+              imgClassName="h-auto w-7 object-contain"
+            />
           </div>
           <div>
             <p className="font-serif text-xl font-bold leading-tight">Coty Cafe</p>

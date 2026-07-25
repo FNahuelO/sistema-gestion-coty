@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { BellRing, ChefHat, LogOut, Truck, Users, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { COTY_HEADER, LOGO_SRC_SVG } from '@/lib/coty-theme'
+import { LoadingImage } from '@/components/shared/loading-image'
 import {
   PANEL_BG,
   PANEL_BORDER,
@@ -88,7 +89,14 @@ export function StaffShell({
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full lg:hidden"
                 style={{ backgroundColor: COTY_HEADER }}
               >
-                <img src={LOGO_SRC_SVG} alt="Coty Cafe" className="h-auto w-5 object-contain" />
+                <LoadingImage
+                  src={LOGO_SRC_SVG}
+                  alt="Coty Cafe"
+                  inline
+                  loading="eager"
+                  skeleton={false}
+                  imgClassName="h-auto w-5 object-contain"
+                />
               </div>
               <div className="min-w-0">
                 <p className="truncate font-serif text-base font-bold leading-tight text-foreground">{SECTION_LABELS[activeSection]}</p>
@@ -188,7 +196,14 @@ function StaffSideNav({
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
             style={{ backgroundColor: COTY_HEADER }}
           >
-            <img src={LOGO_SRC_SVG} alt="Coty Cafe" className="h-auto w-7 object-contain" />
+            <LoadingImage
+              src={LOGO_SRC_SVG}
+              alt="Coty Cafe"
+              inline
+              loading="eager"
+              skeleton={false}
+              imgClassName="h-auto w-7 object-contain"
+            />
           </div>
           <div>
             <p className="font-serif text-xl font-bold leading-tight dark:text-white">Coty Cafe</p>

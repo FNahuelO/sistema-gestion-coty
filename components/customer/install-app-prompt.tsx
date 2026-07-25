@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { LoadingImage } from '@/components/shared/loading-image'
 import { COTY_HEADER, COTY_TEAL, LOGO_SRC_SVG } from '@/lib/coty-theme'
 
 type Platform = 'ios' | 'android' | 'desktop'
@@ -153,7 +154,14 @@ export function InstallAppPrompt() {
                 className="flex h-14 w-14 items-center justify-center rounded-2xl"
                 style={{ backgroundColor: COTY_HEADER }}
               >
-                <img src={LOGO_SRC_SVG} alt="Coty Café" className="h-auto w-8 object-contain" />
+                <LoadingImage
+                  src={LOGO_SRC_SVG}
+                  alt="Coty Café"
+                  inline
+                  loading="eager"
+                  skeleton={false}
+                  imgClassName="h-auto w-8 object-contain"
+                />
               </div>
             </div>
             <DialogTitle className="text-center text-[#2D5A57]">Instalar la app</DialogTitle>

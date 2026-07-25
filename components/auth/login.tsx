@@ -16,6 +16,7 @@ import type { User } from '@/lib/types'
 import { COTY_HEADER, LOGO_SRC_SVG } from '@/lib/coty-theme'
 import { PANEL_CARD, PANEL_PRIMARY_BTN, PANEL_TITLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
+import { LoadingImage } from '@/components/shared/loading-image'
 import { toast } from 'sonner'
 
 const INPUT_CLASS =
@@ -109,7 +110,14 @@ export function LoginPage() {
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
                 style={{ backgroundColor: COTY_HEADER }}
               >
-                <img src={LOGO_SRC_SVG} alt="Coty Cafe" className="h-auto w-7 object-contain" />
+                <LoadingImage
+                  src={LOGO_SRC_SVG}
+                  alt="Coty Cafe"
+                  inline
+                  loading="eager"
+                  skeleton={false}
+                  imgClassName="h-auto w-7 object-contain"
+                />
               </div>
             </div>
             <h1 className="font-serif text-xl font-bold leading-tight text-foreground">Coty Cafe</h1>

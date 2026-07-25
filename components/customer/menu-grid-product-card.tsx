@@ -8,6 +8,7 @@ import { getDefaultCartItem } from '@/lib/menu-cart-utils'
 import { ProductPriceDisplay } from '@/components/customer/product-price-display'
 import { getProductDiscountPercent } from '@/lib/promotions'
 import { Badge } from '@/components/ui/badge'
+import { LoadingImage } from '@/components/shared/loading-image'
 
 interface MenuGridProductCardProps {
   product: Product
@@ -93,7 +94,7 @@ export function MenuGridProductCard({
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm">
       <button type="button" onClick={onOpenDetail} className="relative aspect-square overflow-hidden text-left">
-        <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+        <LoadingImage src={product.image} alt={product.name} />
         {(discount > 0 || isFeatured) && (
           <div className="absolute left-2 top-2 flex flex-col gap-1">
             {discount > 0 && (

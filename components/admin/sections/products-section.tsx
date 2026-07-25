@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { formatPrice } from '@/lib/coty-theme'
 import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TITLE, PANEL_TOGGLE_ROW, PANEL_BADGE, PANEL_BORDER, PANEL_BTN_GHOST, PANEL_ICON_ACTIVE, PANEL_INPUT, PANEL_MUTED_BADGE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
+import { LoadingImage } from '@/components/shared/loading-image'
 import { useAdminData } from '@/lib/store'
 import type { Product } from '@/lib/types'
 import { ImageUploadField } from '@/components/admin/forms/image-upload-field'
@@ -332,7 +333,11 @@ export function ProductsSection() {
               paginatedProducts.map((product) => (
               <div key={product.id} className={cn(PANEL_LIST_ROW, 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between', !product.available && 'opacity-80')}>
                 <div className="flex min-w-0 items-center gap-3">
-                  <img src={product.image} alt={product.name} className="h-14 w-14 shrink-0 rounded-xl object-cover ring-1 ring-gray-100" />
+                  <LoadingImage
+                    src={product.image}
+                    alt={product.name}
+                    className="h-14 w-14 shrink-0 rounded-xl ring-1 ring-gray-100"
+                  />
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate font-medium">{product.name}</p>

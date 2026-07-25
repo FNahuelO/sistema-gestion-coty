@@ -3,6 +3,7 @@
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { LoadingImage } from '@/components/shared/loading-image'
 
 export const PROMO_FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1436076865539-06670f77990b?w=1600&h=400&fit=crop'
@@ -34,10 +35,11 @@ export function PromotionBanner({
         className
       )}
     >
-      <img
+      <LoadingImage
         src={image || PROMO_FALLBACK_IMAGE}
         alt={title}
-        className="h-full w-full object-cover opacity-60"
+        className="h-full w-full"
+        imgClassName="opacity-60"
       />
       <div
         className={cn(
