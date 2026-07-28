@@ -126,13 +126,24 @@ export async function closeCashSession(sessionId: string, closedByUserId: string
 }
 
 export async function listCashSessions(limit = 30) {
-  // El listado histórico no necesita movimientos; solo la caja abierta los usa en UI.
+  // El listado histórico no necesita movimientos; el detalle los pide on-demand.
   return prisma.cashSession.findMany({
     take: limit,
     orderBy: { openedAt: 'desc' },
     include: {
       openedByUser: { select: { id: true, name: true } },
       closedByUser: { select: { id: true, name: true } },
+    },
+  })
+}
+
+export async function getCashSessionById(sessionId: string) {
+  return prisma.cashSession.findUnique({
+    where: { id: sessionId },
+    include: {
+      openedByUser: { select: { id: true, name: true } },
+      closedByUser: { select: { id: true, name: true } },
+      movements: { orderBy: { createdAt: 'desc' } },
     },
   })
 }
