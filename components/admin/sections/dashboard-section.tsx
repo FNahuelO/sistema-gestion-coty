@@ -21,7 +21,7 @@ import { MetricCard } from '../ui/metric-card'
 import { SalesTypeRow } from '../ui/sales-type-row'
 
 export function DashboardSection() {
-  const admin = useAdminData()
+  const admin = useAdminData({ pollAnalytics: true, loadHistory: true })
   const [historySearch, setHistorySearch] = useState('')
   const [historyPage, setHistoryPage] = useState(0)
   const [rangeFrom, setRangeFrom] = useState(() => arDayKey(new Date(Date.now() - 7 * 86400000)))

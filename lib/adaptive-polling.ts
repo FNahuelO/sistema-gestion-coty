@@ -1,5 +1,5 @@
 /** Intervalo máximo de polling adaptativo (sigue detectando reapertura / nuevos pedidos). */
-export const ADAPTIVE_POLLING_MAX_MS = 120_000
+export const ADAPTIVE_POLLING_MAX_MS = 300_000
 
 const ACTIVE_ORDER_STATUSES = new Set([
   'pending',
@@ -28,9 +28,9 @@ export type AdaptivePollingInput = {
  *
  * - mucho (≥3 activos): intervalo base
  * - poco (1–2): ~2× más lento
- * - vacío + abierto/desconocido: ~3×
- * - vacío + cerrado: ~8×
- * - pestaña oculta: ×2 adicional (tope 2 min)
+ * - vacío + abierto/desconocido: ~4×
+ * - vacío + cerrado: ~12×
+ * - pestaña oculta: ×3 adicional (tope 5 min)
  */
 export function adaptiveRefreshInterval({
   baseMs,
@@ -42,13 +42,13 @@ export function adaptiveRefreshInterval({
 
   let factor = 1
   if (activeCount <= 0) {
-    factor = isOpen === false ? 8 : 3
+    factor = isOpen === false ? 12 : 4
   } else if (activeCount <= 2) {
     factor = 2
   }
 
   if (isDocumentHidden) {
-    factor *= 2
+    factor *= 3
   }
 
   return Math.min(Math.round(baseMs * factor), ADAPTIVE_POLLING_MAX_MS)

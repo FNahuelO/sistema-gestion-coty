@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     await requireSessionRole(['admin'])
     const format = new URL(request.url).searchParams.get('format') === 'csv' ? 'csv' : 'xlsx'
-    const orders = await getOrderHistory()
+    const orders = await getOrderHistory({ take: null })
 
     const orderRows = orders.map((order) => ({
       codigo: order.displayCode ?? order.id,

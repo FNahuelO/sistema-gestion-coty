@@ -946,7 +946,8 @@ export function useTables() {
   }
 }
 
-export function useAdminData(): AdminData {
+export function useAdminData(options: { pollAnalytics?: boolean; loadAnalytics?: boolean; loadHistory?: boolean; loadOrders?: boolean } = {}): AdminData {
+  const { pollAnalytics = false, loadAnalytics = false, loadHistory = false, loadOrders = false } = options
   const { user } = useAuth()
   const roleContext = useMemo<SessionRoleContext>(
     () => ({
@@ -957,46 +958,62 @@ export function useAdminData(): AdminData {
   )
   const can = useCallback((permission: Permission) => hasPermission(roleContext, permission), [roleContext])
 
-  const { data: usersData, mutate: mutateUsers } = useSWR<User[]>(can('staff:manage') ? '/api/admin/users' : null, fetchJson)
-  const { data: productsData, mutate: mutateProducts } = useSWR<Product[]>(can('settings:write') ? '/api/admin/products' : null, fetchJson)
+  const { data: usersData, mutate: mutateUsers } = useSWR<User[]>(can('staff:manage') ? '/api/admin/users' : null, fetchJson, {
+    revalidateOnFocus: false,
+  })
+  const { data: productsData, mutate: mutateProducts } = useSWR<Product[]>(can('settings:write') ? '/api/admin/products' : null, fetchJson, {
+    revalidateOnFocus: false,
+  })
   const { data: catalogData, mutate: mutateCatalog } = useSWR<{ products: Product[] }>(
     can('tables:manage') && !can('settings:write') ? '/api/catalog' : null,
-    fetchJson
+    fetchJson,
+    { revalidateOnFocus: false }
   )
-  const { data: categoriesData, mutate: mutateCategories } = useSWR<Category[]>(can('settings:write') ? '/api/admin/categories' : null, fetchJson)
+  const { data: categoriesData, mutate: mutateCategories } = useSWR<Category[]>(can('settings:write') ? '/api/admin/categories' : null, fetchJson, {
+    revalidateOnFocus: false,
+  })
   const { data: promotionsData, mutate: mutatePromotions } = useSWR<Array<Promotion & { validFrom: string | Date; validTo: string | Date }>>(
     can('settings:write') ? '/api/admin/promotions' : null,
-    fetchJson
+    fetchJson,
+    { revalidateOnFocus: false }
   )
   const { data: settingsData, mutate: mutateSettings } = useSWR<BusinessSettings>(
     can('settings:read') ? '/api/admin/settings' : null,
-    fetchJson
+    fetchJson,
+    { revalidateOnFocus: false }
   )
   const { data: schedulesData, mutate: mutateSchedules } = useSWR<{ schedules: ChannelSchedule[]; channelSettings: ChannelSetting[] }>(
     can('schedules:manage') ? '/api/admin/schedules' : null,
-    fetchJson
+    fetchJson,
+    { revalidateOnFocus: false }
   )
-  const { data: tablesData, mutate: mutateTables } = useSWR<Table[]>(can('tables:manage') ? '/api/tables' : null, fetchJson)
+  const { data: tablesData, mutate: mutateTables } = useSWR<Table[]>(can('tables:manage') ? '/api/tables' : null, fetchJson, {
+    revalidateOnFocus: false,
+  })
+  const shouldLoadOrders = can('staff:operate') && loadOrders
   const { data: ordersData, mutate: mutateOrders } = useSWR<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
-    can('staff:operate') ? '/api/orders' : null,
-    fetchJson
+    shouldLoadOrders ? '/api/orders' : null,
+    fetchJson,
+    { revalidateOnFocus: false }
   )
-  const analyticsRefreshInterval = useAdaptiveRefreshInterval(30000, {
-    enabled: can('analytics:read'),
+  const shouldLoadAnalytics = can('analytics:read') && (pollAnalytics || loadAnalytics)
+  const analyticsRefreshInterval = useAdaptiveRefreshInterval(60000, {
+    enabled: shouldLoadAnalytics && pollAnalytics,
     isOpen: settingsData == null ? null : settingsData.isOpen,
     activeCount: countActiveOrders(ordersData) + countBusyTables(tablesData),
   })
   const { data: analyticsData, mutate: mutateAnalytics } = useSWR<AnalyticsOverview>(
-    can('analytics:read') ? '/api/admin/analytics' : null,
+    shouldLoadAnalytics ? '/api/admin/analytics' : null,
     fetchJson,
     {
       refreshInterval: analyticsRefreshInterval,
-      revalidateOnFocus: true,
+      revalidateOnFocus: pollAnalytics,
     }
   )
   const { data: historyData, mutate: mutateHistory } = useSWR<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
-    can('analytics:read') ? '/api/admin/orders/history' : null,
-    fetchJson
+    can('analytics:read') && loadHistory ? '/api/admin/orders/history' : null,
+    fetchJson,
+    { revalidateOnFocus: false }
   )
 
   const refreshAll = useCallback(async () => {

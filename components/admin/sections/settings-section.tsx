@@ -23,7 +23,7 @@ import { HistoryOrderRow } from '../ui/history-order-row'
 import { MetricCard } from '../ui/metric-card'
 
 export function SettingsSection() {
-  const admin = useAdminData()
+  const admin = useAdminData({ loadAnalytics: true, loadOrders: true })
   const { user } = useAuth()
   const roleContext: SessionRoleContext = useMemo(
     () => ({
