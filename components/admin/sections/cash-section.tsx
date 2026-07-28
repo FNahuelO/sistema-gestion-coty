@@ -77,7 +77,7 @@ function movementLabel(type: string) {
   return MOVEMENT_TYPE_LABELS[type] ?? type
 }
 
-export function CashSection() {
+export function CashSection({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth()
   const roleContext = useMemo<SessionRoleContext>(
     () => ({
@@ -287,47 +287,51 @@ export function CashSection() {
     )
   }
 
+  const headerActions = !openSession ? (
+    canOpenClose ? (
+      <Button
+        size="default"
+        className={cn('h-11 w-full sm:h-9 sm:w-auto', PANEL_PRIMARY_BTN)}
+        onClick={() => openForm('open')}
+      >
+        Abrir caja
+      </Button>
+    ) : null
+  ) : (
+    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+      {canRegisterMovement ? (
+        <Button
+          size="default"
+          variant="outline"
+          className={cn('h-11 w-full sm:h-9 sm:w-auto', PANEL_OUTLINE_BTN)}
+          onClick={() => openForm('movement')}
+        >
+          Movimiento
+        </Button>
+      ) : null}
+      {canOpenClose ? (
+        <Button
+          size="default"
+          className={cn('h-11 w-full sm:h-9 sm:w-auto', PANEL_PRIMARY_BTN)}
+          onClick={() => openForm('close')}
+        >
+          Cerrar caja
+        </Button>
+      ) : null}
+    </div>
+  )
+
   return (
-    <div className="mx-auto max-w-3xl space-y-6 lg:max-w-5xl">
-      <AdminPageHeader
-        title="Caja"
-        description="Apertura, movimientos y cierre de turno"
-        action={
-          !openSession ? (
-            canOpenClose ? (
-              <Button
-                size="default"
-                className={cn('h-11 w-full sm:h-9 sm:w-auto', PANEL_PRIMARY_BTN)}
-                onClick={() => openForm('open')}
-              >
-                Abrir caja
-              </Button>
-            ) : null
-          ) : (
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-              {canRegisterMovement ? (
-                <Button
-                  size="default"
-                  variant="outline"
-                  className={cn('h-11 w-full sm:h-9 sm:w-auto', PANEL_OUTLINE_BTN)}
-                  onClick={() => openForm('movement')}
-                >
-                  Movimiento
-                </Button>
-              ) : null}
-              {canOpenClose ? (
-                <Button
-                  size="default"
-                  className={cn('h-11 w-full sm:h-9 sm:w-auto', PANEL_PRIMARY_BTN)}
-                  onClick={() => openForm('close')}
-                >
-                  Cerrar caja
-                </Button>
-              ) : null}
-            </div>
-          )
-        }
-      />
+    <div className={cn(embedded ? 'space-y-4' : 'mx-auto max-w-3xl space-y-6 lg:max-w-5xl')}>
+      {embedded ? (
+        headerActions ? <div className="w-full shrink-0 sm:w-auto">{headerActions}</div> : null
+      ) : (
+        <AdminPageHeader
+          title="Caja"
+          description="Apertura, movimientos y cierre de turno"
+          action={headerActions}
+        />
+      )}
 
       <div className="space-y-4">
         <AdminFormPanel panelId="cash" title={FORM_TITLES[formMode]} open={open} onOpenChange={setOpen}>
