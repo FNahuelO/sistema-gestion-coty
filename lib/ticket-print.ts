@@ -28,7 +28,9 @@ const TICKET_PAYMENT_LABELS: Record<Order['paymentMethod'], string> = {
 
 const TICKET_STYLES = `
   @page {
-    size: 58mm 297mm portrait;
+    /* El ancho menor que el alto ya define orientación vertical.
+       Agregar "portrait" a un tamaño personalizado invalida toda la regla. */
+    size: 58mm 297mm;
     margin: 0;
   }
 
@@ -86,7 +88,7 @@ const TICKET_STYLES = `
 
   @media print {
     @page {
-      size: 58mm 297mm portrait;
+      size: 58mm 297mm;
       margin: 0;
     }
 
