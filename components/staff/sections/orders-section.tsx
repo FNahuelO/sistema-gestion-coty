@@ -340,9 +340,6 @@ export function OrdersSection({
               {' · '}
               {dailyControl.pickup} retiro{dailyControl.pickup === 1 ? '' : 's'})
             </span>
-            <span className="w-full text-xs text-muted-foreground sm:w-auto sm:ml-auto">
-              Un solo correlativo para todos los canales
-            </span>
           </div>
         ) : null}
 
