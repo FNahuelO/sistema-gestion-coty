@@ -15,6 +15,7 @@ import {
   Package,
   ArrowUpDown,
   Plus,
+  MessageCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -30,7 +31,7 @@ import { ManualOrderDialog } from '@/components/staff/manual-order-dialog'
 import { StaffNotificationsButton } from '@/components/staff/staff-notifications-button'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
-import { formatOrderStatus, isDisplayableCustomerPhone } from '@/lib/order-labels'
+import { formatOrderStatus, formatOrderNumber, getDailyOrderControlSummary, getOrderChannelLabel, ORDER_TYPE_BADGE_CLASS, ORDER_TYPE_CARD_ACCENT, isDisplayableCustomerPhone } from '@/lib/order-labels'
 import { canApproveTransferPayment } from '@/lib/payment-flow'
 import { ORDER_SORT_OPTIONS, sortOrders, type OrderSortKey } from '@/lib/order-sort'
 import type { DeliveryQueueEntry, Order, OrderStatus, OrderType } from '@/lib/types'
@@ -43,6 +44,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { formatDeliveryAssignmentStatus } from '@/lib/delivery-labels'
 import { cn } from '@/lib/utils'
 import { printOrderTickets } from '@/lib/ticket-print'
+import { buildWhatsAppChatUrl } from '@/lib/whatsapp-message'
 
 const fetchJson = async (url: string) => {
   const res = await fetch(url, { credentials: 'include' })
@@ -54,12 +56,6 @@ const orderTypeIcons: Record<OrderType, ElementType> = {
   delivery: Truck,
   pickup: Store,
   table: Users,
-}
-
-const ORDER_TYPE_ACCENT: Record<OrderType, string> = {
-  delivery: 'border-l-[#E8A598]',
-  pickup: 'border-l-[#7EB8B3]',
-  table: 'border-l-[#2D5A57]',
 }
 
 const statusActions: Record<OrderStatus, { next: OrderStatus; label: string } | null> = {
@@ -106,7 +102,7 @@ export function OrdersSection({
   embedded?: boolean
   onNavigateToCalls?: () => void
 }) {
-  const { orders, createManualOrder, updateOrderStatus, updateOrderEstimate, closeOrder, approveOrderPayment } =
+  const { orders, createManualOrder, updateOrderStatus, updateOrderEstimate, updateOrderPriority, updateOrderItems, updateOrderPayment, closeOrder, approveOrderPayment } =
     useOrders()
   const { settings, isLoading: settingsLoading } = useBusiness()
   const businessName = settings?.name ?? 'Coty Café'
@@ -128,9 +124,11 @@ export function OrdersSection({
   const [selectedTab, setSelectedTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('active')
-  const [sortBy, setSortBy] = useState<OrderSortKey>('status')
+  const [sortBy, setSortBy] = useState<OrderSortKey>('number')
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [manualOrderOpen, setManualOrderOpen] = useState(false)
+
+  const dailyControl = useMemo(() => getDailyOrderControlSummary(orders), [orders])
 
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -143,9 +141,12 @@ export function OrdersSection({
       }
 
       if (searchQuery) {
-        const query = searchQuery.toLowerCase()
+        const query = searchQuery.toLowerCase().replace(/^#/, '')
+        const daily = order.dailyNumber != null ? String(order.dailyNumber) : ''
         return (
           order.id.toLowerCase().includes(query) ||
+          order.displayCode?.toLowerCase().includes(query) ||
+          daily.includes(query) ||
           order.customerName.toLowerCase().includes(query) ||
           order.customerPhone?.toLowerCase().includes(query)
         )
@@ -219,6 +220,62 @@ export function OrdersSection({
     })
   }
 
+  const handleUpdatePriority = async (orderId: string, priority: boolean) => {
+    await run(`priority:${orderId}`, async () => {
+      try {
+        const updated = await updateOrderPriority(orderId, priority)
+        setSelectedOrder((current) => (current && current.id === orderId ? updated : current))
+        toast.success(priority ? 'Pedido marcado como prioridad' : 'Prioridad quitada')
+        window.dispatchEvent(new Event('coty-refresh-orders'))
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'No se pudo actualizar la prioridad')
+        throw error
+      }
+    })
+  }
+
+  const handleUpdateItems = async (
+    orderId: string,
+    payload: {
+      add?: Array<{
+        productId: string
+        quantity: number
+        selectedOptions: import('@/lib/types').SelectedOption[]
+        notes?: string
+      }>
+      updates?: Array<{ orderItemId: string; quantity: number }>
+      remove?: string[]
+    }
+  ) => {
+    const updated = await run(`items:${orderId}`, async () => {
+      const next = await updateOrderItems(orderId, payload)
+      setSelectedOrder((current) => (current && current.id === orderId ? next : current))
+      return next
+    })
+    if (!updated) {
+      throw new Error('Hay otra acción en curso')
+    }
+    return updated
+  }
+
+  const handleUpdatePayment = async (
+    orderId: string,
+    payload: {
+      paymentMethod: import('@/lib/types').PaymentMethod
+      paymentSplits?: Array<{ method: Exclude<import('@/lib/types').PaymentMethod, 'combined'>; amount: number }>
+    }
+  ) => {
+    const updated = await run(`payment:${orderId}`, async () => {
+      const next = await updateOrderPayment(orderId, payload)
+      setSelectedOrder((current) => (current && current.id === orderId ? next : current))
+      return next
+    })
+    if (!updated) {
+      throw new Error('Hay otra acción en curso')
+    }
+    return updated
+  }
+
   const handleApprovePayment = async (orderId: string, estimatedMinutes?: number) => {
     await run(`approve:${orderId}`, async () => {
       try {
@@ -269,12 +326,32 @@ export function OrdersSection({
           <StatCard label="Activos" value={orderStats.total} icon={Package} iconColor={COTY_TEAL} />
         </div>
 
+        {dailyControl.total > 0 ? (
+          <div className={cn(PANEL_CARD, 'flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm')}>
+            <span className="font-semibold text-[#2D5A57]">
+              Hoy {dailyControl.lastNumber > 0 ? `#1–#${dailyControl.lastNumber}` : 'sin número'}
+            </span>
+            <span className="text-muted-foreground">·</span>
+            <span className="font-medium tabular-nums">{dailyControl.total} pedidos</span>
+            <span className="text-muted-foreground">
+              ({dailyControl.table} mesa{dailyControl.table === 1 ? '' : 's'}
+              {' · '}
+              {dailyControl.delivery} envío{dailyControl.delivery === 1 ? '' : 's'}
+              {' · '}
+              {dailyControl.pickup} retiro{dailyControl.pickup === 1 ? '' : 's'})
+            </span>
+            <span className="w-full text-xs text-muted-foreground sm:w-auto sm:ml-auto">
+              Un solo correlativo para todos los canales
+            </span>
+          </div>
+        ) : null}
+
         <div className={cn(PANEL_CARD, 'p-4')}>
           <div className="flex flex-col gap-3 md:flex-row md:items-center">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Buscar por ID, cliente o teléfono..."
+                placeholder="Buscar por #, código, cliente o teléfono..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="border-gray-200 bg-[#F8FBFA] pl-9 dark:border-border dark:bg-muted"
@@ -349,7 +426,7 @@ export function OrdersSection({
               className="min-h-11 shrink-0 gap-1.5 px-3 data-[state=active]:bg-white data-[state=active]:text-[#2D5A57] data-[state=active]:shadow-sm dark:data-[state=active]:bg-card"
             >
               <Store className="h-4 w-4" />
-              Recoger
+              Retiro en local
             </TabsTrigger>
             <TabsTrigger
               value="table"
@@ -406,7 +483,7 @@ export function OrdersSection({
                           className={cn(
                             PANEL_LIST_ROW,
                             'w-full cursor-pointer border-l-4 text-left transition-colors hover:bg-[#F8FBFA] dark:hover:bg-muted',
-                            ORDER_TYPE_ACCENT[order.type],
+                            ORDER_TYPE_CARD_ACCENT[order.type],
                             order.status === 'pending' && 'bg-[#FFFBEB]/80 dark:bg-amber-950/30'
                           )}
                         >
@@ -419,9 +496,27 @@ export function OrdersSection({
                                 <TypeIcon className="h-4 w-4" style={{ color: COTY_TEAL }} />
                               </div>
                               <div className="min-w-0">
-                                <p className="font-semibold text-foreground">
-                                  {order.displayCode ?? `#${order.id}`}
+                                <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                                  <span
+                                    className={cn(
+                                      'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                                      ORDER_TYPE_BADGE_CLASS[order.type]
+                                    )}
+                                  >
+                                    {getOrderChannelLabel(order)}
+                                  </span>
+                                  {order.priority ? (
+                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
+                                      Prioridad
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <p className="text-lg font-bold tracking-tight text-foreground">
+                                  {formatOrderNumber(order)}
                                 </p>
+                                {order.displayCode && order.dailyNumber != null ? (
+                                  <p className="text-[11px] text-muted-foreground/80">{order.displayCode}</p>
+                                ) : null}
                                 <p className="text-xs text-muted-foreground">
                                   {formatDistanceToNow(order.createdAt, { addSuffix: true, locale: es })}
                                 </p>
@@ -459,7 +554,18 @@ export function OrdersSection({
                           <div className="mt-3 space-y-1 pl-12 text-sm">
                             <p className="font-medium dark:text-white">{order.customerName}</p>
                             {isDisplayableCustomerPhone(order.customerPhone) && (
-                              <p className="text-muted-foreground">{order.customerPhone}</p>
+                              <a
+                                href={buildWhatsAppChatUrl(order.customerPhone)}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label={`Abrir WhatsApp con ${order.customerName}`}
+                                className="flex w-fit items-center gap-1.5 font-medium text-[#128C7E] hover:underline"
+                                onClick={(event) => event.stopPropagation()}
+                                onKeyDown={(event) => event.stopPropagation()}
+                              >
+                                <MessageCircle className="h-3.5 w-3.5 shrink-0" />
+                                {order.customerPhone}
+                              </a>
                             )}
                             <div className="text-xs text-muted-foreground">
                               {order.items.slice(0, 2).map((item) => (
@@ -533,6 +639,9 @@ export function OrdersSection({
         onAdvanceStatus={handleStatusChange}
         onApprovePayment={handleApprovePayment}
         onUpdateEstimate={handleUpdateEstimate}
+        onUpdatePriority={handleUpdatePriority}
+        onUpdateItems={handleUpdateItems}
+        onUpdatePayment={handleUpdatePayment}
         onPrintKitchen={(order) => printOrderTickets({ order, businessName }, ['kitchen'])}
         onPrintCustomer={(order) => printOrderTickets({ order, businessName }, ['customer'])}
         onPrintBoth={(order) => printTicketsForOrder(order)}

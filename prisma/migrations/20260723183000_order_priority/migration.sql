@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "priority" BOOLEAN NOT NULL DEFAULT false;

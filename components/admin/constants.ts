@@ -42,7 +42,7 @@ export const DEFAULT_FORM_PANELS: Record<FormSection, boolean> = {
 
 export const ORDER_TYPE_META: Record<OrderType, { label: string; accent: string; icon: ElementType }> = {
   delivery: { label: 'Delivery', accent: 'border-l-[#E8A598]', icon: Truck },
-  pickup: { label: 'Retiro', accent: 'border-l-[#7EB8B3]', icon: Store },
+  pickup: { label: 'Retiro en local', accent: 'border-l-[#7EB8B3]', icon: Store },
   table: { label: 'Mesa', accent: 'border-l-[#7EB8B3]', icon: Users },
 }
 

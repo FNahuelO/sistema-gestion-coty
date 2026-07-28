@@ -187,6 +187,10 @@ test.describe('Flujo delivery E2E', () => {
     await loginWithEmail(page, 'admin@cotycafe.com')
     await page.getByRole('button', { name: 'Cadetes' }).click()
     await expect(page.getByText(order.displayCode ?? order.id)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('link', { name: 'Abrir WhatsApp con Cliente UI Cadete' })).toHaveAttribute(
+      'href',
+      'https://wa.me/5491199887766'
+    )
     await page.getByRole('combobox').first().click()
     await page.getByRole('option').first().click()
     await expect(page.getByText('Cadete asignado')).toBeVisible({ timeout: 10_000 })

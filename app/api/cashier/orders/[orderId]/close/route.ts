@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { resolveCommonRouteError } from '@/lib/api-route-errors'
 import { prisma } from '@/lib/prisma'
 import { closeTableAndOrders, orderDetailInclude, requireSessionRole, serializeOrder } from '@/lib/server-data'
 
@@ -51,13 +52,8 @@ export async function POST(_request: NextRequest, context: { params: Promise<{ o
 
     return NextResponse.json(serializeOrder(updated))
   } catch (error) {
-    if (error instanceof Error && error.message === 'UNAUTHORIZED') {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
-
-    if (error instanceof Error && error.message === 'FORBIDDEN') {
-      return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
-    }
+    const common = resolveCommonRouteError(error)
+    if (common) return common
 
     console.error('POST /api/cashier/orders/[orderId]/close', error)
     return NextResponse.json({ error: 'No se pudo cerrar el pedido' }, { status: 500 })

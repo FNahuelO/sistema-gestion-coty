@@ -8,30 +8,43 @@ import {
   Clock,
   MapPin,
   Phone,
+  Plus,
   Store,
   Truck,
   Users,
   XCircle,
   Printer,
   MessageCircle,
+  Minus,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Spinner } from '@/components/ui/spinner'
 import { StatusBadge } from '@/components/shared/status-badge'
+import { AddOrderItemsDialog } from '@/components/staff/add-order-items-dialog'
 import { COTY_HEADER, COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
 import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
-import type { Order, OrderStatus, OrderType } from '@/lib/types'
+import type { Order, OrderStatus, OrderType, PaymentMethod, SelectedOption } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS, getPaymentStatusLabel, isDisplayableCustomerPhone } from '@/lib/order-labels'
+import { ORDER_TYPE_LABELS, PAYMENT_METHOD_LABELS, formatOrderNumber, getPaymentStatusLabel, isDisplayableCustomerPhone } from '@/lib/order-labels'
 import { getOrderEstimatedMinutes } from '@/lib/order-estimate'
 import { useOrderCountdown } from '@/hooks/use-order-countdown'
 import { canApproveTransferPayment } from '@/lib/payment-flow'
+import {
+  buildPaymentSplitsFromAmounts,
+  PaymentSplitsEditor,
+} from '@/components/shared/payment-splits-editor'
+import { sumSplitAmounts } from '@/lib/payment-splits'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
 import { DeliveryAssignmentPanel } from '@/components/staff/delivery-assignment-panel'
+import { toast } from 'sonner'
+import { buildWhatsAppChatUrl } from '@/lib/whatsapp-message'
 
 const ORDER_TYPE_META: Record<
   OrderType,
@@ -64,15 +77,24 @@ function EstimateCountdownHint({ order }: { order: Order }) {
 
 function getItemOptionsLabel(order: Order, itemId: string) {
   const item = order.items.find((entry) => entry.id === itemId)
-  if (!item?.selectedOptions?.length) return null
+  if (!item) return null
+
+  if (item.selectionLines?.length) {
+    return item.selectionLines.map((line) => line.choiceName).filter(Boolean).join(' · ')
+  }
+
+  if (!item.selectedOptions?.length) return null
 
   return item.selectedOptions
     .map((opt) => {
       const productOpt = item.product.options?.find((candidate) => candidate.id === opt.optionId)
-      return opt.choiceIds
-        .map((choiceId) => productOpt?.choices.find((choice) => choice.id === choiceId)?.name)
-        .filter(Boolean)
-        .join(', ')
+      if (productOpt) {
+        return opt.choiceIds
+          .map((choiceId) => productOpt.choices.find((choice) => choice.id === choiceId)?.name)
+          .filter(Boolean)
+          .join(', ')
+      }
+      return opt.choiceIds.join(', ')
     })
     .filter(Boolean)
     .join(' · ')
@@ -86,6 +108,27 @@ type OrderDetailSheetProps = {
   onAdvanceStatus: (orderId: string, status: OrderStatus, estimatedMinutes?: number) => Promise<void>
   onApprovePayment?: (orderId: string, estimatedMinutes?: number) => Promise<void>
   onUpdateEstimate?: (orderId: string, estimatedMinutes: number) => Promise<void>
+  onUpdatePriority?: (orderId: string, priority: boolean) => Promise<void>
+  onUpdateItems?: (
+    orderId: string,
+    payload: {
+      add?: Array<{
+        productId: string
+        quantity: number
+        selectedOptions: SelectedOption[]
+        notes?: string
+      }>
+      updates?: Array<{ orderItemId: string; quantity: number }>
+      remove?: string[]
+    }
+  ) => Promise<Order>
+  onUpdatePayment?: (
+    orderId: string,
+    payload: {
+      paymentMethod: PaymentMethod
+      paymentSplits?: Array<{ method: Exclude<PaymentMethod, 'combined'>; amount: number }>
+    }
+  ) => Promise<Order>
   onPrintKitchen?: (order: Order) => void
   onPrintCustomer?: (order: Order) => void
   onPrintBoth?: (order: Order) => void
@@ -95,6 +138,14 @@ type OrderDetailSheetProps = {
   isPending: (key: string) => boolean
   isBusy: boolean
 }
+
+const EDIT_PAYMENT_METHODS: PaymentMethod[] = ['cash', 'card', 'transfer', 'mercado_pago', 'combined']
+const EDIT_SPLIT_METHODS: Array<Exclude<PaymentMethod, 'combined'>> = [
+  'cash',
+  'card',
+  'transfer',
+  'mercado_pago',
+]
 
 export function OrderDetailSheet({
   order,
@@ -110,10 +161,19 @@ export function OrderDetailSheet({
   onArchive,
   onDeliveryUpdated,
   onUpdateEstimate,
+  onUpdatePriority,
+  onUpdateItems,
+  onUpdatePayment,
   isPending,
   isBusy,
 }: OrderDetailSheetProps) {
   const [estimatedInput, setEstimatedInput] = useState('')
+  const [addItemsOpen, setAddItemsOpen] = useState(false)
+  const [editingPayment, setEditingPayment] = useState(false)
+  const [editPaymentMethod, setEditPaymentMethod] = useState<PaymentMethod>('cash')
+  const [editSplitAmounts, setEditSplitAmounts] = useState<
+    Partial<Record<Exclude<PaymentMethod, 'combined'>, string>>
+  >({})
 
   useEffect(() => {
     if (!order || ['completed', 'cancelled'].includes(order.status)) return
@@ -122,11 +182,27 @@ export function OrderDetailSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order?.id])
 
+  useEffect(() => {
+    if (!order) return
+    setEditingPayment(false)
+    setEditPaymentMethod(order.paymentMethod)
+    const nextAmounts: Partial<Record<Exclude<PaymentMethod, 'combined'>, string>> = {}
+    for (const split of order.paymentSplits ?? []) {
+      nextAmounts[split.method] = String(split.amount)
+    }
+    setEditSplitAmounts(nextAmounts)
+    // Solo al cambiar de pedido: evita resetear mientras se edita.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.id])
+
   if (!order) return null
 
   const typeMeta = ORDER_TYPE_META[order.type]
   const TypeIcon = typeMeta.icon
   const isFinished = ['completed', 'cancelled'].includes(order.status)
+  const canEditItems =
+    !['completed', 'cancelled', 'delivered'].includes(order.status) && !!onUpdateItems
+  const itemsPending = isPending(`items:${order.id}`)
   const awaitingTransferProof = canApproveTransferPayment(order)
   const effectiveStatusAction = awaitingTransferProof ? null : statusAction
   // El tiempo estimado se ingresa al confirmar/aprobar y luego se puede reajustar
@@ -140,12 +216,14 @@ export function OrderDetailSheet({
   const estimateInvalid = showEstimateInput && estimateValue === undefined
   const estimateUnchanged = estimateValue !== undefined && estimateValue === order.estimatedMinutes
   const estimatePending = isPending(`estimate:${order.id}`)
+  const priorityPending = isPending(`priority:${order.id}`)
   const statusPending = isPending(`status:${order.id}`)
   const approvePending = isPending(`approve:${order.id}`)
   const cancelPending = isPending(`cancel:${order.id}`)
   const archivePending = isPending(`archive:${order.id}`)
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         className={cn(
@@ -156,8 +234,11 @@ export function OrderDetailSheet({
         <div className="shrink-0 px-5 pb-5 pt-6 text-white" style={{ backgroundColor: COTY_HEADER }}>
           <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">Detalle del pedido</p>
           <h2 className="mt-1 font-serif text-2xl font-bold leading-tight">
-            {order.displayCode ?? `#${order.id}`}
+            {formatOrderNumber(order)}
           </h2>
+          {order.displayCode && order.dailyNumber != null ? (
+            <p className="mt-0.5 text-xs text-white/65">{order.displayCode}</p>
+          ) : null}
           <p className="mt-1 text-xs text-white/75">
             {formatDistanceToNow(order.createdAt, { addSuffix: true, locale: es })}
             {' · '}
@@ -168,9 +249,15 @@ export function OrderDetailSheet({
             <StatusBadge status={order.status} variant="onDark" />
             <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-xs font-semibold text-white">
               <TypeIcon className="h-3.5 w-3.5" />
-              {typeMeta.label}
-              {order.tableNumber ? ` · Mesa ${order.tableNumber}` : null}
+              {order.type === 'table' && order.tableNumber
+                ? `Mesa ${order.tableNumber}`
+                : typeMeta.label}
             </span>
+            {order.priority ? (
+              <span className="rounded-full bg-amber-300/90 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-950">
+                Prioridad
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -185,19 +272,18 @@ export function OrderDetailSheet({
               <div className="space-y-2 px-4 py-3">
                 <p className="font-semibold text-foreground">{order.customerName}</p>
                 {isDisplayableCustomerPhone(order.customerPhone) ? (
-                  <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <a
+                    href={buildWhatsAppChatUrl(order.customerPhone)}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Abrir WhatsApp con ${order.customerName}`}
+                    className="flex w-fit items-center gap-2 text-sm font-medium text-[#128C7E] hover:underline"
+                  >
                     <Phone className="h-3.5 w-3.5 shrink-0 text-[#7EB8B3]" />
                     <span>{order.customerPhone}</span>
-                    <a
-                      href={`https://wa.me/${order.customerPhone.replace(/\D/g, '')}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-[#25D366]"
-                    >
-                      <MessageCircle className="h-3.5 w-3.5" />
-                      WhatsApp
-                    </a>
-                  </p>
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    <span className="text-xs font-semibold">Abrir chat</span>
+                  </a>
                 ) : null}
                 {order.customerAddress ? (
                   <p className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -212,14 +298,58 @@ export function OrderDetailSheet({
               <DeliveryAssignmentPanel order={order} onUpdated={onDeliveryUpdated} />
             ) : null}
 
+            {!isFinished && onUpdatePriority ? (
+              <section className={cn(PANEL_CARD, 'p-4')}>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
+                  Cocina
+                </h3>
+                <label
+                  htmlFor={`priority-${order.id}`}
+                  className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#D6E8E6] bg-[#F8FBFA] p-3 dark:border-border dark:bg-muted"
+                >
+                  <Checkbox
+                    id={`priority-${order.id}`}
+                    checked={Boolean(order.priority)}
+                    disabled={isBusy || priorityPending}
+                    onCheckedChange={(checked) => {
+                      void onUpdatePriority(order.id, checked === true)
+                    }}
+                    className="mt-0.5 border-[#2D5A57] data-[state=checked]:border-[#2D5A57] data-[state=checked]:bg-[#2D5A57]"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-foreground">Prioridad</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Marcá el pedido para destacarlo en cocina y subirlo en el orden.
+                    </span>
+                  </span>
+                </label>
+              </section>
+            ) : null}
+
             <section>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
-                Productos ({order.items.length})
-              </h3>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
+                  Productos ({order.items.length})
+                </h3>
+                {canEditItems ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className={cn(PANEL_OUTLINE_BTN, 'h-8 gap-1 px-2.5 text-xs')}
+                    disabled={isBusy || itemsPending}
+                    onClick={() => setAddItemsOpen(true)}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Agregar
+                  </Button>
+                ) : null}
+              </div>
               <div className="space-y-2">
                 {order.items.map((item) => {
                   const optionsLabel = getItemOptionsLabel(order, item.id)
-                  const lineTotal = item.product.price * item.quantity
+                  const unitPrice = item.unitPrice ?? item.product.price
+                  const lineTotal = unitPrice * item.quantity
 
                   return (
                     <div
@@ -243,13 +373,91 @@ export function OrderDetailSheet({
                             </span>
                           </div>
                           <p className="mt-0.5 text-sm text-muted-foreground">
-                            {item.quantity} × {formatPrice(item.product.price)}
+                            {item.quantity} × {formatPrice(unitPrice)}
                           </p>
                           {optionsLabel ? (
                             <p className="mt-1 text-xs text-[#2D5A57]/80">{optionsLabel}</p>
                           ) : null}
                           {item.notes ? (
                             <p className="mt-1 text-xs italic text-muted-foreground">{item.notes}</p>
+                          ) : null}
+                          {canEditItems ? (
+                            <div className="mt-2 flex items-center gap-2">
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="outline"
+                                className="h-7 w-7"
+                                disabled={isBusy || itemsPending || item.quantity <= 1}
+                                onClick={() => {
+                                  void (async () => {
+                                    try {
+                                      await onUpdateItems?.(order.id, {
+                                        updates: [{ orderItemId: item.id, quantity: item.quantity - 1 }],
+                                      })
+                                    } catch (error) {
+                                      toast.error(
+                                        error instanceof Error
+                                          ? error.message
+                                          : 'No se pudo actualizar la cantidad'
+                                      )
+                                    }
+                                  })()
+                                }}
+                              >
+                                <Minus className="h-3.5 w-3.5" />
+                              </Button>
+                              <span className="min-w-6 text-center text-sm font-semibold tabular-nums">
+                                {item.quantity}
+                              </span>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="outline"
+                                className="h-7 w-7"
+                                disabled={isBusy || itemsPending}
+                                onClick={() => {
+                                  void (async () => {
+                                    try {
+                                      await onUpdateItems?.(order.id, {
+                                        updates: [{ orderItemId: item.id, quantity: item.quantity + 1 }],
+                                      })
+                                    } catch (error) {
+                                      toast.error(
+                                        error instanceof Error
+                                          ? error.message
+                                          : 'No se pudo actualizar la cantidad'
+                                      )
+                                    }
+                                  })()
+                                }}
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="ml-auto h-7 px-2 text-xs text-destructive"
+                                disabled={isBusy || itemsPending || order.items.length <= 1}
+                                onClick={() => {
+                                  void (async () => {
+                                    try {
+                                      await onUpdateItems?.(order.id, { remove: [item.id] })
+                                      toast.success('Producto quitado')
+                                    } catch (error) {
+                                      toast.error(
+                                        error instanceof Error
+                                          ? error.message
+                                          : 'No se pudo quitar el producto'
+                                      )
+                                    }
+                                  })()
+                                }}
+                              >
+                                Quitar
+                              </Button>
+                            </div>
                           ) : null}
                         </div>
                       </div>
@@ -269,31 +477,128 @@ export function OrderDetailSheet({
             ) : null}
 
             <section className={cn(PANEL_CARD, 'p-4')}>
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
-                Pago
-              </h3>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Método</span>
-                <span className="font-medium">{PAYMENT_METHOD_LABELS[order.paymentMethod]}</span>
-              </div>
-              {order.paymentStatus ? (
-                <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Estado del pago</span>
-                  <span
-                    className={cn(
-                      'font-medium',
-                      awaitingTransferProof && 'text-amber-700'
-                    )}
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
+                  Pago
+                </h3>
+                {onUpdatePayment && !isFinished ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    disabled={isBusy || isPending(`payment:${order.id}`)}
+                    onClick={() => setEditingPayment((value) => !value)}
                   >
-                    {getPaymentStatusLabel(order)}
-                  </span>
+                    {editingPayment ? 'Cancelar' : 'Editar'}
+                  </Button>
+                ) : null}
+              </div>
+              {editingPayment && onUpdatePayment ? (
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Método</Label>
+                    <Select
+                      value={editPaymentMethod}
+                      onValueChange={(value) => {
+                        const method = value as PaymentMethod
+                        setEditPaymentMethod(method)
+                        if (method !== 'combined') setEditSplitAmounts({})
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EDIT_PAYMENT_METHODS.map((method) => (
+                          <SelectItem key={method} value={method}>
+                            {PAYMENT_METHOD_LABELS[method]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {editPaymentMethod === 'combined' ? (
+                    <PaymentSplitsEditor
+                      total={order.total}
+                      methods={EDIT_SPLIT_METHODS}
+                      amounts={editSplitAmounts}
+                      onChange={(method, value) =>
+                        setEditSplitAmounts((current) => ({ ...current, [method]: value }))
+                      }
+                    />
+                  ) : null}
+                  <Button
+                    type="button"
+                    className={PANEL_PRIMARY_BTN}
+                    disabled={isBusy || isPending(`payment:${order.id}`)}
+                    onClick={async () => {
+                      const paymentSplits =
+                        editPaymentMethod === 'combined'
+                          ? buildPaymentSplitsFromAmounts(editSplitAmounts)
+                          : undefined
+                      if (editPaymentMethod === 'combined') {
+                        if (!paymentSplits || paymentSplits.length < 2) {
+                          toast.error('En pago combinado usá al menos dos medios con monto')
+                          return
+                        }
+                        if (Math.abs(sumSplitAmounts(paymentSplits) - order.total) > 0.02) {
+                          toast.error('La suma de los montos debe coincidir con el total')
+                          return
+                        }
+                      }
+                      try {
+                        await onUpdatePayment(order.id, {
+                          paymentMethod: editPaymentMethod,
+                          paymentSplits,
+                        })
+                        setEditingPayment(false)
+                        toast.success('Pago actualizado')
+                      } catch (error) {
+                        toast.error(error instanceof Error ? error.message : 'No se pudo actualizar el pago')
+                      }
+                    }}
+                  >
+                    {isPending(`payment:${order.id}`) ? <Spinner className="mr-2" /> : null}
+                    Guardar pago
+                  </Button>
                 </div>
-              ) : null}
-              {awaitingTransferProof ? (
-                <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  Revisá el comprobante en WhatsApp y aprobá el pago para confirmar el pedido.
-                </p>
-              ) : null}
+              ) : (
+                <>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Método</span>
+                    <span className="font-medium">{PAYMENT_METHOD_LABELS[order.paymentMethod]}</span>
+                  </div>
+                  {order.paymentMethod === 'combined' && order.paymentSplits?.length ? (
+                    <ul className="mt-2 space-y-1 border-t border-dashed border-gray-200 pt-2 text-sm">
+                      {order.paymentSplits.map((split) => (
+                        <li key={`${split.method}-${split.amount}`} className="flex items-center justify-between">
+                          <span className="text-muted-foreground">{PAYMENT_METHOD_LABELS[split.method]}</span>
+                          <span className="font-medium tabular-nums">{formatPrice(split.amount)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {order.paymentStatus ? (
+                    <div className="mt-2 flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Estado del pago</span>
+                      <span
+                        className={cn(
+                          'font-medium',
+                          awaitingTransferProof && 'text-amber-700'
+                        )}
+                      >
+                        {getPaymentStatusLabel(order)}
+                      </span>
+                    </div>
+                  ) : null}
+                  {awaitingTransferProof ? (
+                    <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                      Revisá el comprobante en WhatsApp y aprobá el pago para confirmar el pedido.
+                    </p>
+                  ) : null}
+                </>
+              )}
             </section>
           </div>
         </ScrollArea>
@@ -508,5 +813,17 @@ export function OrderDetailSheet({
         </div>
       </SheetContent>
     </Sheet>
+
+    {canEditItems ? (
+      <AddOrderItemsDialog
+        open={addItemsOpen}
+        onOpenChange={setAddItemsOpen}
+        orderLabel={order.displayCode}
+        onSubmit={async (items) => {
+          await onUpdateItems?.(order.id, { add: items })
+        }}
+      />
+    ) : null}
+    </>
   )
 }

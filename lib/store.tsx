@@ -662,6 +662,21 @@ export function useOrders() {
     [mutate]
   )
 
+  const updateOrderPriority = useCallback(
+    async (orderId: string, priority: boolean) => {
+      const order = parseOrder(
+        await sendJson<Order & { createdAt: string; updatedAt: string }>(
+          `/api/cashier/orders/${orderId}/priority`,
+          'PATCH',
+          { priority }
+        )
+      )
+      await mutate()
+      return order
+    },
+    [mutate]
+  )
+
   const closeOrder = useCallback(
     async (orderId: string) => {
       const order = parseOrder(
@@ -692,6 +707,7 @@ export function useOrders() {
       type: 'delivery' | 'pickup'
       source: 'phone' | 'walk_in'
       paymentMethod: Exclude<PaymentMethod, 'mercado_pago'>
+      paymentSplits?: Array<{ method: Exclude<PaymentMethod, 'combined'>; amount: number }>
       customerName: string
       customerPhone: string
       customerAddress?: string
@@ -708,12 +724,58 @@ export function useOrders() {
     [mutate]
   )
 
+  const updateOrderItems = useCallback(
+    async (
+      orderId: string,
+      payload: {
+        add?: CreateOrderItemInput[]
+        updates?: Array<{ orderItemId: string; quantity: number }>
+        remove?: string[]
+      }
+    ) => {
+      const order = parseOrder(
+        await sendJson<Order & { createdAt: string; updatedAt: string }>(
+          `/api/cashier/orders/${orderId}/items`,
+          'PATCH',
+          payload
+        )
+      )
+      await mutate()
+      return order
+    },
+    [mutate]
+  )
+
+  const updateOrderPayment = useCallback(
+    async (
+      orderId: string,
+      payload: {
+        paymentMethod: PaymentMethod
+        paymentSplits?: Array<{ method: Exclude<PaymentMethod, 'combined'>; amount: number }>
+      }
+    ) => {
+      const order = parseOrder(
+        await sendJson<Order & { createdAt: string; updatedAt: string }>(
+          `/api/cashier/orders/${orderId}/payment`,
+          'PATCH',
+          payload
+        )
+      )
+      await mutate()
+      return order
+    },
+    [mutate]
+  )
+
   return {
     orders,
     addOrder,
     createManualOrder,
     updateOrderStatus,
     updateOrderEstimate,
+    updateOrderPriority,
+    updateOrderItems,
+    updateOrderPayment,
     closeOrder,
     approveOrderPayment,
     isLoading,
@@ -858,8 +920,15 @@ export function useTables() {
   )
 
   const closeTable = useCallback(
-    async (tableId: string, paymentMethod: 'cash' | 'card' | 'transfer' | 'mercado_pago' = 'cash') => {
-      const table = await sendJson<Table>(`/api/tables/${tableId}/close`, 'POST', { paymentMethod })
+    async (
+      tableId: string,
+      paymentMethod: PaymentMethod = 'cash',
+      paymentSplits?: Array<{ method: Exclude<PaymentMethod, 'combined'>; amount: number }>
+    ) => {
+      const table = await sendJson<Table>(`/api/tables/${tableId}/close`, 'POST', {
+        paymentMethod,
+        paymentSplits,
+      })
       await mutate()
       return table
     },

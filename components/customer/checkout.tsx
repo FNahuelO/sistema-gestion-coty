@@ -18,8 +18,7 @@ import {
   Info,
   Crosshair,
   Loader2,
-  CheckCircle2,
-  AlertTriangle,
+  Layers,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,6 +27,11 @@ import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { SimpleModal } from '@/components/ui/simple-modal'
 import { TransferPaymentDetails } from '@/components/customer/transfer-payment-details'
+import {
+  buildPaymentSplitsFromAmounts,
+  PaymentSplitsEditor,
+} from '@/components/shared/payment-splits-editor'
+import { sumSplitAmounts } from '@/lib/payment-splits'
 import { useCart, useBusiness, useCatalog, useOrders, useTableSession, rememberOrderTracking } from '@/lib/store'
 import {
   buildCleanUrlWithoutMpReturn,
@@ -173,7 +177,7 @@ export function CheckoutPage() {
   const searchParams = useSearchParams()
   const { items, hydrated, updateQuantity, removeItem, clearCart } = useCart()
   const { settings, isLoading: isSettingsLoading } = useBusiness()
-  const { promotions, channelAvailability, deliveryZones, mercadoPagoAvailable } = useCatalog()
+  const { promotions, channelAvailability, mercadoPagoAvailable } = useCatalog()
   const { subtotal, discount, total } = useCartPricing(items, promotions)
   const { addOrder } = useOrders()
   const { tableSession, isTableMode, hydrated: tableSessionHydrated } = useTableSession()
@@ -181,11 +185,11 @@ export function CheckoutPage() {
 
   const [orderType, setOrderType] = useState<OrderType>('pickup')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('transfer')
+  const [splitAmounts, setSplitAmounts] = useState<Partial<Record<'cash' | 'transfer', string>>>({})
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [customerAddress, setCustomerAddress] = useState('')
   const [notes, setNotes] = useState('')
-  const [deliveryZoneId, setDeliveryZoneId] = useState('')
   const [couponCode, setCouponCode] = useState('')
   const [couponDiscount, setCouponDiscount] = useState(0)
   const [tip, setTip] = useState(0)
@@ -197,10 +201,7 @@ export function CheckoutPage() {
   const [completedWhatsappUrl, setCompletedWhatsappUrl] = useState<string | undefined>()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [deliveryCoords, setDeliveryCoords] = useState<{ lat: number; lng: number } | null>(null)
-  const [coverageStatus, setCoverageStatus] = useState<
-    'idle' | 'checking' | 'covered' | 'out_of_range' | 'not_found' | 'error'
-  >('idle')
-  const [coverageZoneName, setCoverageZoneName] = useState('')
+  const [locatingAddress, setLocatingAddress] = useState(false)
   const redirectingToMpRef = useRef(false)
   const [redirectingToMp, setRedirectingToMp] = useState(false)
   const [pendingMpOrder, setPendingMpOrder] = useState<ReturnType<typeof getMpPendingOrder>>(null)
@@ -216,18 +217,8 @@ export function CheckoutPage() {
   const showingMpRedirect = redirectingToMp
   const isEmpty = items.length === 0 && !orderComplete && !showingMpRedirect
   const activeOrderType = isTableMode ? 'table' : orderType
-  const selectedZone = deliveryZones.find((zone) => zone.id === deliveryZoneId)
-  const geoEnabled = deliveryZones.some((zone) => zone.hasGeo)
-  const deliveryNeedsCoverage = orderType === 'delivery' && !isTableMode && geoEnabled
-  const coverageBlocked = deliveryNeedsCoverage && coverageStatus !== 'covered'
-  const deliveryFee =
-    activeOrderType === 'delivery'
-      ? selectedZone?.deliveryFee ?? settings.deliveryFee
-      : 0
-  const minOrderAmount =
-    activeOrderType === 'delivery' && selectedZone
-      ? Math.max(settings.minOrderAmount, selectedZone.minOrderAmount)
-      : settings.minOrderAmount
+  const deliveryFee = activeOrderType === 'delivery' ? settings.deliveryFee : 0
+  const minOrderAmount = settings.minOrderAmount
   const finalTotal = Math.max(0, total - couponDiscount) + deliveryFee + tip
   const channelKey = activeOrderType === 'delivery' ? 'delivery' : activeOrderType === 'pickup' ? 'pickup' : 'local'
   const channelStatus = activeOrderType === 'table' ? { open: true } : channelAvailability?.[channelKey]
@@ -323,66 +314,56 @@ export function CheckoutPage() {
     }
   }
 
-  const resetCoverage = () => {
-    setCoverageStatus('idle')
-    setCoverageZoneName('')
-    setDeliveryCoords(null)
-    setDeliveryZoneId('')
-  }
-
-  const verifyCoverage = async (coords?: { lat: number; lng: number }) => {
-    if (!coords && customerAddress.trim().length < 4) {
-      toast.error('Ingresá tu dirección para verificar la cobertura')
-      return
-    }
-    setCoverageStatus('checking')
-    try {
-      const response = await fetch('/api/delivery/check-coverage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(coords ? coords : { address: customerAddress }),
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error ?? 'Error')
-
-      if (data.covered && data.zone) {
-        setDeliveryZoneId(data.zone.id)
-        setCoverageZoneName(data.zone.name)
-        setDeliveryCoords(data.coordinates ?? coords ?? null)
-        setCoverageStatus('covered')
-        toast.success(`¡Llegamos a tu zona: ${data.zone.name}!`)
-      } else if (data.reason === 'NOT_FOUND') {
-        setDeliveryZoneId('')
-        setDeliveryCoords(null)
-        setCoverageStatus('not_found')
-      } else if (data.reason === 'NO_ZONES') {
-        resetCoverage()
-      } else {
-        setDeliveryZoneId('')
-        setDeliveryCoords(data.coordinates ?? coords ?? null)
-        setCoverageStatus('out_of_range')
-      }
-    } catch (error) {
-      setCoverageStatus('error')
-      toast.error(error instanceof Error ? error.message : 'No se pudo verificar la cobertura')
-    }
-  }
-
   const useMyLocation = () => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       toast.error('Tu navegador no permite geolocalización')
       return
     }
-    setCoverageStatus('checking')
+
+    setLocatingAddress(true)
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        void verifyCoverage({ lat: position.coords.latitude, lng: position.coords.longitude })
+      async (position) => {
+        const lat = position.coords.latitude
+        const lng = position.coords.longitude
+        try {
+          const response = await fetch('/api/delivery/reverse-geocode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lat, lng }),
+          })
+          const data = await response.json()
+          if (!response.ok) throw new Error(data.error ?? 'No se pudo obtener la dirección')
+
+          // Siempre guardamos el GPS real del dispositivo (no el de Nominatim).
+          setDeliveryCoords({ lat, lng })
+          const suggestion = typeof data.displayName === 'string' ? data.displayName.trim() : ''
+          if (suggestion) {
+            setCustomerAddress(suggestion)
+            toast.success(
+              data.approximate
+                ? 'Zona detectada. Completá el número de calle y referencias.'
+                : 'Ubicación cargada. Revisá que la dirección sea correcta.'
+            )
+          } else {
+            setCustomerAddress('')
+            toast.message('Ubicación guardada. Escribí tu dirección completa.')
+          }
+        } catch (error) {
+          setDeliveryCoords({ lat, lng })
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : 'No se pudo obtener la dirección. Completala manualmente.'
+          )
+        } finally {
+          setLocatingAddress(false)
+        }
       },
       () => {
-        setCoverageStatus('idle')
+        setLocatingAddress(false)
         toast.error('No se pudo obtener tu ubicación. Revisá los permisos del navegador.')
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     )
   }
 
@@ -411,11 +392,6 @@ export function CheckoutPage() {
       return
     }
 
-    if (deliveryNeedsCoverage && coverageStatus !== 'covered') {
-      toast.error('Verificá que tu dirección esté dentro del área de cobertura antes de continuar')
-      return
-    }
-
     if (isTableMode && !tableSession) {
       toast.error('No se pudo identificar la mesa')
       return
@@ -426,20 +402,39 @@ export function CheckoutPage() {
       return
     }
 
+    const resolvedPaymentMethod =
+      isTableMode && (paymentMethod === 'mercado_pago' || paymentMethod === 'combined')
+        ? 'cash'
+        : paymentMethod
+
+    const paymentSplits =
+      resolvedPaymentMethod === 'combined' ? buildPaymentSplitsFromAmounts(splitAmounts) : undefined
+
+    if (resolvedPaymentMethod === 'combined') {
+      if (!paymentSplits || paymentSplits.length < 2) {
+        toast.error('En pago combinado usá al menos dos medios con monto')
+        return
+      }
+      if (Math.abs(sumSplitAmounts(paymentSplits) - finalTotal) > 0.02) {
+        toast.error('La suma de los montos debe coincidir con el total')
+        return
+      }
+    }
+
     setIsSubmitting(true)
     submitLockRef.current = true
 
     try {
       const createdOrder = await addOrder({
         type: activeOrderType,
-        paymentMethod: isTableMode && paymentMethod === 'mercado_pago' ? 'cash' : paymentMethod,
+        paymentMethod: resolvedPaymentMethod,
+        paymentSplits,
         customerName: isTableMode ? `Mesa ${tableSession?.tableNumber}` : customerName,
         customerPhone: isTableMode ? 'mesa' : customerPhone,
         customerAddress: activeOrderType === 'delivery' ? customerAddress : undefined,
         deliveryLat: activeOrderType === 'delivery' && deliveryCoords ? deliveryCoords.lat : undefined,
         deliveryLng: activeOrderType === 'delivery' && deliveryCoords ? deliveryCoords.lng : undefined,
         tableId: isTableMode ? tableSession?.tableId : undefined,
-        deliveryZoneId: activeOrderType === 'delivery' && deliveryZoneId ? deliveryZoneId : undefined,
         discountCode: couponDiscount > 0 ? couponCode : undefined,
         tip: tip > 0 ? tip : undefined,
         notes: notes || undefined,
@@ -720,22 +715,41 @@ export function CheckoutPage() {
                               )}
                             </label>
                           </RadioGroup>
-                          {orderType === 'delivery' && !geoEnabled && deliveryZones.length > 0 ? (
+                          {orderType === 'delivery' ? (
                             <div className="mt-3 space-y-2">
-                              <Label className="text-xs">Zona de entrega</Label>
-                              <RadioGroup
-                                value={deliveryZoneId}
-                                onValueChange={setDeliveryZoneId}
-                                className="space-y-2"
+                              <Label htmlFor="delivery-address" className="flex items-center gap-2 text-xs">
+                                <MapPin className="h-3.5 w-3.5" />
+                                Dirección o ubicación *
+                              </Label>
+                              <Textarea
+                                id="delivery-address"
+                                placeholder="Calle, número, referencias..."
+                                value={customerAddress}
+                                onChange={(e) => {
+                                  setCustomerAddress(e.target.value)
+                                  if (deliveryCoords) setDeliveryCoords(null)
+                                }}
+                                rows={2}
+                                required
+                                className="resize-none text-sm"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full rounded-full"
+                                onClick={useMyLocation}
+                                disabled={locatingAddress}
                               >
-                                {deliveryZones.map((zone) => (
-                                  <label key={zone.id} htmlFor={`zone-${zone.id}`} className="flex cursor-pointer items-center gap-2 text-sm">
-                                    <RadioGroupItem value={zone.id} id={`zone-${zone.id}`} />
-                                    <span>{zone.name}</span>
-                                    <span className="ml-auto text-xs text-muted-foreground">+{formatPrice(zone.deliveryFee)}</span>
-                                  </label>
-                                ))}
-                              </RadioGroup>
+                                {locatingAddress ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Crosshair className="mr-2 h-4 w-4" />
+                                )}
+                                {locatingAddress ? 'Obteniendo ubicación...' : 'Usar mi ubicación'}
+                              </Button>
+                              <p className="text-xs text-muted-foreground">
+                                El GPS sugiere la zona aproximada: completá calle, número y referencias.
+                              </p>
                             </div>
                           ) : null}
                         </CheckoutSection>
@@ -867,6 +881,10 @@ export function CheckoutPage() {
                       void handleSubmit(e as unknown as React.FormEvent)
                       return
                     }
+                    if (orderType === 'delivery' && !customerAddress.trim()) {
+                      toast.error('Por favor ingresá tu dirección de entrega')
+                      return
+                    }
                     setConfirmOpen(true)
                   }}
                   disabled={isSubmitting || isClosed || belowMinOrder}
@@ -928,81 +946,28 @@ export function CheckoutPage() {
                     value={customerAddress}
                     onChange={(e) => {
                       setCustomerAddress(e.target.value)
-                      if (geoEnabled && coverageStatus !== 'idle') resetCoverage()
+                      if (deliveryCoords) setDeliveryCoords(null)
                     }}
                     rows={2}
                     required
                   />
-
-                  {geoEnabled && (
-                    <div className="space-y-2">
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="flex-1 rounded-full"
-                          onClick={() => verifyCoverage()}
-                          disabled={coverageStatus === 'checking'}
-                        >
-                          {coverageStatus === 'checking' ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <MapPin className="mr-2 h-4 w-4" />
-                          )}
-                          Verificar cobertura
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="flex-1 rounded-full"
-                          onClick={useMyLocation}
-                          disabled={coverageStatus === 'checking'}
-                        >
-                          <Crosshair className="mr-2 h-4 w-4" />
-                          Usar mi ubicación
-                        </Button>
-                      </div>
-
-                      {coverageStatus === 'covered' && (
-                        <div className="flex items-start gap-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">
-                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-                          <span>
-                            ¡Hacemos delivery a tu ubicación! Zona <strong>{coverageZoneName}</strong>
-                            {selectedZone ? ` · Envío ${formatPrice(selectedZone.deliveryFee)}` : ''}.
-                          </span>
-                        </div>
-                      )}
-                      {coverageStatus === 'out_of_range' && (
-                        <div className="flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700">
-                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                          <span>
-                            Tu dirección está fuera de nuestra área de delivery. Podés elegir{' '}
-                            <strong>Retiro en el local</strong> para completar el pedido.
-                          </span>
-                        </div>
-                      )}
-                      {coverageStatus === 'not_found' && (
-                        <div className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
-                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                          <span>
-                            No pudimos ubicar esa dirección. Agregá calle, número y ciudad, o usá{' '}
-                            <strong>Usar mi ubicación</strong>.
-                          </span>
-                        </div>
-                      )}
-                      {coverageStatus === 'error' && (
-                        <div className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
-                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                          <span>No se pudo verificar la cobertura. Intentá de nuevo en unos segundos.</span>
-                        </div>
-                      )}
-                      {coverageStatus === 'idle' && (
-                        <p className="text-xs text-muted-foreground">
-                          Verificá tu dirección para confirmar que llegamos con el delivery.
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full rounded-full"
+                    onClick={useMyLocation}
+                    disabled={locatingAddress}
+                  >
+                    {locatingAddress ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Crosshair className="mr-2 h-4 w-4" />
+                    )}
+                    {locatingAddress ? 'Obteniendo ubicación...' : 'Usar mi ubicación'}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    El GPS sugiere la zona aproximada: completá calle, número y referencias.
+                  </p>
                 </div>
               )}
               <div className="space-y-2">
@@ -1012,12 +977,19 @@ export function CheckoutPage() {
                 </Label>
                 <RadioGroup
                   value={paymentMethod}
-                  onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}
+                  onValueChange={(v) => {
+                    const method = v as PaymentMethod
+                    setPaymentMethod(method)
+                    if (method !== 'combined') setSplitAmounts({})
+                  }}
                   className="space-y-2"
                 >
                   {[
                     { value: 'transfer', label: 'Transferencia', icon: Building2 },
                     { value: 'cash', label: 'Efectivo', icon: Banknote },
+                    ...(isTableMode
+                      ? []
+                      : [{ value: 'combined' as const, label: 'Pago combinado', icon: Layers }]),
                     ...(isTableMode || !mercadoPagoAvailable
                       ? []
                       : [{ value: 'mercado_pago' as const, label: 'Mercado Pago', icon: CreditCard }]),
@@ -1033,11 +1005,29 @@ export function CheckoutPage() {
                     </label>
                   ))}
                 </RadioGroup>
-                {paymentMethod === 'transfer' && !isTableMode ? (
+                {paymentMethod === 'combined' && !isTableMode ? (
+                  <PaymentSplitsEditor
+                    total={finalTotal}
+                    methods={['transfer', 'cash']}
+                    amounts={splitAmounts}
+                    onChange={(method, value) => {
+                      if (method !== 'transfer' && method !== 'cash') return
+                      setSplitAmounts((current) => ({ ...current, [method]: value }))
+                    }}
+                    className="mt-3"
+                  />
+                ) : null}
+                {(paymentMethod === 'transfer' ||
+                  (paymentMethod === 'combined' && Number(splitAmounts.transfer || 0) > 0)) &&
+                !isTableMode ? (
                   <TransferPaymentDetails
                     transferAlias={settings.transferAlias}
                     transferCbu={settings.transferCbu}
-                    total={finalTotal}
+                    total={
+                      paymentMethod === 'combined'
+                        ? Number(splitAmounts.transfer?.replace(',', '.') || 0)
+                        : finalTotal
+                    }
                     className="mt-3"
                   />
                 ) : null}
@@ -1046,13 +1036,9 @@ export function CheckoutPage() {
                 type="submit"
                 className="w-full rounded-full py-5 font-bold"
                 style={{ backgroundColor: COTY_TEAL }}
-                disabled={isSubmitting || coverageBlocked}
+                disabled={isSubmitting}
               >
-                {isSubmitting
-                  ? 'Procesando...'
-                  : coverageBlocked
-                    ? 'Verificá tu cobertura'
-                    : 'Confirmar y enviar'}
+                {isSubmitting ? 'Procesando...' : 'Confirmar y enviar'}
               </Button>
             </form>
         </SimpleModal>

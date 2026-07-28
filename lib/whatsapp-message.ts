@@ -1,11 +1,21 @@
-import { PAYMENT_METHOD_LABELS, ORDER_TYPE_LABELS } from '@/lib/order-labels'
+import { PAYMENT_METHOD_LABELS, ORDER_TYPE_LABELS, formatPublicOrderCode } from '@/lib/order-labels'
 import type { CartItem, Order, PaymentMethod } from '@/lib/types'
 
 type OrderMessageItem = Pick<CartItem, 'quantity' | 'product' | 'selectedOptions'>
 
 type OrderMessageInput = Pick<
   Order,
-  'displayCode' | 'id' | 'customerName' | 'customerPhone' | 'customerAddress' | 'total' | 'paymentMethod' | 'type' | 'notes' | 'tableNumber'
+  | 'displayCode'
+  | 'id'
+  | 'customerName'
+  | 'customerPhone'
+  | 'customerAddress'
+  | 'total'
+  | 'paymentMethod'
+  | 'paymentSplits'
+  | 'type'
+  | 'notes'
+  | 'tableNumber'
 > & {
   items: OrderMessageItem[]
 }
@@ -14,6 +24,16 @@ export type WhatsAppMessageOptions = {
   transferAlias?: string | null
   transferCbu?: string | null
   includePaymentInstructions?: boolean
+}
+
+export function buildWhatsAppChatUrl(phone: string) {
+  const digits = phone.replace(/\D/g, '')
+
+  if (digits.startsWith('549')) return `https://wa.me/${digits}`
+  if (digits.startsWith('54')) return `https://wa.me/549${digits.slice(2)}`
+  if (digits.length === 10) return `https://wa.me/549${digits}`
+
+  return `https://wa.me/${digits}`
 }
 
 function formatItemOptions(item: OrderMessageItem) {
@@ -48,7 +68,7 @@ export function buildWhatsAppOrderMessage(
   businessName: string,
   options?: WhatsAppMessageOptions
 ) {
-  const code = order.displayCode ?? order.id
+  const code = formatPublicOrderCode(order)
   const itemsList = order.items
     .map((item) => {
       const optionsLabel = formatItemOptions(item)
@@ -57,10 +77,19 @@ export function buildWhatsAppOrderMessage(
     .join('\n')
 
   const paymentLabel = PAYMENT_METHOD_LABELS[order.paymentMethod as PaymentMethod] ?? order.paymentMethod
+  const paymentDetail =
+    order.paymentMethod === 'combined' && order.paymentSplits?.length
+      ? order.paymentSplits
+          .map((split) => `${PAYMENT_METHOD_LABELS[split.method]} $${split.amount.toFixed(2)}`)
+          .join(' + ')
+      : null
   const typeLabel = ORDER_TYPE_LABELS[order.type] ?? order.type
   const transferDetails = formatTransferDetails(options)
+  const hasTransferSplit = Boolean(order.paymentSplits?.some((split) => split.method === 'transfer'))
   const showPaymentInstructions =
-    options?.includePaymentInstructions && order.paymentMethod === 'transfer' && order.type !== 'table'
+    options?.includePaymentInstructions &&
+    order.type !== 'table' &&
+    (order.paymentMethod === 'transfer' || (order.paymentMethod === 'combined' && hasTransferSplit))
 
   return `🧾 *Nuevo Pedido - ${businessName}*
 
@@ -71,7 +100,7 @@ ${order.customerAddress ? `📍 *Dirección:* ${order.customerAddress}\n` : ''}�
 ${itemsList}
 
 💰 *Total:* $${order.total.toFixed(2)}
-💳 *Pago:* ${paymentLabel}
+💳 *Pago:* ${paymentLabel}${paymentDetail ? `\n   (${paymentDetail})` : ''}
 ${transferDetails ? `${transferDetails}\n` : ''}📦 *Tipo:* ${typeLabel}
 ${order.notes ? `\n📝 *Notas:* ${order.notes}` : ''}${
     showPaymentInstructions
@@ -86,7 +115,6 @@ export function buildWhatsAppUrl(
   businessName: string,
   options?: WhatsAppMessageOptions
 ) {
-  const normalizedPhone = phone.replace(/\D/g, '')
   const text = encodeURIComponent(buildWhatsAppOrderMessage(order, businessName, options))
-  return `https://wa.me/${normalizedPhone}?text=${text}`
+  return `${buildWhatsAppChatUrl(phone)}?text=${text}`
 }

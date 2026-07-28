@@ -81,6 +81,7 @@ export function DashboardSection() {
       (order) =>
         order.displayCode?.toLowerCase().includes(query) ||
         order.publicTrackingCode?.toLowerCase().includes(query) ||
+        (order.dailyNumber != null && String(order.dailyNumber).includes(query.replace(/^#/, ''))) ||
         order.id.toLowerCase().includes(query) ||
         order.customerName.toLowerCase().includes(query) ||
         order.customerPhone.includes(query)

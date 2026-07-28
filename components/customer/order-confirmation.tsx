@@ -282,7 +282,7 @@ export function OrderConfirmationView({
               <ClipboardList className="h-5 w-5 text-white" />
             </div>
             <p className="text-xs text-muted-foreground">Pedido</p>
-            <p className="mt-0.5 text-sm font-bold text-foreground">#{displayCode}</p>
+            <p className="mt-0.5 text-sm font-bold text-foreground">{displayCode}</p>
           </div>
         </div>
 

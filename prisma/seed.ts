@@ -4,6 +4,7 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 import bcrypt from 'bcryptjs'
 import { businessSettings, categories, orders, products, promotions, tables, users } from '../lib/mock-data'
+import { arDayKey } from '../lib/datetime'
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5432/coty_cafe?schema=public',
@@ -355,14 +356,29 @@ async function main() {
     })
   }
 
+  const dailyCounters = new Map<string, number>()
+
   for (let index = 0; index < orders.length; index += 1) {
     const order = orders[index]
+    const dayKey = arDayKey(order.createdAt)
+    const [year, month, day] = dayKey.split('-').map(Number)
+    const serviceDate = new Date(Date.UTC(year, month - 1, day))
+    const dailyNumber = (dailyCounters.get(dayKey) ?? 0) + 1
+    dailyCounters.set(dayKey, dailyNumber)
+
+    await prisma.dailyOrderCounter.upsert({
+      where: { serviceDate },
+      create: { serviceDate, lastNumber: dailyNumber },
+      update: { lastNumber: dailyNumber },
+    })
 
     await prisma.order.create({
       data: {
         id: order.id,
         displayCode: `ORD-${String(index + 1).padStart(4, '0')}`,
         publicTrackingCode: `TRACK-${String(index + 1).padStart(6, '0')}`,
+        dailyNumber,
+        serviceDate,
         type: toOrderType(order.type),
         status: toOrderStatus(order.status),
         paymentMethod: toPaymentMethod(order.paymentMethod),

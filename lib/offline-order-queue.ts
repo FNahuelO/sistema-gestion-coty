@@ -17,6 +17,7 @@ export type CreateOrderItemInput = {
 export type CreateOrderPayload = {
   type: Order['type']
   paymentMethod: PaymentMethod
+  paymentSplits?: Array<{ method: Exclude<PaymentMethod, 'combined'>; amount: number }>
   customerName: string
   customerPhone: string
   customerAddress?: string
@@ -42,6 +43,7 @@ export type OrderQueueSnapshot = {
   tableNumber?: number
   type: OrderType
   paymentMethod: PaymentMethod
+  paymentSplits?: Array<{ method: Exclude<PaymentMethod, 'combined'>; amount: number }>
   notes?: string
 }
 
@@ -149,6 +151,7 @@ function buildSnapshot(
     tableNumber: options?.tableNumber,
     type: payload.type,
     paymentMethod: payload.paymentMethod,
+    paymentSplits: payload.paymentSplits,
     notes: payload.notes,
   }
 }
@@ -190,6 +193,7 @@ export function queuedEntryToOrder(entry: QueuedOrderEntry): Order {
     deliveryFee: snapshot.deliveryFee,
     total: snapshot.total,
     paymentMethod: snapshot.paymentMethod,
+    paymentSplits: snapshot.paymentSplits,
     paymentStatus: 'pending',
     customerName: snapshot.customerName,
     customerPhone: snapshot.customerPhone,

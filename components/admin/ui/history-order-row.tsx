@@ -6,6 +6,7 @@ import { PANEL_ICON_ACTIVE, PANEL_ICON_CIRCLE, PANEL_LIST_ROW, PANEL_SURFACE } f
 import { cn } from '@/lib/utils'
 import type { Order } from '@/lib/types'
 import { StatusBadge } from '@/components/shared/status-badge'
+import { formatOrderNumber } from '@/lib/order-labels'
 import { ORDER_TYPE_META } from '../constants'
 import { CotyPriceBadge } from './coty-price-badge'
 
@@ -19,7 +20,7 @@ export function HistoryOrderRow({ order, compact = false }: { order: Order; comp
         <div className="flex min-w-0 items-center gap-2">
           <Icon className={cn('h-3.5 w-3.5 shrink-0', PANEL_ICON_ACTIVE)} />
           <span className="truncate text-xs">
-            {order.displayCode ?? order.id} · {order.customerName}
+            {formatOrderNumber(order)} · {order.customerName}
           </span>
         </div>
         <CotyPriceBadge>{formatPrice(order.total)}</CotyPriceBadge>
@@ -40,7 +41,7 @@ export function HistoryOrderRow({ order, compact = false }: { order: Order; comp
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0">
-          <p className="truncate font-semibold text-foreground">{order.displayCode ?? order.id}</p>
+          <p className="truncate font-semibold text-foreground">{formatOrderNumber(order)}</p>
           <p className="truncate text-xs text-muted-foreground">
             {order.customerName} · {meta.label} · {formatDateTimeAR(order.createdAt)}
           </p>

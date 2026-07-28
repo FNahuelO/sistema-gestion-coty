@@ -45,8 +45,7 @@ import { LandingCarouselSkeleton, LandingCategoryGridSkeleton, LandingFooterSkel
 import { PromotionBanner } from '@/components/customer/promotion-banner'
 import { InstallAppPrompt } from '@/components/customer/install-app-prompt'
 
-const HERO_IMAGE =
-  'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=999&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
+const HERO_IMAGE = '/images/hero-burger.jpg'
 const CTA_IMAGE = 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=1600&h=500&fit=crop'
 
 function getDefaultCartItem(items: CartItem[], productId: string) {
@@ -124,10 +123,10 @@ function ClocheIllustration() {
 
 function HeroCard({ subtitle, menuHref = '/menu' }: { subtitle: string; menuHref?: string }) {
   return (
-    <div className="overflow-visible rounded-2xl shadow-lg md:rounded-3xl">
+    <div className="overflow-hidden rounded-2xl shadow-lg md:rounded-3xl">
       <div className="flex min-h-38 overflow-hidden rounded-2xl md:min-h-44 md:rounded-3xl">
         <div
-          className="flex w-[58%] shrink-0 flex-col justify-center gap-2.5 px-4 py-5 md:w-[55%] md:gap-3 md:px-6 md:py-6"
+          className="relative z-10 flex w-[56%] shrink-0 flex-col justify-center gap-2.5 py-5 pl-4 pr-5 md:w-[55%] md:gap-3 md:px-6 md:py-6"
           style={{ backgroundColor: COTY_HEADER }}
         >
           <h2 className="text-base font-bold leading-snug text-white md:text-xl">
@@ -143,11 +142,18 @@ function HeroCard({ subtitle, menuHref = '/menu' }: { subtitle: string; menuHref
             Empezar pedido
           </Link>
         </div>
-        <div className="relative flex-1 overflow-visible" style={{ backgroundColor: COTY_PAGE_BG }}>
+        <div className="relative min-w-0 flex-1 overflow-hidden" style={{ backgroundColor: COTY_PAGE_BG }}>
           <img
             src={HERO_IMAGE}
             alt="Especialidad del local"
-            className="absolute -right-3 top-1/2 h-[118%] w-[118%] max-w-none -translate-y-1/2 object-cover object-center md:-right-5"
+            className="absolute inset-0 h-full w-full scale-110 object-cover object-[70%_42%] md:scale-[1.15] md:object-[65%_40%]"
+          />
+          <div
+            className="pointer-events-none absolute inset-y-0 left-0 w-10 md:w-12"
+            style={{
+              background: `linear-gradient(to right, ${COTY_HEADER} 0%, ${COTY_HEADER}40 45%, transparent 100%)`,
+            }}
+            aria-hidden
           />
         </div>
       </div>

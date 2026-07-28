@@ -74,15 +74,33 @@ export async function closeCashSession(sessionId: string, closedByUserId: string
   })
   if (!session || session.status !== CashSessionStatus.OPEN) throw new Error('CASH_SESSION_CLOSED')
 
-  const cashOrders = await prisma.order.findMany({
+  const sessionOrders = await prisma.order.findMany({
     where: {
-      paymentMethod: PrismaPaymentMethod.CASH,
       status: { notIn: ['CANCELLED'] },
       createdAt: { gte: session.openedAt },
+      OR: [
+        { paymentMethod: PrismaPaymentMethod.CASH },
+        { paymentMethod: PrismaPaymentMethod.COMBINED },
+        { paymentSplits: { some: { method: PrismaPaymentMethod.CASH } } },
+      ],
+    },
+    include: {
+      paymentSplits: {
+        select: { method: true, amount: true },
+      },
     },
   })
 
-  const salesCash = cashOrders.reduce((sum, o) => sum + dec(o.total), 0)
+  const salesCash = sessionOrders.reduce((sum, order) => {
+    const cashSplits = order.paymentSplits.filter((split) => split.method === PrismaPaymentMethod.CASH)
+    if (cashSplits.length > 0) {
+      return sum + cashSplits.reduce((splitSum, split) => splitSum + dec(split.amount), 0)
+    }
+    if (order.paymentMethod === PrismaPaymentMethod.CASH) {
+      return sum + dec(order.total)
+    }
+    return sum
+  }, 0)
   const deposits = session.movements
     .filter((m) => m.type === CashMovementType.DEPOSIT)
     .reduce((sum, m) => sum + dec(m.amount), 0)
@@ -540,6 +558,7 @@ export function serializeDeliveryQueueEntry(order: DeliveryQueueOrder): Delivery
     runner: assignment?.runner ?? null,
     order: {
       displayCode: order.displayCode,
+      dailyNumber: order.dailyNumber,
       customerName: order.customerName,
       customerPhone: order.customerPhone,
       customerAddress: order.customerAddress,

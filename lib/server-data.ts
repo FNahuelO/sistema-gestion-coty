@@ -36,6 +36,13 @@ import {
   upsertCustomerFromOrder,
   validateDiscountCode,
 } from '@/lib/commerce'
+import {
+  allocateSplitsAcrossOrders,
+  assertPaymentSplitsMatchTotal,
+  paymentSplitsSchema,
+  uiPaymentMethodToPrisma,
+  type PaymentSplitInput,
+} from '@/lib/payment-splits'
 
 export const selectedOptionSchema = z.object({
   optionId: z.string().min(1),
@@ -52,7 +59,8 @@ export const cartItemInputSchema = z.object({
 export const createOrderSchema = z
   .object({
     type: z.enum(['delivery', 'pickup', 'table']),
-    paymentMethod: z.enum(['cash', 'card', 'transfer', 'mercado_pago']),
+    paymentMethod: z.enum(['cash', 'card', 'transfer', 'mercado_pago', 'combined']),
+    paymentSplits: paymentSplitsSchema.optional(),
     customerName: z.string().trim().max(120).default(''),
     customerPhone: z.string().trim().max(40).default(''),
     customerAddress: z.string().trim().max(200).optional(),
@@ -66,6 +74,22 @@ export const createOrderSchema = z
     items: z.array(cartItemInputSchema).min(1),
   })
   .superRefine((data, ctx) => {
+    if (data.paymentMethod === 'combined') {
+      if (!data.paymentSplits || data.paymentSplits.length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'PAYMENT_SPLITS_REQUIRED',
+          path: ['paymentSplits'],
+        })
+      }
+    } else if (data.paymentSplits?.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'PAYMENT_SPLITS_ONLY_FOR_COMBINED',
+        path: ['paymentSplits'],
+      })
+    }
+
     if (data.type === 'table') {
       if (!data.tableId?.trim()) {
         ctx.addIssue({
@@ -198,6 +222,15 @@ const orderInclude = {
       sandboxInitPoint: true,
     },
   },
+  paymentSplits: {
+    select: {
+      method: true,
+      amount: true,
+    },
+    orderBy: {
+      createdAt: 'asc' as const,
+    },
+  },
   diningTable: {
     select: {
       number: true,
@@ -217,6 +250,7 @@ type SerializableOrder = {
   id: string
   displayCode: string | null
   publicTrackingCode: string | null
+  dailyNumber?: number | null
   type: PrismaOrderType
   status: PrismaOrderStatus
   paymentMethod: PrismaPaymentMethod
@@ -233,6 +267,7 @@ type SerializableOrder = {
   total: Prisma.Decimal | number
   estimatedMinutes?: number | null
   estimatedReadyAt?: Date | null
+  priority?: boolean
   diningTableId?: string | null
   tableSessionId?: string | null
   createdByUserId?: string | null
@@ -260,6 +295,10 @@ type SerializableOrder = {
     initPoint?: string | null
     sandboxInitPoint?: string | null
   } | null
+  paymentSplits?: Array<{
+    method: PrismaPaymentMethod
+    amount: Prisma.Decimal | number
+  }>
   diningTable?: { number: number } | null
   deliveryZone?: { name: string } | null
 }
@@ -436,6 +475,9 @@ function mapPaymentMethod(method: PrismaPaymentMethod | string): PaymentMethod {
     case 'MERCADO_PAGO':
     case 'mercado_pago':
       return 'mercado_pago'
+    case 'COMBINED':
+    case 'combined':
+      return 'combined'
     default:
       return 'cash'
   }
@@ -633,9 +675,21 @@ export function serializeOrder(order: SerializableOrder): Order {
     id: order.id,
     displayCode: order.displayCode ?? undefined,
     publicTrackingCode: order.publicTrackingCode ?? undefined,
+    dailyNumber: order.dailyNumber ?? undefined,
     type: mapOrderType(order.type),
     status: mapOrderStatus(order.status),
     paymentMethod: mapPaymentMethod(order.paymentMethod),
+    paymentSplits: order.paymentSplits?.length
+      ? order.paymentSplits
+          .map((split) => ({
+            method: mapPaymentMethod(split.method),
+            amount: decimalToNumber(split.amount),
+          }))
+          .filter(
+            (split): split is { method: Exclude<PaymentMethod, 'combined'>; amount: number } =>
+              split.method !== 'combined'
+          )
+      : undefined,
     paymentStatus: mapPaymentStatus(order.payment?.status),
     paymentUrl: resolveMercadoPagoCheckoutUrl(order.payment?.initPoint, order.payment?.sandboxInitPoint),
     customerName: order.customerName,
@@ -652,6 +706,7 @@ export function serializeOrder(order: SerializableOrder): Order {
     total: decimalToNumber(order.total),
     estimatedMinutes: order.estimatedMinutes ?? undefined,
     estimatedReadyAt: order.estimatedReadyAt ?? undefined,
+    priority: Boolean(order.priority),
     tableId: order.diningTableId ?? undefined,
     tableNumber: order.diningTable?.number ?? undefined,
     tableSessionId: order.tableSessionId ?? undefined,
@@ -700,6 +755,7 @@ export function stripOrderPii(order: Order): Order {
 
   return {
     ...order,
+    dailyNumber: undefined,
     customerName: isTable
       ? order.tableNumber
         ? `Mesa ${order.tableNumber}`
@@ -979,6 +1035,52 @@ function buildTrackingCode() {
   return `TRK-${randomUUID().slice(0, 8).toUpperCase()}`
 }
 
+function serviceDateFromDayKey(dayKey: string): Date {
+  const [year, month, day] = dayKey.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day))
+}
+
+/** Asigna el próximo número de pedido del día (horario Argentina), atómico por fila.
+ *  Un solo correlativo para TODOS los canales (mesa, delivery y retiro): #1, #2, #3…
+ */
+async function allocateDailyOrderNumber(
+  tx: Prisma.TransactionClient,
+  dayKey = arDayKey(new Date())
+): Promise<{ dailyNumber: number; serviceDate: Date }> {
+  try {
+    const rows = await tx.$queryRaw<Array<{ lastNumber: number }>>`
+      INSERT INTO "DailyOrderCounter" ("serviceDate", "lastNumber")
+      VALUES (CAST(${dayKey} AS DATE), 1)
+      ON CONFLICT ("serviceDate")
+      DO UPDATE SET "lastNumber" = "DailyOrderCounter"."lastNumber" + 1
+      RETURNING "lastNumber"
+    `
+
+    const dailyNumber = rows[0]?.lastNumber
+    if (!dailyNumber) {
+      throw new Error('DAILY_ORDER_NUMBER_FAILED')
+    }
+
+    return { dailyNumber, serviceDate: serviceDateFromDayKey(dayKey) }
+  } catch (error) {
+    if (error instanceof Error && error.message === 'DAILY_ORDER_NUMBER_FAILED') {
+      throw error
+    }
+
+    const message = error instanceof Error ? error.message.toLowerCase() : ''
+    if (
+      message.includes('dailyordercounter') ||
+      message.includes('does not exist') ||
+      message.includes('dailynumber') ||
+      message.includes('servicedate')
+    ) {
+      throw new Error('SCHEMA_OUT_OF_DATE')
+    }
+
+    throw error
+  }
+}
+
 async function applyStockDeltaForOrderItems(
   tx: Prisma.TransactionClient,
   items: Array<{ productId: string | null; quantity: number }>,
@@ -1038,6 +1140,14 @@ export async function createOrderFromPayload(
   }
 
   if (input.paymentMethod === 'mercado_pago' && !isMercadoPagoAvailable(settings)) {
+    throw new Error('MERCADOPAGO_UNAVAILABLE')
+  }
+
+  if (
+    input.paymentMethod === 'combined' &&
+    input.paymentSplits?.some((split) => split.method === 'mercado_pago') &&
+    !isMercadoPagoAvailable(settings)
+  ) {
     throw new Error('MERCADOPAGO_UNAVAILABLE')
   }
 
@@ -1206,101 +1316,36 @@ export async function createOrderFromPayload(
   const tax = (subtotal - discountAmount) * decimalToNumber(settings.taxRate)
   const total = Math.max(0, subtotal - discountAmount) + tax + deliveryFee + tip
 
+  const paymentSplits =
+    input.paymentMethod === 'combined'
+      ? assertPaymentSplitsMatchTotal(total, input.paymentSplits ?? [])
+      : undefined
+  const hasTransferSplit = Boolean(paymentSplits?.some((split) => split.method === 'transfer'))
+  const hasMercadoPagoSplit = Boolean(paymentSplits?.some((split) => split.method === 'mercado_pago'))
+
+  if (hasMercadoPagoSplit && input.type !== 'table') {
+    // El checkout online de MP espera un solo cobro; en combinado se registra desde caja/mesa.
+    throw new Error('COMBINED_MERCADOPAGO_UNSUPPORTED')
+  }
+
   const customer =
     input.type !== 'table'
       ? await upsertCustomerFromOrder(input.customerPhone, input.customerName, input.customerAddress)
       : null
 
   const awaitingTransferProof =
-    input.type !== 'table' && requiresTransferProofApproval(input.paymentMethod, input.type)
+    input.type !== 'table' &&
+    requiresTransferProofApproval(input.paymentMethod, input.type, hasTransferSplit)
   const awaitingMercadoPago = input.paymentMethod === 'mercado_pago'
   const initialStatus = awaitingTransferProof || awaitingMercadoPago ? 'PENDING' : 'CONFIRMED'
 
-  const orderData = {
-    displayCode: buildDisplayCode(),
-    publicTrackingCode: buildTrackingCode(),
-    type:
-      input.type === 'delivery'
-        ? 'DELIVERY'
-        : input.type === 'pickup'
-          ? 'PICKUP'
-          : 'TABLE',
-    status: initialStatus,
-    paymentMethod:
-      input.paymentMethod === 'card'
-        ? 'CARD'
-        : input.paymentMethod === 'transfer'
-          ? 'TRANSFER'
-          : input.paymentMethod === 'mercado_pago'
-            ? 'MERCADO_PAGO'
-            : 'CASH',
-    customerName:
-      input.type === 'table' && diningTable
-        ? `Mesa ${diningTable.number}`
-        : input.customerName,
-    customerPhone: input.type === 'table' ? input.customerPhone || 'mesa' : input.customerPhone,
-    customerAddress: input.type === 'delivery' ? input.customerAddress : undefined,
-    deliveryLat: input.type === 'delivery' ? input.deliveryLat : undefined,
-    deliveryLng: input.type === 'delivery' ? input.deliveryLng : undefined,
-    notes: input.notes,
-    subtotal,
-    tax,
-    deliveryFee,
-    tip,
-    discountCode,
-    discountAmount,
-    deliveryZoneId,
-    customerId: customer?.id,
-    total,
-    diningTableId: diningTable?.id,
-    tableSessionId,
-    createdByUserId,
-    items: {
-      create: itemsToCreate.map((item) => ({
-        productId: item.productId,
-        productName: item.productName,
-        productDescription: item.productDescription,
-        basePrice: item.basePrice,
-        unitPrice: item.unitPrice,
-        imageUrl: item.imageUrl,
-        quantity: item.quantity,
-        notes: item.notes,
-        selections: {
-          create: item.selections,
-        },
-      })),
-    },
-    payment: {
-      create: {
-        provider: input.paymentMethod === 'mercado_pago' ? 'mercadopago' : 'manual',
-        method:
-          input.paymentMethod === 'card'
-            ? 'CARD'
-            : input.paymentMethod === 'transfer'
-              ? 'TRANSFER'
-              : input.paymentMethod === 'mercado_pago'
-                ? 'MERCADO_PAGO'
-                : 'CASH',
-        status: 'PENDING',
-        amount: total,
-      },
-    },
-    statusHistory: {
-      create: {
-        status: initialStatus,
-        changedByUserId: createdByUserId,
-        note: awaitingMercadoPago
-          ? 'Pedido creado, pendiente de pago online'
-          : awaitingTransferProof
-            ? 'Pedido creado, pendiente de comprobante por WhatsApp'
-            : 'Pedido creado',
-      },
-    },
-  }
-
   const deferStockDecrement = awaitingTransferProof || awaitingMercadoPago
 
+  const prismaPaymentMethod = uiPaymentMethodToPrisma(input.paymentMethod)
+
   const createdOrder = (await prisma.$transaction(async (tx) => {
+    const { dailyNumber, serviceDate } = await allocateDailyOrderNumber(tx)
+
     if (!deferStockDecrement) {
       await applyStockDeltaForOrderItems(tx, itemsToCreate.map((item) => ({
         productId: item.productId,
@@ -1309,7 +1354,83 @@ export async function createOrderFromPayload(
     }
 
     const order = await tx.order.create({
-      data: orderData as Prisma.OrderUncheckedCreateInput,
+      data: {
+        displayCode: buildDisplayCode(),
+        publicTrackingCode: buildTrackingCode(),
+        dailyNumber,
+        serviceDate,
+        type:
+          input.type === 'delivery'
+            ? 'DELIVERY'
+            : input.type === 'pickup'
+              ? 'PICKUP'
+              : 'TABLE',
+        status: initialStatus,
+        paymentMethod: prismaPaymentMethod,
+        customerName:
+          input.type === 'table' && diningTable
+            ? `Mesa ${diningTable.number}`
+            : input.customerName,
+        customerPhone: input.type === 'table' ? input.customerPhone || 'mesa' : input.customerPhone,
+        customerAddress: input.type === 'delivery' ? input.customerAddress : undefined,
+        deliveryLat: input.type === 'delivery' ? input.deliveryLat : undefined,
+        deliveryLng: input.type === 'delivery' ? input.deliveryLng : undefined,
+        notes: input.notes,
+        subtotal,
+        tax,
+        deliveryFee,
+        tip,
+        discountCode,
+        discountAmount,
+        deliveryZoneId,
+        customerId: customer?.id,
+        total,
+        diningTableId: diningTable?.id,
+        tableSessionId,
+        createdByUserId,
+        items: {
+          create: itemsToCreate.map((item) => ({
+            productId: item.productId,
+            productName: item.productName,
+            productDescription: item.productDescription,
+            basePrice: item.basePrice,
+            unitPrice: item.unitPrice,
+            imageUrl: item.imageUrl,
+            quantity: item.quantity,
+            notes: item.notes,
+            selections: {
+              create: item.selections,
+            },
+          })),
+        },
+        payment: {
+          create: {
+            provider: input.paymentMethod === 'mercado_pago' ? 'mercadopago' : 'manual',
+            method: prismaPaymentMethod,
+            status: 'PENDING',
+            amount: total,
+          },
+        },
+        paymentSplits: paymentSplits
+          ? {
+              create: paymentSplits.map((split) => ({
+                method: uiPaymentMethodToPrisma(split.method),
+                amount: split.amount,
+              })),
+            }
+          : undefined,
+        statusHistory: {
+          create: {
+            status: initialStatus,
+            changedByUserId: createdByUserId,
+            note: awaitingMercadoPago
+              ? 'Pedido creado, pendiente de pago online'
+              : awaitingTransferProof
+                ? 'Pedido creado, pendiente de comprobante por WhatsApp'
+                : 'Pedido creado',
+          },
+        },
+      } as Prisma.OrderUncheckedCreateInput,
       include: orderInclude,
     })
 
@@ -1544,6 +1665,289 @@ export async function updateOrderEstimatedMinutes(orderId: string, estimatedMinu
   return serialized
 }
 
+export async function updateOrderPriority(orderId: string, priority: boolean) {
+  const order = await prisma.order.update({
+    where: { id: orderId },
+    data: { priority },
+    include: orderInclude,
+  })
+
+  return serializeOrder(order)
+}
+
+const ORDER_ITEM_EDITABLE_STATUSES: PrismaOrderStatus[] = [
+  PrismaOrderStatus.PENDING,
+  PrismaOrderStatus.CONFIRMED,
+  PrismaOrderStatus.PREPARING,
+  PrismaOrderStatus.READY,
+]
+
+function orderHasStockApplied(order: {
+  status: PrismaOrderStatus
+  paymentMethod: PrismaPaymentMethod
+  payment?: { status: PrismaPaymentStatus } | null
+}) {
+  const awaitingOnlinePayment =
+    order.status === PrismaOrderStatus.PENDING &&
+    order.payment?.status === PrismaPaymentStatus.PENDING &&
+    (order.paymentMethod === PrismaPaymentMethod.TRANSFER ||
+      order.paymentMethod === PrismaPaymentMethod.MERCADO_PAGO)
+
+  return !awaitingOnlinePayment
+}
+
+type CartItemInput = z.infer<typeof cartItemInputSchema>
+
+export type UpdateOrderItemsInput = {
+  add?: CartItemInput[]
+  updates?: Array<{ orderItemId: string; quantity: number }>
+  remove?: string[]
+}
+
+/**
+ * Permite a staff sumar / ajustar / quitar productos de un pedido activo
+ * (p. ej. el cliente pide agregar algo por WhatsApp).
+ */
+export async function updateOrderItems(
+  orderId: string,
+  input: UpdateOrderItemsInput,
+  userId?: string
+) {
+  const addItems = input.add ?? []
+  const updates = input.updates ?? []
+  const removeIds = [...new Set(input.remove ?? [])]
+
+  if (addItems.length === 0 && updates.length === 0 && removeIds.length === 0) {
+    throw new Error('NO_ITEM_CHANGES')
+  }
+
+  const productIds = [...new Set(addItems.map((item) => item.productId))]
+  const [products, activePromotions, settings] = await Promise.all([
+    productIds.length > 0
+      ? prisma.product.findMany({
+          where: { id: { in: productIds }, deletedAt: null, available: true },
+          include: productInclude,
+        })
+      : Promise.resolve([]),
+    prisma.promotion.findMany({
+      where: {
+        active: true,
+        validFrom: { lte: new Date() },
+        validTo: { gte: new Date() },
+      },
+      include: promotionInclude,
+    }),
+    prisma.businessSettings.findUnique({ where: { id: 'main' } }),
+  ])
+
+  if (products.length !== productIds.length) {
+    throw new Error('INVALID_PRODUCTS')
+  }
+
+  const serializedPromotions = activePromotions.map(serializePromotion)
+  const taxRate = decimalToNumber(settings?.taxRate ?? 0)
+
+  const itemsToCreate = addItems.map((item) => {
+    const product = products.find((candidate) => candidate.id === item.productId)
+    if (!product) throw new Error('INVALID_PRODUCT')
+
+    let unitPrice = decimalToNumber(product.basePrice)
+
+    const normalizedSelections = item.selectedOptions.flatMap((selectedOption) => {
+      const option = product.options.find(
+        (candidate) => candidate.id === selectedOption.optionId || candidate.name === selectedOption.optionId
+      )
+      if (!option) throw new Error('INVALID_OPTION')
+      if (option.required && selectedOption.choiceIds.length === 0) throw new Error('REQUIRED_OPTION')
+      if (!option.multiple && selectedOption.choiceIds.length > 1) throw new Error('INVALID_OPTION_SELECTION')
+
+      return selectedOption.choiceIds.map((choiceId) => {
+        const choice =
+          option.choices.find((candidate) => candidate.id === choiceId) ??
+          option.choices.find((candidate) => candidate.name === choiceId)
+        if (!choice) throw new Error('INVALID_CHOICE')
+        unitPrice += decimalToNumber(choice.priceModifier)
+        return {
+          optionName: option.name,
+          choiceName: choice.name,
+          priceModifier: decimalToNumber(choice.priceModifier),
+        }
+      })
+    })
+
+    const serializedProduct = serializeProduct(product)
+    const discountPercent = getProductDiscountPercent(serializedProduct, serializedPromotions)
+    const discountedUnitPrice = discountPercent > 0 ? unitPrice * (1 - discountPercent / 100) : unitPrice
+
+    return {
+      productId: product.id,
+      productName: product.name,
+      productDescription: product.description,
+      basePrice: decimalToNumber(product.basePrice),
+      unitPrice: discountedUnitPrice,
+      imageUrl: product.images[0]?.url ?? product.imageUrl,
+      quantity: item.quantity,
+      notes: item.notes,
+      selections: normalizedSelections,
+    }
+  })
+
+  const updatedOrder = await prisma.$transaction(async (tx) => {
+    const existing = await tx.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: true,
+        payment: true,
+      },
+    })
+
+    if (!existing) throw new Error('ORDER_NOT_FOUND')
+    if (!ORDER_ITEM_EDITABLE_STATUSES.includes(existing.status)) {
+      throw new Error('ORDER_NOT_EDITABLE')
+    }
+
+    const existingById = new Map(existing.items.map((item) => [item.id, item]))
+    for (const update of updates) {
+      if (!existingById.has(update.orderItemId)) throw new Error('ORDER_ITEM_NOT_FOUND')
+      if (!Number.isInteger(update.quantity) || update.quantity < 1) throw new Error('INVALID_QUANTITY')
+    }
+    for (const removeId of removeIds) {
+      if (!existingById.has(removeId)) throw new Error('ORDER_ITEM_NOT_FOUND')
+    }
+
+    const remainingAfterRemove = existing.items.filter((item) => !removeIds.includes(item.id))
+    if (remainingAfterRemove.length + itemsToCreate.length === 0) {
+      throw new Error('ORDER_MUST_HAVE_ITEMS')
+    }
+
+    const stockApplied = orderHasStockApplied(existing)
+    const stockDeltas = new Map<string, number>()
+
+    const bumpStock = (productId: string | null | undefined, delta: number) => {
+      if (!productId || delta === 0) return
+      stockDeltas.set(productId, (stockDeltas.get(productId) ?? 0) + delta)
+    }
+
+    for (const removeId of removeIds) {
+      const item = existingById.get(removeId)!
+      bumpStock(item.productId, -item.quantity)
+      await tx.orderItem.delete({ where: { id: removeId } })
+    }
+
+    for (const update of updates) {
+      if (removeIds.includes(update.orderItemId)) continue
+      const item = existingById.get(update.orderItemId)!
+      const delta = update.quantity - item.quantity
+      if (delta === 0) continue
+      bumpStock(item.productId, delta)
+      await tx.orderItem.update({
+        where: { id: update.orderItemId },
+        data: { quantity: update.quantity },
+      })
+    }
+
+    for (const item of itemsToCreate) {
+      bumpStock(item.productId, item.quantity)
+      await tx.orderItem.create({
+        data: {
+          orderId,
+          productId: item.productId,
+          productName: item.productName,
+          productDescription: item.productDescription,
+          basePrice: item.basePrice,
+          unitPrice: item.unitPrice,
+          imageUrl: item.imageUrl,
+          quantity: item.quantity,
+          notes: item.notes,
+          selections: {
+            create: item.selections,
+          },
+        },
+      })
+    }
+
+    if (stockApplied) {
+      const toDecrement = [...stockDeltas.entries()]
+        .filter(([, qty]) => qty > 0)
+        .map(([productId, quantity]) => ({ productId, quantity }))
+      const toIncrement = [...stockDeltas.entries()]
+        .filter(([, qty]) => qty < 0)
+        .map(([productId, quantity]) => ({ productId, quantity: Math.abs(quantity) }))
+
+      if (toDecrement.length > 0) {
+        await applyStockDeltaForOrderItems(tx, toDecrement, 'decrement')
+      }
+      if (toIncrement.length > 0) {
+        await applyStockDeltaForOrderItems(tx, toIncrement, 'increment')
+      }
+    }
+
+    const refreshedItems = await tx.orderItem.findMany({ where: { orderId } })
+    const subtotal = refreshedItems.reduce(
+      (sum, item) => sum + decimalToNumber(item.unitPrice) * item.quantity,
+      0
+    )
+    const discountAmount = decimalToNumber(existing.discountAmount ?? 0)
+    const deliveryFee = decimalToNumber(existing.deliveryFee)
+    const tip = decimalToNumber(existing.tip ?? 0)
+    const tax = Math.max(0, subtotal - discountAmount) * taxRate
+    const total = Math.max(0, subtotal - discountAmount) + tax + deliveryFee + tip
+    const previousTotal = decimalToNumber(existing.total)
+    const totalDelta = total - previousTotal
+
+    const updated = await tx.order.update({
+      where: { id: orderId },
+      data: {
+        subtotal,
+        tax,
+        total,
+        statusHistory: {
+          create: {
+            status: existing.status,
+            changedByUserId: userId,
+            note: 'Productos actualizados por staff',
+          },
+        },
+      },
+      include: orderInclude,
+    })
+
+    if (existing.payment && existing.payment.status === PrismaPaymentStatus.PENDING) {
+      await tx.payment.update({
+        where: { id: existing.payment.id },
+        data: { amount: total },
+      })
+    }
+
+    if (existing.tableSessionId && totalDelta !== 0) {
+      await tx.tableSession.update({
+        where: { id: existing.tableSessionId },
+        data: { accumulatedTotal: { increment: totalDelta } },
+      })
+    }
+
+    await tx.auditLog.create({
+      data: {
+        action: 'order.items_updated',
+        entityType: 'order',
+        entityId: orderId,
+        createdByUserId: userId,
+        metadata: {
+          added: itemsToCreate.length,
+          updated: updates.length,
+          removed: removeIds.length,
+          previousTotal,
+          total,
+        },
+      },
+    })
+
+    return updated
+  })
+
+  return serializeOrder(updatedOrder)
+}
+
 export async function updateOrderStatus(
   orderId: string,
   status: Order['status'],
@@ -1650,7 +2054,12 @@ export async function approveOrderPayment(orderId: string, userId?: string) {
       throw new Error('ORDER_NOT_FOUND')
     }
 
-    if (existingOrder.paymentMethod !== PrismaPaymentMethod.TRANSFER) {
+    const isTransfer = existingOrder.paymentMethod === PrismaPaymentMethod.TRANSFER
+    const isCombinedWithTransfer =
+      existingOrder.paymentMethod === PrismaPaymentMethod.COMBINED &&
+      existingOrder.paymentSplits.some((split) => split.method === PrismaPaymentMethod.TRANSFER)
+
+    if (!isTransfer && !isCombinedWithTransfer) {
       throw new Error('INVALID_PAYMENT_METHOD')
     }
 
@@ -1675,7 +2084,9 @@ export async function approveOrderPayment(orderId: string, userId?: string) {
           create: {
             status: PrismaOrderStatus.CONFIRMED,
             changedByUserId: userId,
-            note: 'Pago verificado por WhatsApp',
+            note: isCombinedWithTransfer
+              ? 'Pago combinado verificado (comprobante WhatsApp)'
+              : 'Pago verificado por WhatsApp',
           },
         },
       },
@@ -1705,9 +2116,10 @@ export async function occupyTable(tableId: string, userId?: string) {
 export async function closeTableAndOrders(
   tableId: string,
   userId?: string,
-  paymentMethod: 'cash' | 'card' | 'transfer' | 'mercado_pago' = 'cash'
+  paymentMethod: PaymentMethod = 'cash',
+  paymentSplits?: PaymentSplitInput[]
 ) {
-  const session = await prisma.tableSession.findFirst({
+  let session = await prisma.tableSession.findFirst({
     where: {
       tableId,
       closedAt: null,
@@ -1720,39 +2132,101 @@ export async function closeTableAndOrders(
     },
   })
 
+  // Si la mesa quedó ocupada sin sesión (estado inconsistente), recuperamos
+  // con los pedidos abiertos de la mesa o liberamos si no hay nada que cobrar.
   if (!session) {
-    throw new Error('TABLE_SESSION_NOT_FOUND')
+    const openOrders = await prisma.order.findMany({
+      where: {
+        diningTableId: tableId,
+        status: {
+          notIn: [PrismaOrderStatus.COMPLETED, PrismaOrderStatus.CANCELLED],
+        },
+      },
+      select: { id: true, total: true },
+    })
+
+    if (openOrders.length === 0) {
+      const freed = await prisma.diningTable.update({
+        where: { id: tableId },
+        data: { status: PrismaTableStatus.FREE },
+        include: tableInclude,
+      })
+      return freed
+    }
+
+    const recovered = await prisma.$transaction(async (tx) => {
+      const created = await tx.tableSession.create({
+        data: {
+          tableId,
+          waitressId: userId,
+          accumulatedTotal: openOrders.reduce((sum, order) => sum + decimalToNumber(order.total), 0),
+        },
+      })
+
+      await tx.order.updateMany({
+        where: { id: { in: openOrders.map((order) => order.id) } },
+        data: { tableSessionId: created.id },
+      })
+
+      return tx.tableSession.findUniqueOrThrow({
+        where: { id: created.id },
+        include: { orders: true },
+      })
+    })
+
+    session = recovered
   }
 
-  const prismaPaymentMethod =
-    paymentMethod === 'card'
-      ? 'CARD'
-      : paymentMethod === 'transfer'
-        ? 'TRANSFER'
-        : paymentMethod === 'mercado_pago'
-          ? 'MERCADO_PAGO'
-          : 'CASH'
+  const prismaPaymentMethod = uiPaymentMethodToPrisma(paymentMethod)
   const orderIds = session.orders.map((order) => order.id)
+  const sessionTotal = session.orders.reduce((sum, order) => sum + decimalToNumber(order.total), 0)
 
-  await prisma.$transaction([
-    ...(orderIds.length > 0
-      ? [
-          prisma.payment.updateMany({
-            where: { orderId: { in: orderIds } },
-            data: {
-              method: prismaPaymentMethod,
-              status: 'APPROVED',
-            },
-          }),
-          prisma.order.updateMany({
-            where: { id: { in: orderIds } },
-            data: {
-              paymentMethod: prismaPaymentMethod,
-            },
-          }),
-        ]
-      : []),
-    prisma.order.updateMany({
+  const normalizedSplits =
+    paymentMethod === 'combined'
+      ? assertPaymentSplitsMatchTotal(sessionTotal, paymentSplits ?? [])
+      : undefined
+
+  const splitsByOrder = normalizedSplits
+    ? allocateSplitsAcrossOrders(
+        session.orders.map((order) => ({ id: order.id, total: decimalToNumber(order.total) })),
+        normalizedSplits
+      )
+    : []
+
+  await prisma.$transaction(async (tx) => {
+    if (orderIds.length > 0) {
+      await tx.payment.updateMany({
+        where: { orderId: { in: orderIds } },
+        data: {
+          method: prismaPaymentMethod,
+          status: 'APPROVED',
+        },
+      })
+      await tx.order.updateMany({
+        where: { id: { in: orderIds } },
+        data: {
+          paymentMethod: prismaPaymentMethod,
+        },
+      })
+
+      await tx.orderPaymentSplit.deleteMany({
+        where: { orderId: { in: orderIds } },
+      })
+
+      if (splitsByOrder.length > 0) {
+        await tx.orderPaymentSplit.createMany({
+          data: splitsByOrder.flatMap(({ orderId, splits }) =>
+            splits.map((split) => ({
+              orderId,
+              method: uiPaymentMethodToPrisma(split.method),
+              amount: split.amount,
+            }))
+          ),
+        })
+      }
+    }
+
+    await tx.order.updateMany({
       where: {
         tableSessionId: session.id,
         status: {
@@ -1762,20 +2236,23 @@ export async function closeTableAndOrders(
       data: {
         status: PrismaOrderStatus.COMPLETED,
       },
-    }),
-    prisma.tableSession.update({
+    })
+
+    await tx.tableSession.update({
       where: { id: session.id },
       data: {
         closedAt: new Date(),
       },
-    }),
-    prisma.diningTable.update({
+    })
+
+    await tx.diningTable.update({
       where: { id: tableId },
       data: {
         status: PrismaTableStatus.FREE,
       },
-    }),
-    prisma.auditLog.create({
+    })
+
+    await tx.auditLog.create({
       data: {
         action: 'table.closed',
         entityType: 'table',
@@ -1784,15 +2261,84 @@ export async function closeTableAndOrders(
         metadata: {
           tableSessionId: session.id,
           paymentMethod,
+          paymentSplits: normalizedSplits ?? null,
         },
       },
-    }),
-  ])
+    })
+  })
 
   return prisma.diningTable.findUnique({
     where: { id: tableId },
     include: tableInclude,
   })
+}
+
+/** Actualiza el medio de pago (y splits) de un pedido ya creado — típico desde caja. */
+export async function updateOrderPaymentMethod(
+  orderId: string,
+  paymentMethod: PaymentMethod,
+  paymentSplits: PaymentSplitInput[] | undefined,
+  userId?: string
+) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { payment: true },
+  })
+  if (!order) throw new Error('ORDER_NOT_FOUND')
+  if (order.status === PrismaOrderStatus.CANCELLED) throw new Error('ORDER_CANCELLED')
+
+  const prismaPaymentMethod = uiPaymentMethodToPrisma(paymentMethod)
+  const normalizedSplits =
+    paymentMethod === 'combined'
+      ? assertPaymentSplitsMatchTotal(decimalToNumber(order.total), paymentSplits ?? [])
+      : undefined
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.orderPaymentSplit.deleteMany({ where: { orderId } })
+
+    if (normalizedSplits?.length) {
+      await tx.orderPaymentSplit.createMany({
+        data: normalizedSplits.map((split) => ({
+          orderId,
+          method: uiPaymentMethodToPrisma(split.method),
+          amount: split.amount,
+        })),
+      })
+    }
+
+    await tx.order.update({
+      where: { id: orderId },
+      data: { paymentMethod: prismaPaymentMethod },
+    })
+
+    if (order.payment) {
+      await tx.payment.update({
+        where: { id: order.payment.id },
+        data: { method: prismaPaymentMethod },
+      })
+    }
+
+    await tx.auditLog.create({
+      data: {
+        action: 'order.payment_updated',
+        entityType: 'order',
+        entityId: orderId,
+        orderId,
+        createdByUserId: userId,
+        metadata: {
+          paymentMethod,
+          paymentSplits: normalizedSplits ?? null,
+        },
+      },
+    })
+
+    return tx.order.findUniqueOrThrow({
+      where: { id: orderId },
+      include: orderInclude,
+    })
+  })
+
+  return serializeOrder(updated)
 }
 
 export async function getAnalytics(): Promise<AnalyticsOverview> {
