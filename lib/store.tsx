@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import useSWR from 'swr'
 import { SessionProvider, signIn, signOut, useSession } from 'next-auth/react'
 import type { AnalyticsOverview, BusinessSettings, CartItem, Category, ChannelSchedule, ChannelSetting, Order, OrderStatus, PaymentMethod, Product, Promotion, SelectedOption, Table, User } from '@/lib/types'
+import { countActiveOrders, countBusyTables } from '@/lib/adaptive-polling'
 import { getOfflineCache, isBrowserOffline, OFFLINE_CACHE_KEYS, setOfflineCache } from '@/lib/offline-cache'
 import {
   enqueueOfflineOrder,
@@ -14,6 +15,7 @@ import {
 } from '@/lib/offline-order-queue'
 import { getMesaIdFromSearch } from '@/lib/menu-url'
 import { hasPermission, type Permission, type SessionRoleContext } from '@/lib/permissions'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
 
 const CART_STORAGE_KEY = 'coty-cafe-cart'
 
@@ -564,13 +566,22 @@ export function useCatalog() {
 
 export function useOrders() {
   const { user } = useAuth()
+  const { settings, isLoading: settingsLoading } = useBusiness()
   const shouldFetch = Boolean(user?.role)
   const [offlineOrders, setOfflineOrders] = useState<Order[]>([])
+  const refreshInterval = useAdaptiveRefreshInterval<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
+    15000,
+    {
+      enabled: shouldFetch,
+      isOpen: settingsLoading ? null : settings.isOpen,
+      getActiveCount: countActiveOrders,
+    }
+  )
   const { data, error, isLoading, mutate } = useSWR<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
     shouldFetch ? '/api/orders' : null,
     fetchJson,
     {
-      refreshInterval: shouldFetch ? 15000 : 0,
+      refreshInterval,
       revalidateOnFocus: true,
     }
   )
@@ -821,11 +832,19 @@ export function useTrackedOrders(searchId: string, paymentReturnOrderId?: string
     return null
   }, [trackingCodes, searchId, paymentReturnOrderId])
 
+  const refreshInterval = useAdaptiveRefreshInterval<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
+    20000,
+    {
+      enabled: Boolean(queryString),
+      getActiveCount: countActiveOrders,
+    }
+  )
+
   const { data, error, isLoading, mutate } = useSWR<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
     queryString,
     fetchJson,
     {
-      refreshInterval: queryString ? 20000 : 0,
+      refreshInterval,
       revalidateOnFocus: true,
     }
   )
@@ -879,9 +898,15 @@ export function useTrackedOrders(searchId: string, paymentReturnOrderId?: string
 
 export function useTables() {
   const { user } = useAuth()
+  const { settings, isLoading: settingsLoading } = useBusiness()
   const shouldFetch = Boolean(user?.role)
+  const refreshInterval = useAdaptiveRefreshInterval<Table[]>(15000, {
+    enabled: shouldFetch,
+    isOpen: settingsLoading ? null : settings.isOpen,
+    getActiveCount: countBusyTables,
+  })
   const { data, error, isLoading, mutate } = useSWR<Table[]>(shouldFetch ? '/api/tables' : null, fetchJson, {
-    refreshInterval: shouldFetch ? 15000 : 0,
+    refreshInterval,
     revalidateOnFocus: true,
   })
 
@@ -990,7 +1015,8 @@ export function useTables() {
   }
 }
 
-export function useAdminData(): AdminData {
+export function useAdminData(options: { pollAnalytics?: boolean; loadAnalytics?: boolean; loadHistory?: boolean; loadOrders?: boolean } = {}): AdminData {
+  const { pollAnalytics = false, loadAnalytics = false, loadHistory = false, loadOrders = false } = options
   const { user } = useAuth()
   const roleContext = useMemo<SessionRoleContext>(
     () => ({
@@ -1001,41 +1027,62 @@ export function useAdminData(): AdminData {
   )
   const can = useCallback((permission: Permission) => hasPermission(roleContext, permission), [roleContext])
 
-  const { data: usersData, mutate: mutateUsers } = useSWR<User[]>(can('staff:manage') ? '/api/admin/users' : null, fetchJson)
-  const { data: productsData, mutate: mutateProducts } = useSWR<Product[]>(can('settings:write') ? '/api/admin/products' : null, fetchJson)
+  const { data: usersData, mutate: mutateUsers } = useSWR<User[]>(can('staff:manage') ? '/api/admin/users' : null, fetchJson, {
+    revalidateOnFocus: false,
+  })
+  const { data: productsData, mutate: mutateProducts } = useSWR<Product[]>(can('settings:write') ? '/api/admin/products' : null, fetchJson, {
+    revalidateOnFocus: false,
+  })
   const { data: catalogData, mutate: mutateCatalog } = useSWR<{ products: Product[] }>(
     can('tables:manage') && !can('settings:write') ? '/api/catalog' : null,
-    fetchJson
+    fetchJson,
+    { revalidateOnFocus: false }
   )
-  const { data: categoriesData, mutate: mutateCategories } = useSWR<Category[]>(can('settings:write') ? '/api/admin/categories' : null, fetchJson)
+  const { data: categoriesData, mutate: mutateCategories } = useSWR<Category[]>(can('settings:write') ? '/api/admin/categories' : null, fetchJson, {
+    revalidateOnFocus: false,
+  })
   const { data: promotionsData, mutate: mutatePromotions } = useSWR<Array<Promotion & { validFrom: string | Date; validTo: string | Date }>>(
     can('settings:write') ? '/api/admin/promotions' : null,
-    fetchJson
+    fetchJson,
+    { revalidateOnFocus: false }
   )
   const { data: settingsData, mutate: mutateSettings } = useSWR<BusinessSettings>(
     can('settings:read') ? '/api/admin/settings' : null,
-    fetchJson
+    fetchJson,
+    { revalidateOnFocus: false }
   )
   const { data: schedulesData, mutate: mutateSchedules } = useSWR<{ schedules: ChannelSchedule[]; channelSettings: ChannelSetting[] }>(
     can('schedules:manage') ? '/api/admin/schedules' : null,
-    fetchJson
+    fetchJson,
+    { revalidateOnFocus: false }
   )
-  const { data: tablesData, mutate: mutateTables } = useSWR<Table[]>(can('tables:manage') ? '/api/tables' : null, fetchJson)
+  const { data: tablesData, mutate: mutateTables } = useSWR<Table[]>(can('tables:manage') ? '/api/tables' : null, fetchJson, {
+    revalidateOnFocus: false,
+  })
+  const shouldLoadOrders = can('staff:operate') && loadOrders
   const { data: ordersData, mutate: mutateOrders } = useSWR<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
-    can('staff:operate') ? '/api/orders' : null,
-    fetchJson
+    shouldLoadOrders ? '/api/orders' : null,
+    fetchJson,
+    { revalidateOnFocus: false }
   )
+  const shouldLoadAnalytics = can('analytics:read') && (pollAnalytics || loadAnalytics)
+  const analyticsRefreshInterval = useAdaptiveRefreshInterval(60000, {
+    enabled: shouldLoadAnalytics && pollAnalytics,
+    isOpen: settingsData == null ? null : settingsData.isOpen,
+    activeCount: countActiveOrders(ordersData) + countBusyTables(tablesData),
+  })
   const { data: analyticsData, mutate: mutateAnalytics } = useSWR<AnalyticsOverview>(
-    can('analytics:read') ? '/api/admin/analytics' : null,
+    shouldLoadAnalytics ? '/api/admin/analytics' : null,
     fetchJson,
     {
-      refreshInterval: can('analytics:read') ? 30000 : 0,
-      revalidateOnFocus: true,
+      refreshInterval: analyticsRefreshInterval,
+      revalidateOnFocus: pollAnalytics,
     }
   )
   const { data: historyData, mutate: mutateHistory } = useSWR<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
-    can('analytics:read') ? '/api/admin/orders/history' : null,
-    fetchJson
+    can('analytics:read') && loadHistory ? '/api/admin/orders/history' : null,
+    fetchJson,
+    { revalidateOnFocus: false }
   )
 
   const refreshAll = useCallback(async () => {

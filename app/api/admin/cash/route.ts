@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getOpenCashSession, listCashSessions, openCashSession } from '@/lib/commerce'
+import { getCashSessionById, getOpenCashSession, listCashSessions, openCashSession } from '@/lib/commerce'
 import { handleRouteError } from '@/lib/api-errors'
 import { requireAnyPermission, requirePermission } from '@/lib/server-data'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     await requireAnyPermission('cashier:close', 'cash:movement')
+    const sessionId = request.nextUrl.searchParams.get('sessionId')
+    if (sessionId) {
+      const session = await getCashSessionById(sessionId)
+      if (!session) {
+        return NextResponse.json({ error: 'Sesión de caja no encontrada' }, { status: 404 })
+      }
+      return NextResponse.json(session)
+    }
+
     const [open, sessions] = await Promise.all([getOpenCashSession(), listCashSessions()])
     return NextResponse.json({ open, sessions })
   } catch (error) {

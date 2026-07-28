@@ -21,7 +21,9 @@ type TableCall = {
 
 export function CallsSection() {
   const { data, mutate, isLoading } = useSWR<TableCall[]>('/api/table-calls', fetchJson, {
-    refreshInterval: 15000,
+    // El poll lo concentra `useCallsAlert` (mismo key SWR); acá solo revalidamos al montar.
+    refreshInterval: 0,
+    revalidateOnFocus: true,
   })
 
   const patch = async (id: string, action: 'acknowledge' | 'resolve') => {

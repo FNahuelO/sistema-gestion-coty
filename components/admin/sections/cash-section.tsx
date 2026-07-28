@@ -8,12 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
 import { formatPrice } from '@/lib/coty-theme'
 import { formatDateAR, formatDateTimeAR } from '@/lib/datetime'
 import { PANEL_CARD, PANEL_INTERACTIVE_HOVER, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TITLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { hasPermission, type SessionRoleContext } from '@/lib/permissions'
-import { useAuth } from '@/lib/store'
+import { useAuth, useBusiness } from '@/lib/store'
 import { useFormPanel } from '../hooks/use-form-panel'
 import { AdminFormPanel } from '../ui/admin-form-panel'
 import { AdminPageHeader } from '../ui/admin-page-header'
@@ -90,12 +91,31 @@ export function CashSection() {
 
   const { open, setOpen, openPanel } = useFormPanel('cash')
   const [formMode, setFormMode] = useState<CashFormMode>('open')
-  const [selectedClosedSession, setSelectedClosedSession] = useState<CashSession | null>(null)
+  const { settings, isLoading: settingsLoading } = useBusiness()
+  const [selectedClosedSessionId, setSelectedClosedSessionId] = useState<string | null>(null)
 
+  const refreshInterval = useAdaptiveRefreshInterval<{ open: CashSession | null; sessions: CashSession[] }>(
+    20000,
+    {
+      isOpen: settingsLoading ? null : settings.isOpen,
+      getActiveCount: (data) => (data?.open ? 1 : 0),
+    }
+  )
   const { data, mutate, isLoading } = useSWR<{ open: CashSession | null; sessions: CashSession[] }>(
     '/api/admin/cash',
     fetchJson,
-    { refreshInterval: 20000 }
+    { refreshInterval }
+  )
+
+  const {
+    data: selectedClosedSession,
+    isLoading: selectedClosedLoading,
+    error: selectedClosedError,
+  } = useSWR<CashSession>(
+    selectedClosedSessionId
+      ? `/api/admin/cash?sessionId=${encodeURIComponent(selectedClosedSessionId)}`
+      : null,
+    fetchJson
   )
 
   const closedSessions = useMemo(
@@ -360,7 +380,7 @@ export function CashSection() {
               <button
                 key={session.id}
                 type="button"
-                onClick={() => setSelectedClosedSession(session)}
+                onClick={() => setSelectedClosedSessionId(session.id)}
                 className={cn(
                   PANEL_LIST_ROW,
                   PANEL_INTERACTIVE_HOVER,
@@ -398,9 +418,9 @@ export function CashSection() {
       </div>
 
       <MobileBottomSheet
-        open={!!selectedClosedSession}
+        open={!!selectedClosedSessionId}
         onOpenChange={(next) => {
-          if (!next) setSelectedClosedSession(null)
+          if (!next) setSelectedClosedSessionId(null)
         }}
         title="Detalle del cierre"
         description={
@@ -409,7 +429,15 @@ export function CashSection() {
             : undefined
         }
       >
-        {selectedClosedSession ? (
+        {selectedClosedLoading && !selectedClosedSession ? (
+          <div className="flex justify-center py-8">
+            <Spinner />
+          </div>
+        ) : selectedClosedError ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            No se pudo cargar el detalle del cierre
+          </p>
+        ) : selectedClosedSession ? (
           <div className="space-y-4 pb-2">
             <div className={cn(PANEL_LIST_ROW, 'space-y-2 text-sm')}>
               <div className="flex justify-between gap-3">

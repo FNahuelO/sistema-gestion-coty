@@ -4,6 +4,7 @@ import useSWR from 'swr'
 import { Truck } from 'lucide-react'
 import { AssignRunnerSelect } from '@/components/staff/assign-runner-select'
 import { Badge } from '@/components/ui/badge'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
 import { PANEL_CARD } from '@/lib/panel-theme'
 import { formatDeliveryAssignmentStatus } from '@/lib/delivery-labels'
 import type { DeliveryQueueEntry, Order } from '@/lib/types'
@@ -26,10 +27,15 @@ export function DeliveryAssignmentPanel({
   const shouldFetch =
     order.type === 'delivery' && !['completed', 'cancelled', 'delivered'].includes(order.status)
 
+  const refreshInterval = useAdaptiveRefreshInterval<DeliveryQueueEntry | null>(20000, {
+    enabled: shouldFetch,
+    // Si estamos polleando este pedido, hay trabajo activo.
+    activeCount: shouldFetch ? 1 : 0,
+  })
   const { data: entry, mutate } = useSWR<DeliveryQueueEntry | null>(
     shouldFetch ? `/api/staff/operations?view=delivery&orderId=${order.id}` : null,
     fetchJson,
-    { refreshInterval: shouldFetch ? 20000 : 0 }
+    { refreshInterval }
   )
 
   if (order.type !== 'delivery' || order.status === 'cancelled') return null

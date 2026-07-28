@@ -126,13 +126,24 @@ export async function closeCashSession(sessionId: string, closedByUserId: string
 }
 
 export async function listCashSessions(limit = 30) {
+  // El listado histórico no necesita movimientos; el detalle los pide on-demand.
   return prisma.cashSession.findMany({
     take: limit,
     orderBy: { openedAt: 'desc' },
     include: {
       openedByUser: { select: { id: true, name: true } },
       closedByUser: { select: { id: true, name: true } },
-      movements: true,
+    },
+  })
+}
+
+export async function getCashSessionById(sessionId: string) {
+  return prisma.cashSession.findUnique({
+    where: { id: sessionId },
+    include: {
+      openedByUser: { select: { id: true, name: true } },
+      closedByUser: { select: { id: true, name: true } },
+      movements: { orderBy: { createdAt: 'desc' } },
     },
   })
 }
@@ -402,8 +413,21 @@ export async function createTableCall(tableId: string) {
 export async function listPendingTableCalls() {
   return prisma.tableCall.findMany({
     where: { status: TableCallStatus.PENDING },
-    include: { table: true },
+    select: {
+      id: true,
+      createdAt: true,
+      table: { select: { number: true } },
+    },
     orderBy: { createdAt: 'asc' },
+  })
+}
+
+export async function countKitchenAttentionOrders() {
+  return prisma.order.count({
+    where: {
+      deletedFromOperationsAt: null,
+      status: { in: [OrderStatus.PENDING, OrderStatus.CONFIRMED] },
+    },
   })
 }
 
@@ -485,13 +509,22 @@ const DELIVERY_QUEUE_ORDER_STATUSES: OrderStatus[] = [
   OrderStatus.DELIVERED,
 ]
 
-const deliveryQueueInclude = {
+const deliveryQueueSelect = {
+  id: true,
+  displayCode: true,
+  status: true,
+  customerName: true,
+  customerPhone: true,
+  customerAddress: true,
+  total: true,
+  deliveryFee: true,
+  createdAt: true,
   deliveryAssignment: {
     include: { runner: { select: { id: true, name: true } } },
   },
-} satisfies Prisma.OrderInclude
+} satisfies Prisma.OrderSelect
 
-type DeliveryQueueOrder = Prisma.OrderGetPayload<{ include: typeof deliveryQueueInclude }>
+type DeliveryQueueOrder = Prisma.OrderGetPayload<{ select: typeof deliveryQueueSelect }>
 
 function mapAssignmentStatus(
   status?: DeliveryAssignmentStatus | null
@@ -574,7 +607,7 @@ export async function listDeliveryQueue() {
         { deliveryAssignment: { status: { not: DeliveryAssignmentStatus.DELIVERED } } },
       ],
     },
-    include: deliveryQueueInclude,
+    select: deliveryQueueSelect,
     orderBy: { createdAt: 'asc' },
   })
 
@@ -593,7 +626,7 @@ export async function getDeliveryQueueEntry(orderId: string) {
         { deliveryAssignment: { status: { not: DeliveryAssignmentStatus.DELIVERED } } },
       ],
     },
-    include: deliveryQueueInclude,
+    select: deliveryQueueSelect,
   })
 
   return order ? serializeDeliveryQueueEntry(order) : null
@@ -699,7 +732,7 @@ export async function updateDeliveryAssignment(
 
     const updatedOrder = await prisma.order.findUnique({
       where: { id: orderId },
-      include: deliveryQueueInclude,
+      select: deliveryQueueSelect,
     })
     if (!updatedOrder) throw new Error('ORDER_NOT_FOUND')
     return serializeDeliveryQueueEntry(updatedOrder)
@@ -779,6 +812,7 @@ export async function getKitchenOrders() {
       deletedFromOperationsAt: null,
     },
     orderBy: { createdAt: 'asc' },
+    take: 100,
     include: {
       items: {
         include: {
@@ -786,11 +820,7 @@ export async function getKitchenOrders() {
           product: { select: { preparationTime: true } },
         },
       },
-      payment: {
-        select: { status: true, initPoint: true, sandboxInitPoint: true },
-      },
       diningTable: { select: { number: true } },
-      deliveryZone: { select: { name: true } },
     },
   })
 }

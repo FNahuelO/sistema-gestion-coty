@@ -1,18 +1,36 @@
 'use client'
 
-import { useMemo } from 'react'
-import { useOrders } from '@/lib/store'
-import type { OrderStatus } from '@/lib/types'
+import useSWR from 'swr'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
+import { useBusiness } from '@/lib/store'
 
-const KITCHEN_ATTENTION_STATUSES: OrderStatus[] = ['pending', 'confirmed']
+type KitchenAlertData = { count: number }
 
+const fetchJson = async (url: string): Promise<KitchenAlertData> => {
+  const res = await fetch(url, { credentials: 'include' })
+  if (!res.ok) throw new Error('Error al cargar')
+  return res.json()
+}
+
+/**
+ * Badge de cocina sin montar el poll pesado de `/api/orders`.
+ * Usa un count liviano; se pausa cuando la sección cocina ya está activa.
+ */
 export function useKitchenAlert(isKitchenActive: boolean) {
-  const { orders } = useOrders()
+  const { settings, isLoading: settingsLoading } = useBusiness()
+  const refreshInterval = useAdaptiveRefreshInterval<KitchenAlertData>(30000, {
+    enabled: !isKitchenActive,
+    isOpen: settingsLoading ? null : settings.isOpen,
+    getActiveCount: (data) => data?.count ?? 0,
+  })
 
-  const pendingKitchenCount = useMemo(
-    () => orders.filter((order) => KITCHEN_ATTENTION_STATUSES.includes(order.status)).length,
-    [orders]
+  const { data } = useSWR<KitchenAlertData>(
+    isKitchenActive ? null : '/api/staff/operations?view=kitchen-alert',
+    fetchJson,
+    { refreshInterval }
   )
+
+  const pendingKitchenCount = data?.count ?? 0
 
   return {
     showKitchenAlert: pendingKitchenCount > 0 && !isKitchenActive,

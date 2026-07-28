@@ -3,6 +3,7 @@ import { z } from 'zod'
 import {
   ackKitchenOrder,
   assignOrderToRunner,
+  countKitchenAttentionOrders,
   getDeliveryQueueEntry,
   getKitchenOrders,
   getRunnerSettlement,
@@ -70,6 +71,11 @@ export async function GET(request: NextRequest) {
       }
       const settlement = await getRunnerSettlement(runnerId, new Date(from), new Date(to))
       return NextResponse.json(settlement)
+    }
+
+    if (view === 'kitchen-alert') {
+      const count = await countKitchenAttentionOrders()
+      return NextResponse.json({ count })
     }
 
     const orders = await getKitchenOrders()

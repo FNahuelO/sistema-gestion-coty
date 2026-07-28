@@ -40,7 +40,9 @@ export function StaffNotificationsButton({
 }: StaffNotificationsButtonProps) {
   const [open, setOpen] = useState(false)
   const { data: tableCalls } = useSWR<TableCall[]>('/api/table-calls', fetchJson, {
-    refreshInterval: 15000,
+    // Comparte cache con `useCallsAlert`; evita un segundo timer de poll.
+    refreshInterval: 0,
+    revalidateOnFocus: true,
   })
 
   const pendingOrders = useMemo(
