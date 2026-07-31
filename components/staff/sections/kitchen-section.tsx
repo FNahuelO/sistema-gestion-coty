@@ -6,7 +6,6 @@ import { ArrowUpDown, CheckCircle, ChefHat, Store, Truck, Users } from 'lucide-r
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
 import {
   ORDER_TYPE_BADGE_CLASS,
   ORDER_TYPE_CARD_ACCENT,
@@ -16,12 +15,13 @@ import {
 import { ORDER_SORT_OPTIONS, sortOrders, type OrderSortKey } from '@/lib/order-sort'
 import { PANEL_CARD, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
 import { StatusBadge } from '@/components/shared/status-badge'
-import { useBusiness } from '@/lib/store'
 import { cn } from '@/lib/utils'
 import type { Order, OrderType } from '@/lib/types'
 import { Spinner } from '@/components/ui/spinner'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { mutate as globalMutate } from 'swr'
+import { POLL_SWR_DEFAULTS, usePollInterval } from '@/lib/swr-poll'
 
 const fetchJson = async (url: string) => {
   const res = await fetch(url, { credentials: 'include' })
@@ -42,12 +42,9 @@ function notifyOrdersChanged() {
 export function KitchenSection() {
   const [sortBy, setSortBy] = useState<OrderSortKey>('priority')
   const [pendingAction, setPendingAction] = useState<string | null>(null)
-  const { settings, isLoading: settingsLoading } = useBusiness()
-  const refreshInterval = useAdaptiveRefreshInterval<Order[]>(15000, {
-    isOpen: settingsLoading ? null : settings.isOpen,
-    getActiveCount: (data) => data?.length ?? 0,
-  })
+  const refreshInterval = usePollInterval(15_000)
   const { data, mutate, isLoading } = useSWR<Order[]>('/api/staff/operations', fetchJson, {
+    ...POLL_SWR_DEFAULTS,
     refreshInterval,
   })
 
@@ -73,7 +70,7 @@ export function KitchenSection() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, orderId }),
       })
-      await mutate()
+      await Promise.all([mutate(), globalMutate('/api/staff/alerts')])
       notifyOrdersChanged()
       toast.success(successMessage)
     } catch {

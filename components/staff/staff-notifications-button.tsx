@@ -8,8 +8,10 @@ import { es } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { StatusBadge } from '@/components/shared/status-badge'
+import { useStaffOpsAlerts } from '@/hooks/use-staff-ops-alerts'
 import { PANEL_OUTLINE_BTN } from '@/lib/panel-theme'
 import { formatOrderNumber } from '@/lib/order-labels'
+import { POLL_SWR_DEFAULTS, usePollInterval } from '@/lib/swr-poll'
 import type { Order } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -39,10 +41,11 @@ export function StaffNotificationsButton({
   className,
 }: StaffNotificationsButtonProps) {
   const [open, setOpen] = useState(false)
-  const { data: tableCalls } = useSWR<TableCall[]>('/api/table-calls', fetchJson, {
-    // Comparte cache con `useCallsAlert`; evita un segundo timer de poll.
-    refreshInterval: 0,
-    revalidateOnFocus: true,
+  const { tableCallsPending } = useStaffOpsAlerts()
+  const callsPollMs = usePollInterval(open ? 15_000 : 0)
+  const { data: tableCalls } = useSWR<TableCall[]>(open ? '/api/table-calls' : null, fetchJson, {
+    ...POLL_SWR_DEFAULTS,
+    refreshInterval: callsPollMs,
   })
 
   const pendingOrders = useMemo(
@@ -50,7 +53,7 @@ export function StaffNotificationsButton({
     [orders]
   )
   const calls = tableCalls ?? []
-  const count = pendingOrders.length + calls.length
+  const count = pendingOrders.length + (open ? calls.length : tableCallsPending)
 
   const handleSelectOrder = (order: Order) => {
     onSelectOrder(order)

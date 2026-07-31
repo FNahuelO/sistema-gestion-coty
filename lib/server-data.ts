@@ -8,6 +8,7 @@ import {
   OrderType as PrismaOrderType,
   PaymentMethod as PrismaPaymentMethod,
   PaymentStatus as PrismaPaymentStatus,
+  TableCallStatus as PrismaTableCallStatus,
   TableStatus as PrismaTableStatus,
   UserRole as PrismaUserRole,
   StaffRole as PrismaStaffRole,
@@ -948,21 +949,37 @@ export const getPublicCatalog = unstable_cache(loadPublicCatalog, ['public-catal
   tags: [PUBLIC_CATALOG_TAG],
 })
 
+export async function getStaffOpsAlerts() {
+  const [kitchenPending, tableCallsPending] = await Promise.all([
+    prisma.order.count({
+      where: {
+        deletedFromOperationsAt: null,
+        status: { in: [PrismaOrderStatus.PENDING, PrismaOrderStatus.CONFIRMED] },
+      },
+    }),
+    prisma.tableCall.count({
+      where: { status: PrismaTableCallStatus.PENDING },
+    }),
+  ])
+
+  return { kitchenPending, tableCallsPending }
+}
+
+/** Pedidos activos + terminales del día AR (evita arrastrar historial operativo). */
 export async function getOperationalOrders() {
-  // Pedidos activos + terminados recientes: evita arrastrar histórico operativo ilimitado en cada poll.
-  const recentCutoff = new Date(Date.now() - 36 * 60 * 60 * 1000)
-  const activeStatuses: PrismaOrderStatus[] = [
-    PrismaOrderStatus.PENDING,
-    PrismaOrderStatus.CONFIRMED,
-    PrismaOrderStatus.PREPARING,
-    PrismaOrderStatus.READY,
-    PrismaOrderStatus.DELIVERED,
-  ]
+  const todayStart = new Date(arDayStartISO(arDayKey(new Date())))
 
   const orders = await prisma.order.findMany({
     where: {
       deletedFromOperationsAt: null,
-      OR: [{ status: { in: activeStatuses } }, { updatedAt: { gte: recentCutoff } }],
+      OR: [
+        {
+          status: {
+            notIn: [PrismaOrderStatus.COMPLETED, PrismaOrderStatus.CANCELLED],
+          },
+        },
+        { createdAt: { gte: todayStart } },
+      ],
     },
     orderBy: { createdAt: 'desc' },
     take: 200,
@@ -2346,27 +2363,36 @@ export async function getAnalytics(): Promise<AnalyticsOverview> {
   const todayKey = arDayKey(now)
   const todayStart = new Date(arDayStartISO(todayKey))
   const todayEnd = new Date(arDayEndISO(todayKey))
-  const dailyWindowStart = new Date(arDayStartISO(arDayKey(new Date(now.getTime() - 13 * 86400000))))
-  // Top productos: ventana acotada para no traer todo el histórico de ítems.
-  const topProductsSince = new Date(now.getTime() - 30 * 86400000)
+
+  const dailyKeys = Array.from({ length: 14 }, (_, index) => {
+    const day = new Date(todayStart)
+    day.setUTCDate(day.getUTCDate() - (13 - index))
+    return arDayKey(day)
+  })
+  const dailyWindowStart = new Date(arDayStartISO(dailyKeys[0]!))
+
+  const topProductsWindowStart = new Date(todayStart)
+  topProductsWindowStart.setUTCDate(topProductsWindowStart.getUTCDate() - 90)
+
   const notCancelled = { status: { not: PrismaOrderStatus.CANCELLED } } as const
 
   const [
-    totals,
-    todayTotals,
+    revenueAll,
+    revenueToday,
+    ordersAllCount,
+    ordersTodayCount,
     activeOrders,
     tablesServed,
     tablesServedToday,
     salesByTypeRows,
     salesByTypeTodayRows,
-    todayOrdersLite,
-    dailyOrdersLite,
+    todayOrderTimes,
+    dailyOrders,
     recentItems,
   ] = await Promise.all([
     prisma.order.aggregate({
       where: notCancelled,
       _sum: { total: true },
-      _count: { _all: true },
     }),
     prisma.order.aggregate({
       where: {
@@ -2374,7 +2400,12 @@ export async function getAnalytics(): Promise<AnalyticsOverview> {
         createdAt: { gte: todayStart, lte: todayEnd },
       },
       _sum: { total: true },
-      _count: { _all: true },
+    }),
+    prisma.order.count({ where: notCancelled }),
+    prisma.order.count({
+      where: {
+        createdAt: { gte: todayStart, lte: todayEnd },
+      },
     }),
     prisma.order.count({
       where: {
@@ -2387,7 +2418,9 @@ export async function getAnalytics(): Promise<AnalyticsOverview> {
       where: { closedAt: { not: null } },
     }),
     prisma.tableSession.count({
-      where: { closedAt: { gte: todayStart, lte: todayEnd } },
+      where: {
+        closedAt: { gte: todayStart, lte: todayEnd },
+      },
     }),
     prisma.order.groupBy({
       by: ['type'],
@@ -2420,7 +2453,7 @@ export async function getAnalytics(): Promise<AnalyticsOverview> {
       where: {
         order: {
           ...notCancelled,
-          createdAt: { gte: topProductsSince },
+          createdAt: { gte: topProductsWindowStart },
         },
       },
       select: {
@@ -2433,19 +2466,26 @@ export async function getAnalytics(): Promise<AnalyticsOverview> {
     }),
   ])
 
-  const mapTypeSales = (rows: Array<{ type: PrismaOrderType; _sum: { total: Prisma.Decimal | null } }>) => {
-    const sales = { delivery: 0, pickup: 0, table: 0 }
-    for (const row of rows) {
-      const amount = decimalToNumber(row._sum.total)
-      if (row.type === PrismaOrderType.DELIVERY) sales.delivery += amount
-      if (row.type === PrismaOrderType.PICKUP) sales.pickup += amount
-      if (row.type === PrismaOrderType.TABLE) sales.table += amount
-    }
-    return sales
-  }
+  const totalRevenue = decimalToNumber(revenueAll._sum.total ?? 0)
+  const todayRevenue = decimalToNumber(revenueToday._sum.total ?? 0)
+
+  const emptySales = { delivery: 0, pickup: 0, table: 0 }
+  const toSalesByType = (
+    rows: Array<{ type: PrismaOrderType; _sum: { total: Prisma.Decimal | null } }>
+  ) =>
+    rows.reduce(
+      (accumulator, row) => {
+        const amount = decimalToNumber(row._sum.total ?? 0)
+        if (row.type === PrismaOrderType.DELIVERY) accumulator.delivery += amount
+        if (row.type === PrismaOrderType.PICKUP) accumulator.pickup += amount
+        if (row.type === PrismaOrderType.TABLE) accumulator.table += amount
+        return accumulator
+      },
+      { ...emptySales }
+    )
 
   const hourlyBuckets = Array.from({ length: 24 }, (_, hour) => ({ hour, revenue: 0 }))
-  for (const order of todayOrdersLite) {
+  for (const order of todayOrderTimes) {
     hourlyBuckets[arHour(order.createdAt)].revenue += decimalToNumber(order.total)
   }
 
@@ -2479,38 +2519,34 @@ export async function getAnalytics(): Promise<AnalyticsOverview> {
       .slice(0, 5)
 
   const dailyMap = new Map<string, { revenue: number; orders: number }>()
-  for (const order of dailyOrdersLite) {
+  for (const key of dailyKeys) {
+    dailyMap.set(key, { revenue: 0, orders: 0 })
+  }
+  for (const order of dailyOrders) {
     const day = arDayKey(order.createdAt)
-    const current = dailyMap.get(day) ?? { revenue: 0, orders: 0 }
+    const current = dailyMap.get(day)
+    if (!current) continue
     current.revenue += decimalToNumber(order.total)
     current.orders += 1
-    dailyMap.set(day, current)
   }
 
-  const totalRevenue = decimalToNumber(totals._sum.total)
-  const orderCount = totals._count._all
-
   return {
-    todayRevenue: decimalToNumber(todayTotals._sum.total),
-    todayOrders: todayTotals._count._all,
-    averageTicket: orderCount ? totalRevenue / orderCount : 0,
+    todayRevenue,
+    todayOrders: ordersTodayCount,
+    averageTicket: ordersAllCount ? totalRevenue / ordersAllCount : 0,
     totalRevenue,
     activeOrders,
     tablesServed,
     tablesServedToday,
-    salesByType: mapTypeSales(salesByTypeRows),
-    salesByTypeToday: mapTypeSales(salesByTypeTodayRows),
+    salesByType: toSalesByType(salesByTypeRows),
+    salesByTypeToday: toSalesByType(salesByTypeTodayRows),
     hourlySalesToday: hourlyBuckets,
     topProducts: mapProducts('quantity'),
     topProductsByRevenue: mapProducts('revenue'),
-    dailySales: [...dailyMap.entries()]
-      .map(([date, value]) => ({
-        date,
-        revenue: value.revenue,
-        orders: value.orders,
-      }))
-      .sort((left, right) => left.date.localeCompare(right.date))
-      .slice(-14),
+    dailySales: dailyKeys.map((date) => {
+      const value = dailyMap.get(date) ?? { revenue: 0, orders: 0 }
+      return { date, revenue: value.revenue, orders: value.orders }
+    }),
   }
 }
 

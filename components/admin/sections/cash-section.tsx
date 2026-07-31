@@ -8,13 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
 import { formatPrice } from '@/lib/coty-theme'
 import { formatDateAR, formatDateTimeAR } from '@/lib/datetime'
 import { PANEL_CARD, PANEL_INTERACTIVE_HOVER, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TITLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { hasPermission, type SessionRoleContext } from '@/lib/permissions'
-import { useAuth, useBusiness } from '@/lib/store'
+import { useAuth } from '@/lib/store'
+import { POLL_SWR_DEFAULTS, usePollInterval } from '@/lib/swr-poll'
 import { useFormPanel } from '../hooks/use-form-panel'
 import { AdminFormPanel } from '../ui/admin-form-panel'
 import { AdminPageHeader } from '../ui/admin-page-header'
@@ -91,20 +91,13 @@ export function CashSection() {
 
   const { open, setOpen, openPanel } = useFormPanel('cash')
   const [formMode, setFormMode] = useState<CashFormMode>('open')
-  const { settings, isLoading: settingsLoading } = useBusiness()
   const [selectedClosedSessionId, setSelectedClosedSessionId] = useState<string | null>(null)
 
-  const refreshInterval = useAdaptiveRefreshInterval<{ open: CashSession | null; sessions: CashSession[] }>(
-    20000,
-    {
-      isOpen: settingsLoading ? null : settings.isOpen,
-      getActiveCount: (data) => (data?.open ? 1 : 0),
-    }
-  )
+  const cashPollMs = usePollInterval(20_000)
   const { data, mutate, isLoading } = useSWR<{ open: CashSession | null; sessions: CashSession[] }>(
     '/api/admin/cash',
     fetchJson,
-    { refreshInterval }
+    { ...POLL_SWR_DEFAULTS, refreshInterval: cashPollMs }
   )
 
   const {

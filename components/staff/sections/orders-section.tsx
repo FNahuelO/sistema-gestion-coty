@@ -23,9 +23,7 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useOrders, useBusiness } from '@/lib/store'
-import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
 import { usePendingAction } from '@/hooks/use-pending-action'
-import { countActiveDeliveryEntries } from '@/lib/adaptive-polling'
 import { OrderDetailSheet } from '@/components/staff/order-detail-sheet'
 import { ManualOrderDialog } from '@/components/staff/manual-order-dialog'
 import { StaffNotificationsButton } from '@/components/staff/staff-notifications-button'
@@ -34,6 +32,7 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { formatOrderStatus, formatOrderNumber, getDailyOrderControlSummary, getOrderChannelLabel, ORDER_TYPE_BADGE_CLASS, ORDER_TYPE_CARD_ACCENT, isDisplayableCustomerPhone } from '@/lib/order-labels'
 import { canApproveTransferPayment } from '@/lib/payment-flow'
 import { ORDER_SORT_OPTIONS, sortOrders, type OrderSortKey } from '@/lib/order-sort'
+import { POLL_SWR_DEFAULTS, usePollInterval } from '@/lib/swr-poll'
 import type { DeliveryQueueEntry, Order, OrderStatus, OrderType } from '@/lib/types'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -104,16 +103,13 @@ export function OrdersSection({
 }) {
   const { orders, createManualOrder, updateOrderStatus, updateOrderEstimate, updateOrderPriority, updateOrderItems, updateOrderPayment, closeOrder, approveOrderPayment } =
     useOrders()
-  const { settings, isLoading: settingsLoading } = useBusiness()
+  const { settings } = useBusiness()
   const businessName = settings?.name ?? 'Coty Café'
-  const deliveryRefreshInterval = useAdaptiveRefreshInterval<DeliveryQueueEntry[]>(20000, {
-    isOpen: settingsLoading ? null : settings.isOpen,
-    getActiveCount: countActiveDeliveryEntries,
-  })
+  const deliveryPollMs = usePollInterval(20_000)
   const { data: deliveryQueue = [], mutate: mutateDeliveryQueue } = useSWR<DeliveryQueueEntry[]>(
     '/api/staff/operations?view=delivery',
     fetchJson,
-    { refreshInterval: deliveryRefreshInterval }
+    { ...POLL_SWR_DEFAULTS, refreshInterval: deliveryPollMs }
   )
   const deliveryByOrderId = useMemo(
     () => new Map(deliveryQueue.map((entry) => [entry.orderId, entry])),
