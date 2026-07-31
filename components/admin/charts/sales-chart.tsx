@@ -5,6 +5,7 @@ import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { formatPrice } from '@/lib/coty-theme'
 import type { DailySales } from '@/lib/types'
 
 const chartConfig = {
@@ -44,7 +45,14 @@ export function SalesChart({ data }: { data: DailySales[] }) {
         <ChartTooltip
           content={
             <ChartTooltipContent
-              formatter={(value) => [`$${Number(value).toFixed(2)}`, 'Ventas']}
+              formatter={(value) => (
+                <div className="flex flex-1 items-center justify-between gap-4 leading-none">
+                  <span className="text-muted-foreground">Ventas</span>
+                  <span className="font-mono font-medium tabular-nums text-foreground">
+                    {formatPrice(Number(value))}
+                  </span>
+                </div>
+              )}
             />
           }
         />
