@@ -866,7 +866,17 @@ export async function getAnalyticsForRange(from: Date, to: Date) {
       createdAt: { gte: from, lte: to },
       status: { not: 'CANCELLED' },
     },
-    include: { items: true },
+    include: {
+      items: {
+        select: {
+          productId: true,
+          productName: true,
+          quantity: true,
+          unitPrice: true,
+          imageUrl: true,
+        },
+      },
+    },
   })
 
   const revenue = orders.reduce((sum, o) => sum + dec(o.total), 0)
@@ -877,6 +887,40 @@ export async function getAnalyticsForRange(from: Date, to: Date) {
     if (o.type === 'TABLE') byType.table += dec(o.total)
   }
 
+  const productMap = new Map<
+    string,
+    { productName: string; quantity: number; revenue: number; imageUrl?: string }
+  >()
+  for (const order of orders) {
+    for (const item of order.items) {
+      const key = item.productId ?? item.productName
+      const current = productMap.get(key) ?? {
+        productName: item.productName,
+        quantity: 0,
+        revenue: 0,
+        imageUrl: item.imageUrl ?? undefined,
+      }
+      current.quantity += item.quantity
+      current.revenue += dec(item.unitPrice) * item.quantity
+      if (!current.imageUrl && item.imageUrl) current.imageUrl = item.imageUrl
+      productMap.set(key, current)
+    }
+  }
+
+  const mapProducts = (sortBy: 'quantity' | 'revenue') =>
+    [...productMap.entries()]
+      .map(([productId, value]) => ({
+        productId,
+        productName: value.productName,
+        quantity: value.quantity,
+        revenue: value.revenue,
+        imageUrl: value.imageUrl,
+      }))
+      .sort((left, right) =>
+        sortBy === 'quantity' ? right.quantity - left.quantity : right.revenue - left.revenue
+      )
+      .slice(0, 10)
+
   return {
     from: from.toISOString(),
     to: to.toISOString(),
@@ -884,5 +928,7 @@ export async function getAnalyticsForRange(from: Date, to: Date) {
     orders: orders.length,
     averageTicket: orders.length ? revenue / orders.length : 0,
     salesByType: byType,
+    topProducts: mapProducts('quantity'),
+    topProductsByRevenue: mapProducts('revenue'),
   }
 }

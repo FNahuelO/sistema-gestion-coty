@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { formatPrice } from '@/lib/coty-theme'
-import { arDayEndISO, arDayKey, arDayStartISO } from '@/lib/datetime'
+import { arDayEndISO, arDayKey, arDayStartISO, formatDateAR } from '@/lib/datetime'
 import { PANEL_CARD, PANEL_INPUT, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_SURFACE_ALT, PANEL_TITLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { useAdminData } from '@/lib/store'
@@ -45,8 +45,21 @@ export function DashboardSection() {
   const { data: rangeAnalytics } = useSWR(rangeKey, async (url: string) => {
     const res = await fetch(url, { credentials: 'include' })
     if (!res.ok) throw new Error('Error')
-    return res.json() as Promise<{ revenue: number; orders: number; averageTicket: number }>
+    return res.json() as Promise<{
+      revenue: number
+      orders: number
+      averageTicket: number
+      topProductsByRevenue: Array<{
+        productId: string
+        productName: string
+        quantity: number
+        revenue: number
+        imageUrl?: string
+      }>
+    }>
   })
+
+  const rangeTopProducts = rangeAnalytics?.topProductsByRevenue ?? []
 
   const yesterday = useMemo(
     () => yesterdayMetrics(admin.analytics?.dailySales ?? []),
@@ -136,6 +149,47 @@ export function DashboardSection() {
         </Card>
       </section>
 
+      <Card className={PANEL_CARD}>
+        <CardHeader>
+          <CardTitle className={PANEL_TITLE}>Productos más vendidos del período</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            {rangeError
+              ? 'Seleccioná un período válido arriba para ver el ranking'
+              : `Del ${formatDateAR(arDayStartISO(rangeFrom))} al ${formatDateAR(arDayStartISO(rangeTo))}`}
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {rangeTopProducts.map((product) => (
+            <div key={product.productId} className={cn(PANEL_LIST_ROW, 'flex items-center justify-between gap-3 text-sm')}>
+              <div className="flex min-w-0 items-center gap-3">
+                {product.imageUrl ? (
+                  <img
+                    src={product.imageUrl}
+                    alt={product.productName}
+                    className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs text-muted-foreground', PANEL_SURFACE_ALT)}>
+                    —
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{product.productName}</p>
+                  <p className="text-xs text-muted-foreground">{product.quantity} unidades</p>
+                </div>
+              </div>
+              <CotyPriceBadge>{formatPrice(product.revenue)}</CotyPriceBadge>
+            </div>
+          ))}
+          {!rangeError && rangeTopProducts.length === 0 && (
+            <p className="py-6 text-center text-xs text-muted-foreground">Sin ventas de productos en este período</p>
+          )}
+          {rangeError && (
+            <p className="py-6 text-center text-xs text-muted-foreground">Ajustá las fechas del reporte para ver productos</p>
+          )}
+        </CardContent>
+      </Card>
+
       <section>
         <h2 className="mb-3 text-sm font-semibold text-foreground">Resumen de hoy</h2>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -203,39 +257,6 @@ export function DashboardSection() {
         </CardHeader>
         <CardContent>
           <SalesChart data={admin.analytics?.dailySales ?? []} />
-        </CardContent>
-      </Card>
-
-      <Card className={PANEL_CARD}>
-        <CardHeader>
-          <CardTitle className={PANEL_TITLE}>Ingresos por productos más vendidos</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {(admin.analytics?.topProductsByRevenue ?? []).map((product) => (
-            <div key={product.productId} className={cn(PANEL_LIST_ROW, 'flex items-center justify-between gap-3 text-sm')}>
-              <div className="flex min-w-0 items-center gap-3">
-                {product.imageUrl ? (
-                  <img
-                    src={product.imageUrl}
-                    alt={product.productName}
-                    className="h-10 w-10 shrink-0 rounded-lg object-cover"
-                  />
-                ) : (
-                  <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs text-muted-foreground', PANEL_SURFACE_ALT)}>
-                    —
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{product.productName}</p>
-                  <p className="text-xs text-muted-foreground">{product.quantity} unidades</p>
-                </div>
-              </div>
-              <CotyPriceBadge>{formatPrice(product.revenue)}</CotyPriceBadge>
-            </div>
-          ))}
-          {(admin.analytics?.topProductsByRevenue ?? []).length === 0 && (
-            <p className="py-6 text-center text-xs text-muted-foreground">Sin datos de productos</p>
-          )}
         </CardContent>
       </Card>
 

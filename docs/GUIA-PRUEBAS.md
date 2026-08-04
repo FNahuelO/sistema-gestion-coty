@@ -333,7 +333,7 @@ Acceso: `{URL}/admin` · Login: admin o cajero (permisos limitados).
 | # | Acción | Esperado |
 | - | ------ | -------- |
 | 1 | Ver resumen del día | Ventas, pedidos, ticket promedio |
-| 2 | Cambiar rango de fechas en reporte | Gráficos y totales se actualizan |
+| 2 | Cambiar rango de fechas en reporte | Totales del período y ranking de productos más vendidos se actualizan |
 | 3 | Ver gráfico por hora y por canal | Datos coherentes |
 | 4 | Buscar en historial de ventas | Paginación y búsqueda funcionan |
 | 5 | Exportar CSV y Excel | Archivo descargado con datos |
