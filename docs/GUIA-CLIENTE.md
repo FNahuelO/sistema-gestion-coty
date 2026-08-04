@@ -149,12 +149,11 @@ Acceso: `/admin` · Usuarios: Administrador y Cajero/a (con permisos limitados).
 
 Centro de control con métricas del negocio:
 
-- **Reporte por período** con fechas personalizables: ingresos y cantidad de pedidos.
+- **Reporte por período** con fechas personalizables: ingresos, cantidad de pedidos y **productos más vendidos** (unidades e ingresos) del rango elegido.
 - **Resumen del día**: ventas, pedidos, ticket promedio y pedidos activos (con comparación vs. ayer).
 - Gráfico de **ingresos por hora**.
 - Desglose por **canal** (delivery, retiro, mesas).
 - Gráfico de **ventas diarias** (últimos 14 días).
-- **Top de productos** por ingresos.
 - **Historial de ventas** con búsqueda y paginación.
 - **Exportación** a CSV y Excel desde el historial.
 
@@ -436,7 +435,7 @@ Cliente sin internet → confirma pedido (excepto Mercado Pago)
 
 - Métricas del día con comparación vs. ayer.
 - Ventas por hora, por canal y por producto.
-- Reporte por rango de fechas personalizado.
+- Reporte por rango de fechas personalizado (ingresos, pedidos y productos más vendidos).
 - Mesas atendidas (hoy y total histórico).
 - Exportación de ventas en CSV y Excel (solo administrador).
 
