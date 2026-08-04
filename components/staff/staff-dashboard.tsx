@@ -93,7 +93,7 @@ export function StaffDashboard() {
           />
         ) : null}
         {safeActiveSection === 'calls' ? <CallsSection /> : null}
-        {safeActiveSection === 'cash' ? <CashSection /> : null}
+        {safeActiveSection === 'cash' ? <CashSection embedded /> : null}
       </div>
     </StaffShell>
   )
