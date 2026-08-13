@@ -39,6 +39,14 @@ type CashMovement = {
   createdAt?: string
 }
 
+type CashSalesBreakdown = {
+  cash: number
+  card: number
+  transfer: number
+  mercadoPago: number
+  total: number
+}
+
 type CashSession = {
   id: string
   status: string
@@ -52,6 +60,7 @@ type CashSession = {
   openedByUser?: { name: string }
   closedByUser?: { name: string } | null
   movements?: CashMovement[]
+  salesBreakdown?: CashSalesBreakdown
 }
 
 const FORM_TITLES: Record<CashFormMode, string> = {
@@ -69,12 +78,41 @@ const MOVEMENT_TYPE_LABELS: Record<string, string> = {
   DEPOSIT: 'Depósito',
 }
 
+const SALES_BREAKDOWN_ROWS: Array<{ key: keyof Omit<CashSalesBreakdown, 'total'>; label: string }> = [
+  { key: 'cash', label: 'Efectivo' },
+  { key: 'transfer', label: 'Transferencia' },
+  { key: 'card', label: 'Tarjeta' },
+  { key: 'mercadoPago', label: 'Mercado Pago' },
+]
+
 function num(value: string | number | null | undefined) {
   return Number(value ?? 0)
 }
 
 function movementLabel(type: string) {
   return MOVEMENT_TYPE_LABELS[type] ?? type
+}
+
+function SalesBreakdownBlock({ breakdown }: { breakdown: CashSalesBreakdown }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
+        Ventas por medio de pago
+      </p>
+      <div className={cn(PANEL_LIST_ROW, 'space-y-2 text-sm')}>
+        {SALES_BREAKDOWN_ROWS.map(({ key, label }) => (
+          <div key={key} className="flex justify-between gap-3">
+            <span className="text-muted-foreground">{label}</span>
+            <span className="font-medium">{formatPrice(num(breakdown[key]))}</span>
+          </div>
+        ))}
+        <div className="flex justify-between gap-3 border-t border-gray-100 pt-2 dark:border-border">
+          <span className="text-muted-foreground">Total ventas</span>
+          <span className="font-semibold">{formatPrice(num(breakdown.total))}</span>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function CashSection() {
@@ -252,7 +290,10 @@ export function CashSection() {
       case 'close':
         return (
           <>
-            <Field label="Monto contado">
+            {openSession?.salesBreakdown ? (
+              <SalesBreakdownBlock breakdown={openSession.salesBreakdown} />
+            ) : null}
+            <Field label="Monto contado (efectivo)">
               <Input
                 type="number"
                 min={0}
@@ -332,12 +373,17 @@ export function CashSection() {
             <CardHeader>
               <CardTitle className={PANEL_TITLE}>Sesión activa</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p>Apertura: {formatPrice(num(openSession.openingAmount))}</p>
-              <p>Abierta por: {openSession.openedByUser?.name ?? '—'}</p>
-              <p className="text-muted-foreground">
-                Desde {formatDateTimeAR(openSession.openedAt)}
-              </p>
+            <CardContent className="space-y-4 text-sm">
+              <div className="space-y-2">
+                <p>Apertura: {formatPrice(num(openSession.openingAmount))}</p>
+                <p>Abierta por: {openSession.openedByUser?.name ?? '—'}</p>
+                <p className="text-muted-foreground">
+                  Desde {formatDateTimeAR(openSession.openedAt)}
+                </p>
+              </div>
+              {openSession.salesBreakdown ? (
+                <SalesBreakdownBlock breakdown={openSession.salesBreakdown} />
+              ) : null}
             </CardContent>
           </Card>
         ) : (
@@ -439,7 +485,7 @@ export function CashSection() {
               </div>
               {selectedClosedSession.expectedAmount != null ? (
                 <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Esperado</span>
+                  <span className="text-muted-foreground">Esperado (efectivo)</span>
                   <span className="font-medium">{formatPrice(num(selectedClosedSession.expectedAmount))}</span>
                 </div>
               ) : null}
@@ -467,6 +513,10 @@ export function CashSection() {
                 </div>
               ) : null}
             </div>
+
+            {selectedClosedSession.salesBreakdown ? (
+              <SalesBreakdownBlock breakdown={selectedClosedSession.salesBreakdown} />
+            ) : null}
 
             <div className="space-y-1 text-sm">
               <p>

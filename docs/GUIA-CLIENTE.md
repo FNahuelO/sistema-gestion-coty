@@ -400,7 +400,8 @@ Cliente sin internet → confirma pedido (excepto Mercado Pago)
 
 - Sesiones de turno con apertura y cierre.
 - Movimientos manuales: gastos, retiros y depósitos.
-- Al cerrar, el sistema calcula el monto esperado (apertura + ventas en efectivo + depósitos − salidas) y muestra la diferencia con lo contado.
+- Al cerrar, el sistema calcula el monto esperado en efectivo (apertura + ventas en efectivo + depósitos − salidas) y muestra la diferencia con lo contado.
+- El cierre y la sesión activa desglosan las ventas del turno por medio de pago: efectivo, transferencia, tarjeta y Mercado Pago.
 
 ### Facturación / comprobantes
 
