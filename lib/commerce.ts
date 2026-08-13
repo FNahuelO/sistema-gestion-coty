@@ -24,12 +24,81 @@ function dec(value: number | string | { toString(): string }) {
 
 // ─── Cash register ───────────────────────────────────────────────────────────
 
+export type CashSalesBreakdown = {
+  cash: number
+  card: number
+  transfer: number
+  mercadoPago: number
+  total: number
+}
+
+const EMPTY_SALES_BREAKDOWN: CashSalesBreakdown = {
+  cash: 0,
+  card: 0,
+  transfer: 0,
+  mercadoPago: 0,
+  total: 0,
+}
+
+function amountForMethod(
+  order: {
+    paymentMethod: PrismaPaymentMethod
+    total: number | string | { toString(): string }
+    paymentSplits: Array<{ method: PrismaPaymentMethod; amount: number | string | { toString(): string } }>
+  },
+  method: PrismaPaymentMethod
+) {
+  const methodSplits = order.paymentSplits.filter((split) => split.method === method)
+  if (methodSplits.length > 0) {
+    return methodSplits.reduce((sum, split) => sum + dec(split.amount), 0)
+  }
+  if (order.paymentSplits.length === 0 && order.paymentMethod === method) {
+    return dec(order.total)
+  }
+  return 0
+}
+
+export async function getCashSessionSalesBreakdown(
+  openedAt: Date,
+  closedAt?: Date | null
+): Promise<CashSalesBreakdown> {
+  const sessionOrders = await prisma.order.findMany({
+    where: {
+      status: { notIn: ['CANCELLED'] },
+      createdAt: {
+        gte: openedAt,
+        ...(closedAt ? { lte: closedAt } : {}),
+      },
+    },
+    select: {
+      paymentMethod: true,
+      total: true,
+      paymentSplits: {
+        select: { method: true, amount: true },
+      },
+    },
+  })
+
+  const breakdown: CashSalesBreakdown = { ...EMPTY_SALES_BREAKDOWN }
+  for (const order of sessionOrders) {
+    breakdown.cash += amountForMethod(order, PrismaPaymentMethod.CASH)
+    breakdown.card += amountForMethod(order, PrismaPaymentMethod.CARD)
+    breakdown.transfer += amountForMethod(order, PrismaPaymentMethod.TRANSFER)
+    breakdown.mercadoPago += amountForMethod(order, PrismaPaymentMethod.MERCADO_PAGO)
+  }
+  breakdown.total = breakdown.cash + breakdown.card + breakdown.transfer + breakdown.mercadoPago
+  return breakdown
+}
+
 export async function getOpenCashSession() {
-  return prisma.cashSession.findFirst({
+  const session = await prisma.cashSession.findFirst({
     where: { status: CashSessionStatus.OPEN },
     include: { movements: true, openedByUser: { select: { id: true, name: true } } },
     orderBy: { openedAt: 'desc' },
   })
+  if (!session) return null
+  const salesBreakdown = await getCashSessionSalesBreakdown(session.openedAt)
+  return { ...session, salesBreakdown }
 }
 
 export async function openCashSession(openedByUserId: string, openingAmount: number) {
@@ -74,33 +143,7 @@ export async function closeCashSession(sessionId: string, closedByUserId: string
   })
   if (!session || session.status !== CashSessionStatus.OPEN) throw new Error('CASH_SESSION_CLOSED')
 
-  const sessionOrders = await prisma.order.findMany({
-    where: {
-      status: { notIn: ['CANCELLED'] },
-      createdAt: { gte: session.openedAt },
-      OR: [
-        { paymentMethod: PrismaPaymentMethod.CASH },
-        { paymentMethod: PrismaPaymentMethod.COMBINED },
-        { paymentSplits: { some: { method: PrismaPaymentMethod.CASH } } },
-      ],
-    },
-    include: {
-      paymentSplits: {
-        select: { method: true, amount: true },
-      },
-    },
-  })
-
-  const salesCash = sessionOrders.reduce((sum, order) => {
-    const cashSplits = order.paymentSplits.filter((split) => split.method === PrismaPaymentMethod.CASH)
-    if (cashSplits.length > 0) {
-      return sum + cashSplits.reduce((splitSum, split) => splitSum + dec(split.amount), 0)
-    }
-    if (order.paymentMethod === PrismaPaymentMethod.CASH) {
-      return sum + dec(order.total)
-    }
-    return sum
-  }, 0)
+  const salesBreakdown = await getCashSessionSalesBreakdown(session.openedAt)
   const deposits = session.movements
     .filter((m) => m.type === CashMovementType.DEPOSIT)
     .reduce((sum, m) => sum + dec(m.amount), 0)
@@ -108,10 +151,11 @@ export async function closeCashSession(sessionId: string, closedByUserId: string
     .filter((m) => m.type === CashMovementType.EXPENSE || m.type === CashMovementType.WITHDRAWAL)
     .reduce((sum, m) => sum + dec(m.amount), 0)
 
-  const expectedAmount = dec(session.openingAmount) + salesCash + deposits - outflows
+  // El arqueo físico solo contempla efectivo en cajón; transferencia/tarjeta/MP son informativos.
+  const expectedAmount = dec(session.openingAmount) + salesBreakdown.cash + deposits - outflows
   const difference = closingAmount - expectedAmount
 
-  return prisma.cashSession.update({
+  const closed = await prisma.cashSession.update({
     where: { id: sessionId },
     data: {
       status: CashSessionStatus.CLOSED,
@@ -123,6 +167,7 @@ export async function closeCashSession(sessionId: string, closedByUserId: string
       notes: notes ?? null,
     },
   })
+  return { ...closed, salesBreakdown }
 }
 
 export async function listCashSessions(limit = 30) {
@@ -138,7 +183,7 @@ export async function listCashSessions(limit = 30) {
 }
 
 export async function getCashSessionById(sessionId: string) {
-  return prisma.cashSession.findUnique({
+  const session = await prisma.cashSession.findUnique({
     where: { id: sessionId },
     include: {
       openedByUser: { select: { id: true, name: true } },
@@ -146,6 +191,9 @@ export async function getCashSessionById(sessionId: string) {
       movements: { orderBy: { createdAt: 'desc' } },
     },
   })
+  if (!session) return null
+  const salesBreakdown = await getCashSessionSalesBreakdown(session.openedAt, session.closedAt)
+  return { ...session, salesBreakdown }
 }
 
 // ─── Delivery zones ──────────────────────────────────────────────────────────
