@@ -93,6 +93,26 @@ function movementLabel(type: string) {
   return MOVEMENT_TYPE_LABELS[type] ?? type
 }
 
+function isDeposit(type: string) {
+  return type === 'deposit' || type === 'DEPOSIT'
+}
+
+function isOutflow(type: string) {
+  return type === 'expense' || type === 'EXPENSE' || type === 'withdrawal' || type === 'WITHDRAWAL'
+}
+
+function sumMovements(movements: CashMovement[] | undefined, predicate: (type: string) => boolean) {
+  return (movements ?? []).reduce((sum, entry) => (predicate(entry.type) ? sum + num(entry.amount) : sum), 0)
+}
+
+function expectedCashAmount(
+  openingAmount: string | number,
+  salesCash: number,
+  movements: CashMovement[] | undefined
+) {
+  return num(openingAmount) + salesCash + sumMovements(movements, isDeposit) - sumMovements(movements, isOutflow)
+}
+
 function SalesBreakdownBlock({ breakdown }: { breakdown: CashSalesBreakdown }) {
   return (
     <div className="space-y-2">
@@ -110,6 +130,82 @@ function SalesBreakdownBlock({ breakdown }: { breakdown: CashSalesBreakdown }) {
           <span className="text-muted-foreground">Total ventas</span>
           <span className="font-semibold">{formatPrice(num(breakdown.total))}</span>
         </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Transferencia, tarjeta y Mercado Pago no entran al cajón: no forman parte de la diferencia de efectivo.
+      </p>
+    </div>
+  )
+}
+
+function CashReconciliationBlock({
+  openingAmount,
+  salesCash,
+  movements,
+  expectedAmount,
+  closingAmount,
+  difference,
+}: {
+  openingAmount: string | number
+  salesCash: number
+  movements?: CashMovement[]
+  expectedAmount?: string | number | null
+  closingAmount?: string | number | null
+  difference?: string | number | null
+}) {
+  const deposits = sumMovements(movements, isDeposit)
+  const outflows = sumMovements(movements, isOutflow)
+  const expected = expectedAmount != null ? num(expectedAmount) : expectedCashAmount(openingAmount, salesCash, movements)
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-[#2D5A57]/70">
+        Arqueo de efectivo
+      </p>
+      <div className={cn(PANEL_LIST_ROW, 'space-y-2 text-sm')}>
+        <div className="flex justify-between gap-3">
+          <span className="text-muted-foreground">Apertura</span>
+          <span className="font-medium">{formatPrice(num(openingAmount))}</span>
+        </div>
+        <div className="flex justify-between gap-3">
+          <span className="text-muted-foreground">+ Ventas en efectivo</span>
+          <span className="font-medium">{formatPrice(salesCash)}</span>
+        </div>
+        {deposits > 0 ? (
+          <div className="flex justify-between gap-3">
+            <span className="text-muted-foreground">+ Depósitos</span>
+            <span className="font-medium">{formatPrice(deposits)}</span>
+          </div>
+        ) : null}
+        {outflows > 0 ? (
+          <div className="flex justify-between gap-3">
+            <span className="text-muted-foreground">− Gastos / retiros</span>
+            <span className="font-medium">{formatPrice(outflows)}</span>
+          </div>
+        ) : null}
+        <div className="flex justify-between gap-3 border-t border-gray-100 pt-2 dark:border-border">
+          <span className="text-muted-foreground">Esperado en cajón</span>
+          <span className="font-semibold">{formatPrice(expected)}</span>
+        </div>
+        {closingAmount != null ? (
+          <div className="flex justify-between gap-3">
+            <span className="text-muted-foreground">Contado / cierre</span>
+            <span className="font-semibold text-[#2D5A57]">{formatPrice(num(closingAmount))}</span>
+          </div>
+        ) : null}
+        {difference != null ? (
+          <div className="flex justify-between gap-3 border-t border-gray-100 pt-2 dark:border-border">
+            <span className="text-muted-foreground">Diferencia de efectivo</span>
+            <span
+              className={cn(
+                'font-semibold',
+                num(difference) < 0 ? 'text-red-600' : num(difference) > 0 ? 'text-emerald-700' : 'text-foreground'
+              )}
+            >
+              {formatPrice(num(difference))}
+            </span>
+          </div>
+        ) : null}
       </div>
     </div>
   )
@@ -287,21 +383,36 @@ export function CashSection() {
             </Button>
           </>
         )
-      case 'close':
+      case 'close': {
+        const salesCash = openSession?.salesBreakdown?.cash ?? 0
+        const expected = openSession
+          ? expectedCashAmount(openSession.openingAmount, salesCash, openSession.movements)
+          : 0
         return (
           <>
             {openSession?.salesBreakdown ? (
               <SalesBreakdownBlock breakdown={openSession.salesBreakdown} />
             ) : null}
-            <Field label="Monto contado (efectivo)">
+            {openSession ? (
+              <CashReconciliationBlock
+                openingAmount={openSession.openingAmount}
+                salesCash={salesCash}
+                movements={openSession.movements}
+              />
+            ) : null}
+            <Field label="Monto contado (solo efectivo en cajón)">
               <Input
                 type="number"
                 min={0}
                 step="0.01"
                 value={closingAmount}
+                placeholder={String(expected)}
                 onChange={(e) => setClosingAmount(e.target.value)}
               />
             </Field>
+            <p className="text-xs text-muted-foreground">
+              Contá solo el efectivo del cajón. La transferencia ya está desglosada arriba y no debe sumarse acá.
+            </p>
             <Field label="Notas (opcional)">
               <Textarea value={closeNotes} onChange={(e) => setCloseNotes(e.target.value)} rows={2} />
             </Field>
@@ -310,6 +421,7 @@ export function CashSection() {
             </Button>
           </>
         )
+      }
     }
   }
 
@@ -375,7 +487,6 @@ export function CashSection() {
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
               <div className="space-y-2">
-                <p>Apertura: {formatPrice(num(openSession.openingAmount))}</p>
                 <p>Abierta por: {openSession.openedByUser?.name ?? '—'}</p>
                 <p className="text-muted-foreground">
                   Desde {formatDateTimeAR(openSession.openedAt)}
@@ -384,6 +495,11 @@ export function CashSection() {
               {openSession.salesBreakdown ? (
                 <SalesBreakdownBlock breakdown={openSession.salesBreakdown} />
               ) : null}
+              <CashReconciliationBlock
+                openingAmount={openSession.openingAmount}
+                salesCash={openSession.salesBreakdown?.cash ?? 0}
+                movements={openSession.movements}
+              />
             </CardContent>
           </Card>
         ) : (
@@ -478,45 +594,18 @@ export function CashSection() {
           </p>
         ) : selectedClosedSession ? (
           <div className="space-y-4 pb-2">
-            <div className={cn(PANEL_LIST_ROW, 'space-y-2 text-sm')}>
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">Apertura</span>
-                <span className="font-medium">{formatPrice(num(selectedClosedSession.openingAmount))}</span>
-              </div>
-              {selectedClosedSession.expectedAmount != null ? (
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Esperado (efectivo)</span>
-                  <span className="font-medium">{formatPrice(num(selectedClosedSession.expectedAmount))}</span>
-                </div>
-              ) : null}
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">Contado / cierre</span>
-                <span className="font-semibold text-[#2D5A57]">
-                  {formatPrice(num(selectedClosedSession.closingAmount))}
-                </span>
-              </div>
-              {selectedClosedSession.difference != null ? (
-                <div className="flex justify-between gap-3 border-t border-gray-100 pt-2 dark:border-border">
-                  <span className="text-muted-foreground">Diferencia</span>
-                  <span
-                    className={cn(
-                      'font-semibold',
-                      num(selectedClosedSession.difference) < 0
-                        ? 'text-red-600'
-                        : num(selectedClosedSession.difference) > 0
-                          ? 'text-emerald-700'
-                          : 'text-foreground'
-                    )}
-                  >
-                    {formatPrice(num(selectedClosedSession.difference))}
-                  </span>
-                </div>
-              ) : null}
-            </div>
-
             {selectedClosedSession.salesBreakdown ? (
               <SalesBreakdownBlock breakdown={selectedClosedSession.salesBreakdown} />
             ) : null}
+
+            <CashReconciliationBlock
+              openingAmount={selectedClosedSession.openingAmount}
+              salesCash={selectedClosedSession.salesBreakdown?.cash ?? 0}
+              movements={selectedClosedSession.movements}
+              expectedAmount={selectedClosedSession.expectedAmount}
+              closingAmount={selectedClosedSession.closingAmount}
+              difference={selectedClosedSession.difference}
+            />
 
             <div className="space-y-1 text-sm">
               <p>
