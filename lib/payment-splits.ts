@@ -112,6 +112,27 @@ export function uiPaymentMethodToPrisma(
   }
 }
 
+export function prismaPaymentMethodToUi(
+  method: 'CASH' | 'CARD' | 'TRANSFER' | 'MERCADO_PAGO' | 'COMBINED' | string
+): PaymentMethod {
+  switch (method) {
+    case 'CARD':
+    case 'card':
+      return 'card'
+    case 'TRANSFER':
+    case 'transfer':
+      return 'transfer'
+    case 'MERCADO_PAGO':
+    case 'mercado_pago':
+      return 'mercado_pago'
+    case 'COMBINED':
+    case 'combined':
+      return 'combined'
+    default:
+      return 'cash'
+  }
+}
+
 export function formatPaymentSplitsLabel(
   splits: PaymentSplitInput[] | undefined,
   labels: Record<SplittablePaymentMethod, string>

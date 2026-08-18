@@ -16,6 +16,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { revalidatePublicCatalog } from '@/lib/catalog-cache'
 import { findMatchingZone, type LatLng, type ZoneGeometry } from '@/lib/geo'
+import { prismaPaymentMethodToUi } from '@/lib/payment-splits'
 import type { DeliveryAssignmentStatus as DeliveryAssignmentStatusUi, DeliveryQueueEntry } from '@/lib/types'
 
 function dec(value: number | string | { toString(): string }) {
@@ -560,12 +561,14 @@ const DELIVERY_QUEUE_ORDER_STATUSES: OrderStatus[] = [
 const deliveryQueueSelect = {
   id: true,
   displayCode: true,
+  dailyNumber: true,
   status: true,
   customerName: true,
   customerPhone: true,
   customerAddress: true,
   total: true,
   deliveryFee: true,
+  paymentMethod: true,
   createdAt: true,
   deliveryAssignment: {
     include: { runner: { select: { id: true, name: true } } },
@@ -623,6 +626,7 @@ export function serializeDeliveryQueueEntry(order: DeliveryQueueOrder): Delivery
       customerAddress: order.customerAddress,
       total: dec(order.total),
       deliveryFee: order.deliveryFee != null ? dec(order.deliveryFee) : undefined,
+      paymentMethod: prismaPaymentMethodToUi(order.paymentMethod),
       createdAt: order.createdAt.toISOString(),
     },
   }
