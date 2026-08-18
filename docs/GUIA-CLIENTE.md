@@ -238,6 +238,19 @@ Control del turno de caja:
 
 Si un pedido de delivery entró como efectivo y el cliente después paga por transferencia, **editá el medio de pago antes de cerrar el turno** (ver sección Pedidos más abajo). Así el arqueo no queda desfasado y el cadete no lleva plata de más en la calle.
 
+#### Agregar plata al fondo durante el turno
+
+No hace falta cerrar y reabrir caja. Si el turno tarde abrió con **$5.000** y más tarde querés sumar **$5.000** extra (por ejemplo cuando Luna ya está en el turno y le llevás cambio):
+
+1. **Caja → Agregar al fondo**
+2. Ingresá el monto (ej. $5.000)
+3. Opcional: motivo (ej. “Refuerzo para Luna — turno tarde”)
+4. **Agregar al fondo**
+
+Eso registra un **refuerzo de fondo** que suma al efectivo esperado al cerrar. También podés hacerlo desde **Movimiento → Agregar al fondo** si preferís el formulario completo.
+
+> **Nota:** el monto de apertura original no se edita (queda en el historial). Los refuerzos se registran como movimientos aparte, que es lo correcto para el arqueo.
+
 ### Comercio
 
 Herramientas comerciales agrupadas en pestañas:

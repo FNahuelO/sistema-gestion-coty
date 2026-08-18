@@ -320,7 +320,8 @@ Acceso: `{URL}/staff` · Login: cadete, cajero o admin.
 | 1 | Abrir caja con monto inicial (ej. $5000) | Sesión activa visible |
 | 2 | Registrar un gasto | Aparece en movimientos |
 | 3 | Registrar retiro y depósito | Saldo esperado se recalcula |
-| 4 | Cerrar turno con monto contado | Muestra diferencia vs. esperado |
+| 4 | **Agregar al fondo** (ej. $5.000 extra al turno ya abierto) | Suma al efectivo esperado; aparece como “Refuerzo de fondo” |
+| 5 | Cerrar turno con monto contado | Muestra diferencia vs. esperado |
 
 ### 7.7 Permisos del cadete
 
