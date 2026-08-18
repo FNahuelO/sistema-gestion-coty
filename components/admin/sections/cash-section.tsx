@@ -276,10 +276,6 @@ export function CashSection() {
       case 'fund':
         return (
           <>
-            <p className="text-sm text-muted-foreground">
-              Sumá efectivo al turno sin cerrar caja. Ejemplo: el turno tarde abrió con $5.000 y más tarde
-              le entregás $5.000 extra al cadete.
-            </p>
             <Field label="Monto a agregar">
               <Input
                 type="number"
@@ -458,10 +454,6 @@ export function CashSection() {
                   <span className="font-semibold text-[#2D5A57]">
                     {formatPrice(computeExpectedCash(openSession))}
                   </span>
-                </p>
-                <p className="text-muted-foreground">
-                  El fondo inicial no se modifica después de abrir. Para sumar plata al turno (ej. cuando
-                  traés cambio extra o plata de otro turno), usá &quot;Agregar al fondo&quot;.
                 </p>
                 <p>Abierta por: {openSession.openedByUser?.name ?? '—'}</p>
                 <p className="text-muted-foreground">
