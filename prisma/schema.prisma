@@ -279,6 +279,7 @@ model BusinessSettings {
   isOpen         Boolean  @default(true)
   openTime       String
   closeTime      String
+  operationalDayCutoffTime String @default("01:00")
   timezone       String   @default("America/Argentina/Buenos_Aires")
   phone          String
   address        String

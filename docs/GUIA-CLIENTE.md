@@ -269,6 +269,7 @@ Datos generales del negocio:
 
 - Nombre, logo, teléfono, dirección.
 - Horarios de apertura y cierre.
+- **Corte del día operativo** (HH:MM, por defecto `01:00`): hasta qué hora los pedidos cuentan para el mismo día antes de reiniciar el correlativo `#1`.
 - Costo de delivery por defecto, pedido mínimo y tasa impositiva.
 - WhatsApp, Instagram y Facebook.
 - Estado abierto/cerrado manual.
@@ -301,6 +302,7 @@ Panel unificado para el día a día del local. Incluye 6 secciones:
 Vista en tiempo real de todos los pedidos activos:
 
 - **Numeración del día unificada:** mesa, delivery y retiro comparten el mismo correlativo (`#1`, `#2`, `#3`…). Así podés controlar el total del día (por ejemplo 30 pedidos = 17 mesas + 13 envíos) sin series separadas por canal.
+- **Corte del día operativo:** configurable en Admin → Configuración (por defecto **01:00**). Los pedidos entre medianoche y esa hora siguen contando para el mismo día (mismo `#` correlativo y mismo resumen “Hoy”). Así no se reinicia el `#1` a las 00:00 ni se desfasan los pedidos nocturnos respecto al turno de caja.
 - Filtros por tipo (delivery, retiro, mesa), estado y búsqueda.
 - Contadores: pendientes, preparando, listos, activos; y resumen del día con desglose por canal.
 - Avance de estado paso a paso: Confirmar → Preparar → Listo → Entregar → Completar.

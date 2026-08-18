@@ -187,6 +187,7 @@ async function main() {
       isOpen: businessSettings.isOpen,
       openTime: businessSettings.openTime,
       closeTime: businessSettings.closeTime,
+      operationalDayCutoffTime: businessSettings.operationalDayCutoffTime ?? '01:00',
       timezone: 'America/Argentina/Buenos_Aires',
       phone: businessSettings.phone,
       address: businessSettings.address,

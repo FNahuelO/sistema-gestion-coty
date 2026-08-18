@@ -26,7 +26,17 @@ import { buildWhatsAppOrderMessage, buildWhatsAppUrl } from '@/lib/whatsapp-mess
 import { requiresTransferProofApproval } from '@/lib/payment-flow'
 import { createTrackingProof, verifyTrackingProof } from '@/lib/tracking-proof'
 import { notifyOrderStatusChanged, notifyOrderEstimateChanged } from '@/lib/push-notifications'
-import { arDayEndISO, arDayKey, arDayStartISO, arHour } from '@/lib/datetime'
+import {
+  arDayEndISO,
+  arDayKey,
+  arDayStartISO,
+  arHour,
+  operationalDayEndISO,
+  operationalDayKey,
+  operationalDayStartISO,
+  normalizeOperationalDayCutoffTime,
+  OPERATIONAL_DAY_CUTOFF_TIME,
+} from '@/lib/datetime'
 import {
   buildMercadoPagoPreferenceItems,
   isMercadoPagoAvailable,
@@ -173,6 +183,12 @@ export const settingsInputSchema = z.object({
   isOpen: z.boolean(),
   openTime: z.string().trim().min(1),
   closeTime: z.string().trim().min(1),
+  operationalDayCutoffTime: z
+    .string()
+    .trim()
+    .regex(/^\d{1,2}:\d{2}$/, 'Formato HH:MM')
+    .transform(normalizeOperationalDayCutoffTime)
+    .default(OPERATIONAL_DAY_CUTOFF_TIME),
   phone: z.string().trim().min(1),
   address: z.string().trim().min(1),
   instagram: z.string().trim().optional().or(z.literal('')),
@@ -634,6 +650,7 @@ export function serializeSettings(settings: Prisma.BusinessSettingsGetPayload<ob
     isOpen: settings.isOpen,
     openTime: settings.openTime,
     closeTime: settings.closeTime,
+    operationalDayCutoffTime: normalizeOperationalDayCutoffTime(settings.operationalDayCutoffTime),
     timezone: settings.timezone ?? 'America/Argentina/Buenos_Aires',
     phone: settings.phone,
     address: settings.address,
@@ -647,6 +664,22 @@ export function serializeSettings(settings: Prisma.BusinessSettingsGetPayload<ob
     taxRate: decimalToNumber(settings.taxRate),
     mercadoPagoEnabled: settings.mercadoPagoEnabled,
   }
+}
+
+const getOperationalDayCutoffTimeCached = unstable_cache(
+  async () => {
+    const settings = await prisma.businessSettings.findUnique({
+      where: { id: 'main' },
+      select: { operationalDayCutoffTime: true },
+    })
+    return normalizeOperationalDayCutoffTime(settings?.operationalDayCutoffTime)
+  },
+  ['operational-day-cutoff'],
+  { revalidate: 300, tags: [PUBLIC_CATALOG_TAG] }
+)
+
+export async function getOperationalDayCutoffTime(): Promise<string> {
+  return getOperationalDayCutoffTimeCached()
 }
 
 export function serializeUser(user: {
@@ -965,9 +998,10 @@ export async function getStaffOpsAlerts() {
   return { kitchenPending, tableCallsPending }
 }
 
-/** Pedidos activos + terminales del día AR (evita arrastrar historial operativo). */
+/** Pedidos activos + terminales del día operativo AR (corte ~01:00, evita arrastrar historial). */
 export async function getOperationalOrders() {
-  const todayStart = new Date(arDayStartISO(arDayKey(new Date())))
+  const cutoffTime = await getOperationalDayCutoffTime()
+  const todayStart = new Date(operationalDayStartISO(operationalDayKey(new Date(), cutoffTime), cutoffTime))
 
   const orders = await prisma.order.findMany({
     where: {
@@ -1057,17 +1091,19 @@ function serviceDateFromDayKey(dayKey: string): Date {
   return new Date(Date.UTC(year, month - 1, day))
 }
 
-/** Asigna el próximo número de pedido del día (horario Argentina), atómico por fila.
+/** Asigna el próximo número de pedido del día operativo (corte ~01:00 AR), atómico por fila.
  *  Un solo correlativo para TODOS los canales (mesa, delivery y retiro): #1, #2, #3…
  */
 async function allocateDailyOrderNumber(
   tx: Prisma.TransactionClient,
-  dayKey = arDayKey(new Date())
+  dayKey?: string,
+  cutoffTime = OPERATIONAL_DAY_CUTOFF_TIME
 ): Promise<{ dailyNumber: number; serviceDate: Date }> {
+  const resolvedDayKey = dayKey ?? operationalDayKey(new Date(), cutoffTime)
   try {
     const rows = await tx.$queryRaw<Array<{ lastNumber: number }>>`
       INSERT INTO "DailyOrderCounter" ("serviceDate", "lastNumber")
-      VALUES (CAST(${dayKey} AS DATE), 1)
+      VALUES (CAST(${resolvedDayKey} AS DATE), 1)
       ON CONFLICT ("serviceDate")
       DO UPDATE SET "lastNumber" = "DailyOrderCounter"."lastNumber" + 1
       RETURNING "lastNumber"
@@ -1078,7 +1114,7 @@ async function allocateDailyOrderNumber(
       throw new Error('DAILY_ORDER_NUMBER_FAILED')
     }
 
-    return { dailyNumber, serviceDate: serviceDateFromDayKey(dayKey) }
+    return { dailyNumber, serviceDate: serviceDateFromDayKey(resolvedDayKey) }
   } catch (error) {
     if (error instanceof Error && error.message === 'DAILY_ORDER_NUMBER_FAILED') {
       throw error
@@ -1359,9 +1395,10 @@ export async function createOrderFromPayload(
   const deferStockDecrement = awaitingTransferProof || awaitingMercadoPago
 
   const prismaPaymentMethod = uiPaymentMethodToPrisma(input.paymentMethod)
+  const cutoffTime = await getOperationalDayCutoffTime()
 
   const createdOrder = (await prisma.$transaction(async (tx) => {
-    const { dailyNumber, serviceDate } = await allocateDailyOrderNumber(tx)
+    const { dailyNumber, serviceDate } = await allocateDailyOrderNumber(tx, undefined, cutoffTime)
 
     if (!deferStockDecrement) {
       await applyStockDeltaForOrderItems(tx, itemsToCreate.map((item) => ({
@@ -2360,9 +2397,10 @@ export async function updateOrderPaymentMethod(
 
 export async function getAnalytics(): Promise<AnalyticsOverview> {
   const now = new Date()
-  const todayKey = arDayKey(now)
-  const todayStart = new Date(arDayStartISO(todayKey))
-  const todayEnd = new Date(arDayEndISO(todayKey))
+  const cutoffTime = await getOperationalDayCutoffTime()
+  const todayKey = operationalDayKey(now, cutoffTime)
+  const todayStart = new Date(operationalDayStartISO(todayKey, cutoffTime))
+  const todayEnd = new Date(operationalDayEndISO(todayKey, cutoffTime))
 
   const dailyKeys = Array.from({ length: 14 }, (_, index) => {
     const day = new Date(todayStart)
@@ -2523,7 +2561,7 @@ export async function getAnalytics(): Promise<AnalyticsOverview> {
     dailyMap.set(key, { revenue: 0, orders: 0 })
   }
   for (const order of dailyOrders) {
-    const day = arDayKey(order.createdAt)
+    const day = operationalDayKey(order.createdAt, cutoffTime)
     const current = dailyMap.get(day)
     if (!current) continue
     current.revenue += decimalToNumber(order.total)
