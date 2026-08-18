@@ -120,6 +120,7 @@ export interface DeliveryQueueEntry {
     customerAddress?: string | null
     total: number
     deliveryFee?: number
+    paymentMethod: PaymentMethod
     createdAt: string
   }
 }

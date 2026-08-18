@@ -292,10 +292,18 @@ Acceso: `{URL}/staff` · Login: cadete, cajero o admin.
 
 | # | Acción | Esperado |
 | - | ------ | -------- |
-| 1 | Ver entregas activas de delivery | Lista con dirección y total |
+| 1 | Ver entregas activas de delivery | Lista con dirección, total y **medio de pago** (badge) |
 | 2 | Asignar cadete (Isaac / cadete@cotycafe.com) | Queda asignado |
 | 3 | Marcar “Retirado” → “Entregado” | Estados avanzan |
 | 4 | Completar desde Pedidos | Pedido finalizado en historial |
+
+### 7.4.1 Editar medio de pago (delivery efectivo → transferencia)
+
+| # | Acción | Esperado |
+| - | ------ | -------- |
+| 1 | Crear pedido delivery con pago en efectivo | Badge “Efectivo” en Cadetes y en detalle del pedido |
+| 2 | Staff → Pedidos → abrir pedido → Pago → **Editar** → Transferencia → **Guardar pago** | Método actualizado; badge en Cadetes pasa a “Transferencia” |
+| 3 | Ver Caja (sesión abierta) | Desglose del turno refleja el cambio (menos efectivo, más transferencia) |
 
 ### 7.5 Llamados de mozo
 
@@ -312,7 +320,8 @@ Acceso: `{URL}/staff` · Login: cadete, cajero o admin.
 | 1 | Abrir caja con monto inicial (ej. $5000) | Sesión activa visible |
 | 2 | Registrar un gasto | Aparece en movimientos |
 | 3 | Registrar retiro y depósito | Saldo esperado se recalcula |
-| 4 | Cerrar turno con monto contado | Muestra diferencia vs. esperado |
+| 4 | **Agregar al fondo** (ej. $5.000 extra al turno ya abierto) | Suma al efectivo esperado; aparece como “Refuerzo de fondo” |
+| 5 | Cerrar turno con monto contado | Muestra diferencia vs. esperado |
 
 ### 7.7 Permisos del cadete
 

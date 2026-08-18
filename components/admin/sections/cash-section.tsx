@@ -23,7 +23,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { MobileBottomSheet } from '@/components/ui/mobile-bottom-sheet'
 import { ChevronRight } from 'lucide-react'
 
-type CashFormMode = 'open' | 'movement' | 'close'
+type CashFormMode = 'open' | 'movement' | 'fund' | 'close'
 
 const fetchJson = async (url: string) => {
   const res = await fetch(url, { credentials: 'include' })
@@ -66,6 +66,7 @@ type CashSession = {
 const FORM_TITLES: Record<CashFormMode, string> = {
   open: 'Abrir caja',
   movement: 'Registrar movimiento',
+  fund: 'Agregar al fondo',
   close: 'Cerrar caja',
 }
 
@@ -74,8 +75,8 @@ const MOVEMENT_TYPE_LABELS: Record<string, string> = {
   EXPENSE: 'Gasto',
   withdrawal: 'Retiro',
   WITHDRAWAL: 'Retiro',
-  deposit: 'Depósito',
-  DEPOSIT: 'Depósito',
+  deposit: 'Refuerzo de fondo',
+  DEPOSIT: 'Refuerzo de fondo',
 }
 
 const SALES_BREAKDOWN_ROWS: Array<{ key: keyof Omit<CashSalesBreakdown, 'total'>; label: string }> = [
@@ -91,6 +92,23 @@ function num(value: string | number | null | undefined) {
 
 function movementLabel(type: string) {
   return MOVEMENT_TYPE_LABELS[type] ?? type
+}
+
+function computeExpectedCash(session: CashSession) {
+  const deposits = (session.movements ?? [])
+    .filter((entry) => entry.type === 'deposit' || entry.type === 'DEPOSIT')
+    .reduce((sum, entry) => sum + num(entry.amount), 0)
+  const outflows = (session.movements ?? [])
+    .filter(
+      (entry) =>
+        entry.type === 'expense' ||
+        entry.type === 'EXPENSE' ||
+        entry.type === 'withdrawal' ||
+        entry.type === 'WITHDRAWAL'
+    )
+    .reduce((sum, entry) => sum + num(entry.amount), 0)
+  const cashSales = num(session.salesBreakdown?.cash)
+  return num(session.openingAmount) + cashSales + deposits - outflows
 }
 
 function SalesBreakdownBlock({ breakdown }: { breakdown: CashSalesBreakdown }) {
@@ -166,6 +184,9 @@ export function CashSection() {
     setFormMode(mode)
     if (mode === 'open') setOpeningAmount('0')
     if (mode === 'movement') setMovement({ type: 'expense', amount: '', description: '' })
+    if (mode === 'fund') {
+      setMovement({ type: 'deposit', amount: '', description: 'Refuerzo de fondo' })
+    }
     if (mode === 'close') {
       setClosingAmount('')
       setCloseNotes('')
@@ -217,16 +238,16 @@ export function CashSection() {
     }
   }
 
-  const handleMovement = async () => {
+  const handleMovement = async (successMessage = 'Movimiento registrado') => {
     if (!openSession) return
     try {
       await post('/api/admin/cash/movements', {
         sessionId: openSession.id,
         type: movement.type,
         amount: Number(movement.amount),
-        description: movement.description,
+        description: movement.description.trim() || 'Refuerzo de fondo',
       })
-      toast.success('Movimiento registrado')
+      toast.success(successMessage)
       setMovement({ type: 'expense', amount: '', description: '' })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo registrar el movimiento')
@@ -252,6 +273,38 @@ export function CashSection() {
             </Button>
           </>
         )
+      case 'fund':
+        return (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Sumá efectivo al turno sin cerrar caja. Ejemplo: el turno tarde abrió con $5.000 y más tarde
+              le entregás $5.000 extra al cadete.
+            </p>
+            <Field label="Monto a agregar">
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                value={movement.amount}
+                onChange={(e) => setMovement((c) => ({ ...c, amount: e.target.value }))}
+              />
+            </Field>
+            <Field label="Motivo (opcional)">
+              <Input
+                placeholder="Ej. Refuerzo para Luna — turno tarde"
+                value={movement.description}
+                onChange={(e) => setMovement((c) => ({ ...c, description: e.target.value }))}
+              />
+            </Field>
+            <Button
+              className={cn('w-full', PANEL_PRIMARY_BTN)}
+              disabled={busy}
+              onClick={() => void handleMovement('Fondo actualizado')}
+            >
+              Agregar al fondo
+            </Button>
+          </>
+        )
       case 'movement':
         return (
           <>
@@ -263,7 +316,7 @@ export function CashSection() {
                 <SelectContent>
                   <SelectItem value="expense">Gasto</SelectItem>
                   <SelectItem value="withdrawal">Retiro</SelectItem>
-                  <SelectItem value="deposit">Depósito</SelectItem>
+                  <SelectItem value="deposit">Agregar al fondo</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
@@ -340,14 +393,24 @@ export function CashSection() {
           ) : (
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
               {canRegisterMovement ? (
-                <Button
-                  size="default"
-                  variant="outline"
-                  className={cn('h-11 w-full sm:h-9 sm:w-auto', PANEL_OUTLINE_BTN)}
-                  onClick={() => openForm('movement')}
-                >
-                  Movimiento
-                </Button>
+                <>
+                  <Button
+                    size="default"
+                    variant="outline"
+                    className={cn('h-11 w-full sm:h-9 sm:w-auto', PANEL_OUTLINE_BTN)}
+                    onClick={() => openForm('fund')}
+                  >
+                    Agregar al fondo
+                  </Button>
+                  <Button
+                    size="default"
+                    variant="outline"
+                    className={cn('h-11 w-full sm:h-9 sm:w-auto', PANEL_OUTLINE_BTN)}
+                    onClick={() => openForm('movement')}
+                  >
+                    Movimiento
+                  </Button>
+                </>
               ) : null}
               {canOpenClose ? (
                 <Button
@@ -375,7 +438,13 @@ export function CashSection() {
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
               <div className="space-y-2">
-                <p>Apertura: {formatPrice(num(openSession.openingAmount))}</p>
+                <p>Fondo inicial: {formatPrice(num(openSession.openingAmount))}</p>
+                <p>
+                  Efectivo esperado en caja:{' '}
+                  <span className="font-semibold text-[#2D5A57]">
+                    {formatPrice(computeExpectedCash(openSession))}
+                  </span>
+                </p>
                 <p>Abierta por: {openSession.openedByUser?.name ?? '—'}</p>
                 <p className="text-muted-foreground">
                   Desde {formatDateTimeAR(openSession.openedAt)}
@@ -401,9 +470,12 @@ export function CashSection() {
             </CardHeader>
             <CardContent className="space-y-2">
               {openSession.movements.map((entry) => (
-                <div key={entry.id} className={cn(PANEL_LIST_ROW, 'flex justify-between text-sm')}>
-                  <span>{entry.description}</span>
-                  <span className="font-medium">{formatPrice(num(entry.amount))}</span>
+                <div key={entry.id} className={cn(PANEL_LIST_ROW, 'flex justify-between gap-3 text-sm')}>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-[#2D5A57]/70">{movementLabel(entry.type)}</p>
+                    <p className="truncate">{entry.description}</p>
+                  </div>
+                  <span className="shrink-0 font-medium">{formatPrice(num(entry.amount))}</span>
                 </div>
               ))}
             </CardContent>
