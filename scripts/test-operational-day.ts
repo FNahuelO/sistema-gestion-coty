@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import {
+  normalizeOperationalDayCutoffTime,
   OPERATIONAL_DAY_CUTOFF_TIME,
   operationalDayEndISO,
   operationalDayKey,
@@ -8,6 +9,10 @@ import {
 } from '../lib/datetime'
 
 const cutoff = OPERATIONAL_DAY_CUTOFF_TIME
+
+assert.equal(normalizeOperationalDayCutoffTime(undefined), '01:00')
+assert.equal(normalizeOperationalDayCutoffTime('2:30'), '02:30')
+assert.equal(normalizeOperationalDayCutoffTime('25:00'), '01:00')
 
 // 18/08/2026 23:30 AR → mismo día operativo
 assert.equal(

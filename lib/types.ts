@@ -223,6 +223,7 @@ export interface BusinessSettings {
   isOpen: boolean
   openTime: string
   closeTime: string
+  operationalDayCutoffTime?: string
   timezone?: string
   phone: string
   address: string

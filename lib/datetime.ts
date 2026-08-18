@@ -86,6 +86,22 @@ export function arDayKey(date: DateInput): string {
  */
 export const OPERATIONAL_DAY_CUTOFF_TIME = '01:00'
 
+/** Normaliza HH:MM para el corte del día operativo; fallback 01:00. */
+export function normalizeOperationalDayCutoffTime(value?: string | null): string {
+  if (!value?.trim()) return OPERATIONAL_DAY_CUTOFF_TIME
+
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})$/)
+  if (!match) return OPERATIONAL_DAY_CUTOFF_TIME
+
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours > 23 || minutes > 59) {
+    return OPERATIONAL_DAY_CUTOFF_TIME
+  }
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
 function parseTimeToMinutes(value: string): number {
   const [hours, minutes] = value.split(':').map(Number)
   return hours * 60 + (minutes ?? 0)

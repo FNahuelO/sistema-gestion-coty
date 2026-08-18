@@ -16,6 +16,7 @@ export const businessSettings: BusinessSettings = {
   isOpen: true,
   openTime: '07:00',
   closeTime: '21:00',
+  operationalDayCutoffTime: '01:00',
   phone: '+54 11 4567 8901',
   address: 'Av. Santa Fe 1234, Palermo, CABA',
   instagram: 'cotycafe',

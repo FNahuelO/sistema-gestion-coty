@@ -30,6 +30,7 @@ import { StaffNotificationsButton } from '@/components/staff/staff-notifications
 import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
 import { formatOrderStatus, formatOrderNumber, getDailyOrderControlSummary, getOrderChannelLabel, ORDER_TYPE_BADGE_CLASS, ORDER_TYPE_CARD_ACCENT, isDisplayableCustomerPhone } from '@/lib/order-labels'
+import { normalizeOperationalDayCutoffTime } from '@/lib/datetime'
 import { canApproveTransferPayment } from '@/lib/payment-flow'
 import { ORDER_SORT_OPTIONS, sortOrders, type OrderSortKey } from '@/lib/order-sort'
 import { POLL_SWR_DEFAULTS, usePollInterval } from '@/lib/swr-poll'
@@ -124,7 +125,11 @@ export function OrdersSection({
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [manualOrderOpen, setManualOrderOpen] = useState(false)
 
-  const dailyControl = useMemo(() => getDailyOrderControlSummary(orders), [orders])
+  const cutoffTime = normalizeOperationalDayCutoffTime(settings?.operationalDayCutoffTime)
+  const dailyControl = useMemo(
+    () => getDailyOrderControlSummary(orders, undefined, cutoffTime),
+    [orders, cutoffTime]
+  )
 
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {

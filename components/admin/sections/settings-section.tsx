@@ -121,6 +121,21 @@ export function SettingsSection() {
             <Field label="Hora apertura"><Input value={settingsDraft?.openTime ?? ''} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, openTime: event.target.value } : previous)} /></Field>
             <Field label="Hora cierre"><Input value={settingsDraft?.closeTime ?? ''} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, closeTime: event.target.value } : previous)} /></Field>
           </div>
+          <Field label="Corte del día operativo (pedidos)">
+            <Input
+              value={settingsDraft?.operationalDayCutoffTime ?? '01:00'}
+              placeholder="01:00"
+              onChange={(event) =>
+                setSettingsDraft((previous) =>
+                  previous ? { ...previous, operationalDayCutoffTime: event.target.value } : previous
+                )
+              }
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Hora (HH:MM) hasta la cual los pedidos cuentan para el mismo día. Ej.: con 01:00, un pedido
+              a las 00:30 sigue siendo del día anterior.
+            </p>
+          </Field>
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="Delivery fee"><Input type="number" value={settingsDraft?.deliveryFee ?? 0} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, deliveryFee: Number(event.target.value) } : previous)} /></Field>
             <Field label="Pedido mínimo"><Input type="number" value={settingsDraft?.minOrderAmount ?? 0} onChange={(event) => setSettingsDraft((previous) => previous ? { ...previous, minOrderAmount: Number(event.target.value) } : previous)} /></Field>
@@ -152,6 +167,10 @@ export function SettingsSection() {
               <p><span className="font-medium text-foreground">Teléfono:</span> {admin.settings?.phone}</p>
               <p><span className="font-medium text-foreground">Dirección:</span> {admin.settings?.address}</p>
               <p><span className="font-medium text-foreground">Horario:</span> {admin.settings?.openTime} – {admin.settings?.closeTime}</p>
+              <p>
+                <span className="font-medium text-foreground">Corte día operativo:</span>{' '}
+                {admin.settings?.operationalDayCutoffTime ?? '01:00'}
+              </p>
               <p><span className="font-medium text-foreground">Estado:</span> {admin.settings?.isOpen ? 'Abierto' : 'Cerrado'}</p>
               {admin.settings?.transferAlias ? (
                 <p><span className="font-medium text-foreground">Alias / CVU:</span> {admin.settings.transferAlias}</p>

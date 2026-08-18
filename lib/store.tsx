@@ -508,6 +508,7 @@ export function useBusiness() {
         isOpen: false,
         openTime: '07:00',
         closeTime: '21:00',
+        operationalDayCutoffTime: '01:00',
         phone: '',
         address: '',
         whatsapp: '',
