@@ -301,6 +301,7 @@ Panel unificado para el día a día del local. Incluye 6 secciones:
 Vista en tiempo real de todos los pedidos activos:
 
 - **Numeración del día unificada:** mesa, delivery y retiro comparten el mismo correlativo (`#1`, `#2`, `#3`…). Así podés controlar el total del día (por ejemplo 30 pedidos = 17 mesas + 13 envíos) sin series separadas por canal.
+- **Corte del día operativo a la 01:00:** los pedidos entre medianoche y la 01:00 siguen contando para el mismo día (mismo `#` correlativo y mismo resumen “Hoy”). Así no se reinicia el `#1` a las 00:00 ni se desfasan los pedidos nocturnos respecto al turno de caja.
 - Filtros por tipo (delivery, retiro, mesa), estado y búsqueda.
 - Contadores: pendientes, preparando, listos, activos; y resumen del día con desglose por canal.
 - Avance de estado paso a paso: Confirmar → Preparar → Listo → Entregar → Completar.

@@ -26,7 +26,15 @@ import { buildWhatsAppOrderMessage, buildWhatsAppUrl } from '@/lib/whatsapp-mess
 import { requiresTransferProofApproval } from '@/lib/payment-flow'
 import { createTrackingProof, verifyTrackingProof } from '@/lib/tracking-proof'
 import { notifyOrderStatusChanged, notifyOrderEstimateChanged } from '@/lib/push-notifications'
-import { arDayEndISO, arDayKey, arDayStartISO, arHour } from '@/lib/datetime'
+import {
+  arDayEndISO,
+  arDayKey,
+  arDayStartISO,
+  arHour,
+  operationalDayEndISO,
+  operationalDayKey,
+  operationalDayStartISO,
+} from '@/lib/datetime'
 import {
   buildMercadoPagoPreferenceItems,
   isMercadoPagoAvailable,
@@ -965,9 +973,9 @@ export async function getStaffOpsAlerts() {
   return { kitchenPending, tableCallsPending }
 }
 
-/** Pedidos activos + terminales del día AR (evita arrastrar historial operativo). */
+/** Pedidos activos + terminales del día operativo AR (corte ~01:00, evita arrastrar historial). */
 export async function getOperationalOrders() {
-  const todayStart = new Date(arDayStartISO(arDayKey(new Date())))
+  const todayStart = new Date(operationalDayStartISO(operationalDayKey(new Date())))
 
   const orders = await prisma.order.findMany({
     where: {
@@ -1057,12 +1065,12 @@ function serviceDateFromDayKey(dayKey: string): Date {
   return new Date(Date.UTC(year, month - 1, day))
 }
 
-/** Asigna el próximo número de pedido del día (horario Argentina), atómico por fila.
+/** Asigna el próximo número de pedido del día operativo (corte ~01:00 AR), atómico por fila.
  *  Un solo correlativo para TODOS los canales (mesa, delivery y retiro): #1, #2, #3…
  */
 async function allocateDailyOrderNumber(
   tx: Prisma.TransactionClient,
-  dayKey = arDayKey(new Date())
+  dayKey = operationalDayKey(new Date())
 ): Promise<{ dailyNumber: number; serviceDate: Date }> {
   try {
     const rows = await tx.$queryRaw<Array<{ lastNumber: number }>>`
@@ -2360,9 +2368,9 @@ export async function updateOrderPaymentMethod(
 
 export async function getAnalytics(): Promise<AnalyticsOverview> {
   const now = new Date()
-  const todayKey = arDayKey(now)
-  const todayStart = new Date(arDayStartISO(todayKey))
-  const todayEnd = new Date(arDayEndISO(todayKey))
+  const todayKey = operationalDayKey(now)
+  const todayStart = new Date(operationalDayStartISO(todayKey))
+  const todayEnd = new Date(operationalDayEndISO(todayKey))
 
   const dailyKeys = Array.from({ length: 14 }, (_, index) => {
     const day = new Date(todayStart)
@@ -2523,7 +2531,7 @@ export async function getAnalytics(): Promise<AnalyticsOverview> {
     dailyMap.set(key, { revenue: 0, orders: 0 })
   }
   for (const order of dailyOrders) {
-    const day = arDayKey(order.createdAt)
+    const day = operationalDayKey(order.createdAt)
     const current = dailyMap.get(day)
     if (!current) continue
     current.revenue += decimalToNumber(order.total)

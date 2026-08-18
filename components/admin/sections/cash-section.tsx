@@ -439,11 +439,29 @@ export function CashSection() {
             <CardContent className="space-y-4 text-sm">
               <div className="space-y-2">
                 <p>Fondo inicial: {formatPrice(num(openSession.openingAmount))}</p>
+                {(openSession.movements ?? []).some(
+                  (entry) => entry.type === 'deposit' || entry.type === 'DEPOSIT'
+                ) ? (
+                  <p>
+                    Refuerzos de fondo:{' '}
+                    <span className="font-medium text-[#2D5A57]">
+                      {formatPrice(
+                        (openSession.movements ?? [])
+                          .filter((entry) => entry.type === 'deposit' || entry.type === 'DEPOSIT')
+                          .reduce((sum, entry) => sum + num(entry.amount), 0)
+                      )}
+                    </span>
+                  </p>
+                ) : null}
                 <p>
                   Efectivo esperado en caja:{' '}
                   <span className="font-semibold text-[#2D5A57]">
                     {formatPrice(computeExpectedCash(openSession))}
                   </span>
+                </p>
+                <p className="text-muted-foreground">
+                  El fondo inicial no se modifica después de abrir. Para sumar plata al turno (ej. cuando
+                  traés cambio extra o plata de otro turno), usá &quot;Agregar al fondo&quot;.
                 </p>
                 <p>Abierta por: {openSession.openedByUser?.name ?? '—'}</p>
                 <p className="text-muted-foreground">

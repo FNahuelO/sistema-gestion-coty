@@ -1,5 +1,5 @@
 import type { Order, OrderStatus, OrderType, PaymentStatus, TableStatus } from '@/lib/types'
-import { arDayKey } from '@/lib/datetime'
+import { operationalDayKey } from '@/lib/datetime'
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   pending: 'Pendiente',
@@ -123,10 +123,10 @@ export function getOrderNumberText(
 /** Resumen del correlativo del día (todos los canales juntos). */
 export function getDailyOrderControlSummary(
   orders: Array<Pick<Order, 'dailyNumber' | 'type' | 'status' | 'createdAt'>>,
-  dayKey = arDayKey(new Date())
+  dayKey = operationalDayKey(new Date())
 ) {
   const todays = orders.filter(
-    (order) => arDayKey(order.createdAt) === dayKey && order.status !== 'cancelled'
+    (order) => operationalDayKey(order.createdAt) === dayKey && order.status !== 'cancelled'
   )
   const lastNumber = todays.reduce(
     (max, order) => Math.max(max, order.dailyNumber ?? 0),

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { formatPrice } from '@/lib/coty-theme'
-import { arDayEndISO, arDayKey, arDayStartISO, formatDateAR } from '@/lib/datetime'
+import { arDayEndISO, arDayKey, arDayStartISO, formatDateAR, operationalDayKey } from '@/lib/datetime'
 import { PANEL_CARD, PANEL_INPUT, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_SURFACE_ALT, PANEL_TITLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { useAdminData } from '@/lib/store'
@@ -27,7 +27,7 @@ export function DashboardSection() {
   const [rangeFrom, setRangeFrom] = useState(() => arDayKey(new Date(Date.now() - 7 * 86400000)))
   const [rangeTo, setRangeTo] = useState(() => arDayKey(new Date()))
 
-  const today = arDayKey(new Date())
+  const today = operationalDayKey(new Date())
 
   const rangeError = useMemo(() => {
     if (!rangeFrom || !rangeTo) return 'Seleccioná ambas fechas para ver el reporte'

@@ -1,4 +1,4 @@
-import { arDayKey } from '@/lib/datetime'
+import { operationalDayKey, shiftDayKey } from '@/lib/datetime'
 
 export function percentVsYesterday(today: number, yesterday: number) {
   if (yesterday === 0) return null
@@ -6,7 +6,7 @@ export function percentVsYesterday(today: number, yesterday: number) {
 }
 
 export function yesterdayMetrics(dailySales: { date: string; revenue: number; orders: number }[]) {
-  const key = arDayKey(new Date(Date.now() - 86_400_000))
+  const key = shiftDayKey(operationalDayKey(new Date()), -1)
   const entry = dailySales.find((day) => day.date === key)
   return {
     revenue: entry?.revenue ?? 0,
