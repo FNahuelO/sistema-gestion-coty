@@ -12,7 +12,7 @@ import { StatusBadge } from '@/components/shared/status-badge'
 import { PANEL_CARD, PANEL_LIST_ROW, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
 import { COTY_TEAL, formatPrice } from '@/lib/coty-theme'
 import { formatDeliveryAssignmentStatus } from '@/lib/delivery-labels'
-import { formatOrderNumber, isDisplayableCustomerPhone } from '@/lib/order-labels'
+import { formatOrderNumber, isDisplayableCustomerPhone, PAYMENT_METHOD_LABELS } from '@/lib/order-labels'
 import type { DeliveryQueueEntry } from '@/lib/types'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
@@ -23,6 +23,23 @@ const fetchJson = async (url: string) => {
   const res = await fetch(url, { credentials: 'include' })
   if (!res.ok) throw new Error('Error al cargar')
   return res.json()
+}
+
+function paymentBadgeClass(method: DeliveryQueueEntry['order']['paymentMethod']) {
+  switch (method) {
+    case 'cash':
+      return 'bg-emerald-100 text-emerald-900 hover:bg-emerald-100'
+    case 'transfer':
+      return 'bg-violet-100 text-violet-900 hover:bg-violet-100'
+    case 'card':
+      return 'bg-blue-100 text-blue-900 hover:bg-blue-100'
+    case 'mercado_pago':
+      return 'bg-sky-100 text-sky-900 hover:bg-sky-100'
+    case 'combined':
+      return 'bg-amber-100 text-amber-900 hover:bg-amber-100'
+    default:
+      return 'bg-gray-100 text-gray-700 hover:bg-gray-100'
+  }
 }
 
 function assignmentBadgeClass(status: DeliveryQueueEntry['assignmentStatus']) {
@@ -110,9 +127,12 @@ function DeliveryQueueCard({
             ) : null}
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span>{formatPrice(entry.order.total)}</span>
             {entry.order.deliveryFee ? <span>Envío {formatPrice(entry.order.deliveryFee)}</span> : null}
+            <Badge className={cn('border-0 text-[10px]', paymentBadgeClass(entry.order.paymentMethod))}>
+              {PAYMENT_METHOD_LABELS[entry.order.paymentMethod]}
+            </Badge>
             <span>
               {formatDistanceToNow(new Date(entry.order.createdAt), { addSuffix: true, locale: es })}
             </span>

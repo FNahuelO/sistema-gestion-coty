@@ -120,6 +120,7 @@ export interface DeliveryQueueEntry {
     customerAddress?: string | null
     total: number
     deliveryFee?: number
+    paymentMethod: PaymentMethod
     createdAt: string
   }
 }
@@ -222,6 +223,7 @@ export interface BusinessSettings {
   isOpen: boolean
   openTime: string
   closeTime: string
+  operationalDayCutoffTime?: string
   timezone?: string
   phone: string
   address: string

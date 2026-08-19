@@ -3,6 +3,7 @@
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { formatPrice } from '@/lib/coty-theme'
 import type { HourlySales } from '@/lib/types'
 
 const chartConfig = {
@@ -43,7 +44,14 @@ export function HourlySalesChart({ data }: { data: HourlySales[] }) {
         <ChartTooltip
           content={
             <ChartTooltipContent
-              formatter={(value) => [`$${Number(value).toLocaleString('es-AR')}`, 'Ingresos']}
+              formatter={(value) => (
+                <div className="flex flex-1 items-center justify-between gap-4 leading-none">
+                  <span className="text-muted-foreground">Ingresos</span>
+                  <span className="font-mono font-medium tabular-nums text-foreground">
+                    {formatPrice(Number(value))}
+                  </span>
+                </div>
+              )}
             />
           }
         />

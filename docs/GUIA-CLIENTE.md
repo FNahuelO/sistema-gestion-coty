@@ -149,12 +149,11 @@ Acceso: `/admin` · Usuarios: Administrador y Cajero/a (con permisos limitados).
 
 Centro de control con métricas del negocio:
 
-- **Reporte por período** con fechas personalizables: ingresos y cantidad de pedidos.
+- **Reporte por período** con fechas personalizables: ingresos, cantidad de pedidos y **productos más vendidos** (unidades e ingresos) del rango elegido.
 - **Resumen del día**: ventas, pedidos, ticket promedio y pedidos activos (con comparación vs. ayer).
 - Gráfico de **ingresos por hora**.
 - Desglose por **canal** (delivery, retiro, mesas).
 - Gráfico de **ventas diarias** (últimos 14 días).
-- **Top de productos** por ingresos.
 - **Historial de ventas** con búsqueda y paginación.
 - **Exportación** a CSV y Excel desde el historial.
 
@@ -222,10 +221,35 @@ Control de cuándo se aceptan pedidos por canal:
 
 Control del turno de caja:
 
-- **Abrir caja** con monto inicial.
+- **Abrir caja** con monto inicial (fondo de caja).
 - Registrar movimientos: gasto, retiro, depósito.
 - **Cerrar turno**: monto contado, notas y cálculo de diferencia vs. monto esperado.
 - Ver sesión activa, movimientos del turno e historial de cierres.
+- Desglose de ventas del turno por medio de pago: efectivo, transferencia, tarjeta y Mercado Pago.
+
+#### Fondo de caja vs. módulo Caja
+
+| Concepto | Qué es | Para qué sirve |
+| -------- | ------ | -------------- |
+| **Fondo de caja** | El efectivo con el que **abrís** el turno (monto inicial). | Cambio para el día: el cadete o cajero sale con ese dinero para dar vuelto en entregas en efectivo. |
+| **Módulo Caja** | La sección del sistema donde registrás el turno completo. | Apertura, movimientos (gastos/retiros/depósitos), cierre y arqueo. |
+
+**Importante:** al cerrar caja, el **arqueo físico** solo suma el efectivo real del cajón: fondo inicial + ventas en efectivo + depósitos − gastos/retiros. Las ventas por transferencia, tarjeta y Mercado Pago aparecen en el desglose informativo, pero **no entran** en el monto que tenés que contar en billetes.
+
+Si un pedido de delivery entró como efectivo y el cliente después paga por transferencia, **editá el medio de pago antes de cerrar el turno** (ver sección Pedidos más abajo). Así el arqueo no queda desfasado y el cadete no lleva plata de más en la calle.
+
+#### Agregar plata al fondo durante el turno
+
+No hace falta cerrar y reabrir caja. Si el turno tarde abrió con **$5.000** y más tarde querés sumar **$5.000** extra (por ejemplo cuando Luna ya está en el turno y le llevás cambio):
+
+1. **Caja → Agregar al fondo**
+2. Ingresá el monto (ej. $5.000)
+3. Opcional: motivo (ej. “Refuerzo para Luna — turno tarde”)
+4. **Agregar al fondo**
+
+Eso registra un **refuerzo de fondo** que suma al efectivo esperado al cerrar. También podés hacerlo desde **Movimiento → Agregar al fondo** si preferís el formulario completo.
+
+> **Nota:** el monto de apertura original no se edita (queda en el historial). Los refuerzos se registran como movimientos aparte, que es lo correcto para el arqueo.
 
 ### Comercio
 
@@ -245,6 +269,7 @@ Datos generales del negocio:
 
 - Nombre, logo, teléfono, dirección.
 - Horarios de apertura y cierre.
+- **Corte del día operativo** (HH:MM, por defecto `01:00`): hasta qué hora los pedidos cuentan para el mismo día antes de reiniciar el correlativo `#1`.
 - Costo de delivery por defecto, pedido mínimo y tasa impositiva.
 - WhatsApp, Instagram y Facebook.
 - Estado abierto/cerrado manual.
@@ -277,10 +302,12 @@ Panel unificado para el día a día del local. Incluye 6 secciones:
 Vista en tiempo real de todos los pedidos activos:
 
 - **Numeración del día unificada:** mesa, delivery y retiro comparten el mismo correlativo (`#1`, `#2`, `#3`…). Así podés controlar el total del día (por ejemplo 30 pedidos = 17 mesas + 13 envíos) sin series separadas por canal.
+- **Corte del día operativo:** configurable en Admin → Configuración (por defecto **01:00**). Los pedidos entre medianoche y esa hora siguen contando para el mismo día (mismo `#` correlativo y mismo resumen “Hoy”). Así no se reinicia el `#1` a las 00:00 ni se desfasan los pedidos nocturnos respecto al turno de caja.
 - Filtros por tipo (delivery, retiro, mesa), estado y búsqueda.
 - Contadores: pendientes, preparando, listos, activos; y resumen del día con desglose por canal.
 - Avance de estado paso a paso: Confirmar → Preparar → Listo → Entregar → Completar.
 - Cancelar pedido o archivarlo (sale de operaciones, queda en historial).
+- **Editar medio de pago** en el detalle del pedido (botón **Editar** en la sección Pago): efectivo, tarjeta, transferencia, Mercado Pago o combinado. Disponible mientras el pedido no esté completado ni cancelado — útil cuando un delivery entra como efectivo y el cliente avisa por WhatsApp que va a transferir antes de que salga el cadete.
 - **Alerta sonora** ante nuevos pedidos pendientes.
 - Detalle expandible de cada pedido.
 - Indicador visual de pedidos guardados offline pendientes de sincronizar.
@@ -308,10 +335,12 @@ Mapa del salón para mozos y cajeros:
 
 Gestión de entregas de delivery:
 
-- Lista de entregas activas.
+- Lista de entregas activas con **medio de pago visible** (efectivo, transferencia, etc.) para saber si el cadete debe cobrar en puerta o no.
 - Asignar cadete (solo usuarios registrados como Cadete).
 - Marcar: retirado → entregado.
 - Actualización automática periódica.
+
+> **Cambiar efectivo → transferencia:** lo hace cajero/a o quien tenga acceso a **Pedidos** (no el cadete): abrir el pedido → sección **Pago** → **Editar** → elegir Transferencia → **Guardar pago**. Hacelo antes de que el cadete salga o en cuanto el cliente avise, para que no lleve efectivo de más.
 
 ### Llamados (Mozos)
 
@@ -401,7 +430,9 @@ Cliente sin internet → confirma pedido (excepto Mercado Pago)
 
 - Sesiones de turno con apertura y cierre.
 - Movimientos manuales: gastos, retiros y depósitos.
-- Al cerrar, el sistema calcula el monto esperado (apertura + ventas en efectivo + depósitos − salidas) y muestra la diferencia con lo contado.
+- Al cerrar, el sistema calcula el monto esperado en efectivo (apertura + ventas en efectivo + depósitos − salidas) y muestra la diferencia con lo contado.
+- El cierre y la sesión activa desglosan las ventas del turno por medio de pago: efectivo, transferencia, tarjeta y Mercado Pago.
+- Si corregís el medio de pago de un pedido (efectivo ↔ transferencia), el desglose y el arqueo se actualizan automáticamente para ese turno.
 
 ### Facturación / comprobantes
 
@@ -436,7 +467,7 @@ Cliente sin internet → confirma pedido (excepto Mercado Pago)
 
 - Métricas del día con comparación vs. ayer.
 - Ventas por hora, por canal y por producto.
-- Reporte por rango de fechas personalizado.
+- Reporte por rango de fechas personalizado (ingresos, pedidos y productos más vendidos).
 - Mesas atendidas (hoy y total histórico).
 - Exportación de ventas en CSV y Excel (solo administrador).
 
