@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -46,7 +47,7 @@ import { PromotionBanner } from '@/components/customer/promotion-banner'
 import { InstallAppPrompt } from '@/components/customer/install-app-prompt'
 
 const HERO_IMAGE = '/images/hero-burger.jpg'
-const CTA_IMAGE = 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=1600&h=500&fit=crop'
+const CTA_IMAGE = 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=1200&h=400&fit=crop'
 
 function getDefaultCartItem(items: CartItem[], productId: string) {
   return items.find(
@@ -59,7 +60,10 @@ function TablePill() {
   const { tableSession, isLoading } = useTableSession()
   const mesaFromUrl = getMesaIdFromSearch(searchParams)
 
-  if (isLoading) {
+  // Sin mesa en URL no reservamos espacio (evita CLS al hidratar).
+  if (!mesaFromUrl) return null
+
+  if (isLoading || !tableSession) {
     return (
       <div
         className="absolute right-4 top-6 z-20 h-7 w-20 animate-pulse rounded-full bg-white/20"
@@ -68,11 +72,9 @@ function TablePill() {
     )
   }
 
-  if (!mesaFromUrl || !tableSession) return null
-
   return (
     <div
-      className="absolute right-4 top-6 z-20 flex items-center gap-1.5 rounded-full px-3 py-1.5 shadow-sm"
+      className="absolute right-4 top-6 z-20 flex h-7 min-w-20 items-center justify-center gap-1.5 rounded-full px-3 shadow-sm"
       style={{ backgroundColor: COTY_MINT }}
     >
       <Armchair className="h-3.5 w-3.5" style={{ color: COTY_HEADER }} strokeWidth={2} />
@@ -143,10 +145,13 @@ function HeroCard({ subtitle, menuHref = '/menu' }: { subtitle: string; menuHref
           </Link>
         </div>
         <div className="relative min-w-0 flex-1 overflow-hidden" style={{ backgroundColor: COTY_PAGE_BG }}>
-          <img
+          <Image
             src={HERO_IMAGE}
             alt="Especialidad del local"
-            className="absolute inset-0 h-full w-full scale-110 object-cover object-[70%_42%] md:scale-[1.15] md:object-[65%_40%]"
+            fill
+            priority
+            sizes="(max-width: 768px) 44vw, 40vw"
+            className="scale-110 object-cover object-[70%_42%] md:scale-[1.15] md:object-[65%_40%]"
           />
           <div
             className="pointer-events-none absolute inset-y-0 left-0 w-10 md:w-12"
@@ -246,8 +251,14 @@ function ProductCard({
       className={`flex h-full flex-col overflow-hidden rounded-2xl border border-black/8 shadow-sm md:rounded-3xl ${cardBg === 'white' ? 'bg-white' : 'bg-white/95'
         }`}
     >
-      <div className="aspect-4/3 shrink-0 overflow-hidden">
-        <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+      <div className="relative aspect-4/3 shrink-0 overflow-hidden">
+        <Image
+          src={product.image}
+          alt={product.name}
+          fill
+          sizes="(max-width: 768px) 45vw, 220px"
+          className="object-cover"
+        />
       </div>
       <div className="flex flex-1 flex-col p-3 md:p-4">
         <h3 className="line-clamp-2 min-h-10 text-sm font-bold leading-tight md:min-h-11 md:text-base">
@@ -336,7 +347,6 @@ export function CustomerLanding() {
   const { items, itemCount, hydrated: cartHydrated, addItem, updateQuantity } = useCart()
   const { products, categories, promotions, channelAvailability, isLoading: isCatalogLoading } =
     useCatalog()
-  const { tableSession } = useTableSession()
   const [searchQuery, setSearchQuery] = useState('')
   const mesaFromUrl = getMesaIdFromSearch(searchParams)
   const menuHref = mesaFromUrl ? buildMenuPathWithTable(mesaFromUrl) : '/menu'
@@ -539,11 +549,13 @@ export function CustomerLanding() {
       <div className="mx-auto max-w-6xl px-4 md:px-8">
         {/* CTA */}
         <section className="pb-6 md:pb-10">
-          <div className="relative overflow-hidden rounded-2xl md:rounded-3xl">
-            <img
+          <div className="relative h-28 overflow-hidden rounded-2xl md:h-40 md:rounded-3xl lg:h-48">
+            <Image
               src={CTA_IMAGE}
               alt="Hacé tu pedido"
-              className="h-28 w-full object-cover md:h-40 lg:h-48"
+              fill
+              sizes="(max-width: 768px) 100vw, 1152px"
+              className="object-cover"
             />
             <div className="absolute inset-0 flex items-center justify-around gap-4 bg-black/45 px-4 md:px-8 lg:px-12">
               <img

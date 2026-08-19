@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef, type ElementType } from 'react'
+import dynamic from 'next/dynamic'
 import useSWR from 'swr'
-import { motion, AnimatePresence } from 'framer-motion'
 import {
   Truck,
   Store,
@@ -24,8 +24,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useOrders, useBusiness } from '@/lib/store'
 import { usePendingAction } from '@/hooks/use-pending-action'
-import { OrderDetailSheet } from '@/components/staff/order-detail-sheet'
-import { ManualOrderDialog } from '@/components/staff/manual-order-dialog'
 import { StaffNotificationsButton } from '@/components/staff/staff-notifications-button'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { EmptyState } from '@/components/shared/empty-state'
@@ -42,13 +40,33 @@ import { PANEL_CARD, PANEL_LIST_ROW, PANEL_PRIMARY_BTN } from '@/lib/panel-theme
 import { Spinner } from '@/components/ui/spinner'
 import { formatDeliveryAssignmentStatus } from '@/lib/delivery-labels'
 import { cn } from '@/lib/utils'
-import { printOrderTickets } from '@/lib/ticket-print'
 import { buildWhatsAppChatUrl } from '@/lib/whatsapp-message'
+
+const OrderDetailSheet = dynamic(
+  () =>
+    import('@/components/staff/order-detail-sheet').then((mod) => ({
+      default: mod.OrderDetailSheet,
+    }))
+)
+
+const ManualOrderDialog = dynamic(
+  () =>
+    import('@/components/staff/manual-order-dialog').then((mod) => ({
+      default: mod.ManualOrderDialog,
+    }))
+)
 
 const fetchJson = async (url: string) => {
   const res = await fetch(url, { credentials: 'include' })
   if (!res.ok) throw new Error('Error al cargar')
   return res.json()
+}
+
+async function printOrderTicketsLazy(
+  ...args: Parameters<typeof import('@/lib/ticket-print').printOrderTickets>
+) {
+  const { printOrderTickets } = await import('@/lib/ticket-print')
+  return printOrderTickets(...args)
 }
 
 const orderTypeIcons: Record<OrderType, ElementType> = {
@@ -188,7 +206,7 @@ export function OrdersSection({
   }, [orderStats.pending])
 
   const printTicketsForOrder = (order: Order) => {
-    printOrderTickets({ order, businessName }, ['kitchen', 'customer'])
+    void printOrderTicketsLazy({ order, businessName }, ['kitchen', 'customer'])
   }
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus, estimatedMinutes?: number) => {
@@ -441,8 +459,7 @@ export function OrdersSection({
               </div>
             ) : (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                <AnimatePresence>
-                  {sortedOrders.map((order, index) => {
+                  {sortedOrders.map((order) => {
                     const TypeIcon = orderTypeIcons[order.type]
                     const awaitingTransferProof = canApproveTransferPayment(order)
                     const action = order.offlinePending
@@ -456,14 +473,8 @@ export function OrdersSection({
                       order.type === 'delivery' ? deliveryByOrderId.get(order.id) : undefined
 
                     return (
-                      <motion.div
-                        key={order.id}
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.98 }}
-                        transition={{ delay: index * 0.03 }}
-                      >
                         <div
+                          key={order.id}
                           role="button"
                           tabIndex={0}
                           onClick={() => setSelectedOrder(order)}
@@ -608,10 +619,8 @@ export function OrdersSection({
                             )}
                           </div>
                         </div>
-                      </motion.div>
                     )
                   })}
-                </AnimatePresence>
               </div>
             )}
           </TabsContent>
@@ -635,8 +644,8 @@ export function OrdersSection({
         onUpdatePriority={handleUpdatePriority}
         onUpdateItems={handleUpdateItems}
         onUpdatePayment={handleUpdatePayment}
-        onPrintKitchen={(order) => printOrderTickets({ order, businessName }, ['kitchen'])}
-        onPrintCustomer={(order) => printOrderTickets({ order, businessName }, ['customer'])}
+        onPrintKitchen={(order) => void printOrderTicketsLazy({ order, businessName }, ['kitchen'])}
+        onPrintCustomer={(order) => void printOrderTicketsLazy({ order, businessName }, ['customer'])}
         onPrintBoth={(order) => printTicketsForOrder(order)}
         onCancel={handleCancelOrder}
         onArchive={handleCloseOrder}

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { formatDateTimeAR } from '@/lib/datetime'
+import { buildCloudinaryUrl } from '@/lib/cloudinary-loader'
 import {
   Clock,
   MapPin,
@@ -358,7 +359,7 @@ export function OrderDetailSheet({
                     >
                       <div className="flex gap-3">
                         <img
-                          src={item.product.image}
+                          src={buildCloudinaryUrl(item.product.image, 112)}
                           alt={item.product.name}
                           className="h-14 w-14 shrink-0 rounded-xl object-cover"
                         />

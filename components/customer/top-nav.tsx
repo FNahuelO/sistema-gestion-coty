@@ -77,12 +77,15 @@ function useHasMounted() {
 
 function CartCountBadge({ count }: { count: number }) {
   const mounted = useHasMounted()
-  if (!mounted || count < 1) return null
-
+  // Slot fijo: evita que el badge empuje el botón Carrito al hidratar.
   return (
-    <Badge className="h-5 min-w-5 rounded-full bg-[#00C9B7] px-1 text-[10px] text-white">
-      {count}
-    </Badge>
+    <span className="inline-flex h-5 min-w-5 items-center justify-center">
+      {mounted && count >= 1 ? (
+        <Badge className="h-5 min-w-5 rounded-full bg-[#00C9B7] px-1 text-[10px] text-white">
+          {count}
+        </Badge>
+      ) : null}
+    </span>
   )
 }
 
@@ -151,43 +154,42 @@ export function CustomerTopNav() {
           </nav>
 
           <div className="flex shrink-0 items-center gap-2">
-            {(instagramUrl || facebookUrl || whatsappUrl) && (
-              <div className="hidden items-center gap-1 lg:flex">
-                {whatsappUrl && (
-                  <a
-                    href={whatsappUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-full p-2 text-white/75 transition-colors hover:bg-white/10 hover:text-white"
-                    aria-label="WhatsApp"
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                  </a>
-                )}
-                {instagramUrl && (
-                  <a
-                    href={instagramUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-full p-2 text-white/75 transition-colors hover:bg-white/10 hover:text-white"
-                    aria-label="Instagram"
-                  >
-                    <Instagram className="h-4 w-4" />
-                  </a>
-                )}
-                {facebookUrl && (
-                  <a
-                    href={facebookUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-full p-2 text-white/75 transition-colors hover:bg-white/10 hover:text-white"
-                    aria-label="Facebook"
-                  >
-                    <Facebook className="h-4 w-4" />
-                  </a>
-                )}
-              </div>
-            )}
+            {/* Slot fijo en desktop: evita CLS cuando aparecen los iconos sociales post-mount */}
+            <div className="hidden min-h-8 min-w-[108px] items-center justify-end gap-1 lg:flex">
+              {whatsappUrl ? (
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full p-2 text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+                  aria-label="WhatsApp"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                </a>
+              ) : null}
+              {instagramUrl ? (
+                <a
+                  href={instagramUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full p-2 text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+                  aria-label="Instagram"
+                >
+                  <Instagram className="h-4 w-4" />
+                </a>
+              ) : null}
+              {facebookUrl ? (
+                <a
+                  href={facebookUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full p-2 text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+                  aria-label="Facebook"
+                >
+                  <Facebook className="h-4 w-4" />
+                </a>
+              ) : null}
+            </div>
 
             <Link
               href={checkoutHref}

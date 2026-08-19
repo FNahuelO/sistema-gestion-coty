@@ -35,6 +35,10 @@ export async function uploadImageBuffer(
         folder: options?.folder ?? 'coty-cafe',
         public_id: options?.publicId,
         resource_type: 'image',
+        quality: 'auto:good',
+        fetch_format: 'auto',
+        flags: 'strip_profile.progressive',
+        transformation: [{ width: 1200, crop: 'limit', quality: 'auto:good', fetch_format: 'auto' }],
       },
       (error, result) => {
         if (error || !result?.secure_url) {

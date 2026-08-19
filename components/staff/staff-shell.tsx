@@ -21,6 +21,75 @@ import { AdminThemeToggle } from '@/components/admin/ui/theme-toggle'
 
 export type StaffSection = 'orders' | 'tables' | 'kitchen' | 'delivery' | 'calls' | 'cash'
 
+/** Skeleton con la misma chrome que StaffShell — evita CLS al autenticar. */
+export function StaffLoadingScreen() {
+  return (
+    <div className={cn('flex min-h-screen', PANEL_BG)} aria-busy="true" aria-label="Cargando panel de staff">
+      <aside className={cn('hidden w-72 shrink-0 border-r lg:block', PANEL_BORDER, PANEL_SHELL)}>
+        <div className={cn('flex items-start gap-3 border-b p-5', PANEL_BORDER)}>
+          <div
+            className="h-12 w-12 shrink-0 animate-pulse rounded-full"
+            style={{ backgroundColor: COTY_HEADER }}
+          />
+          <div className="flex-1 space-y-2 pt-1">
+            <div className="h-5 w-28 animate-pulse rounded bg-muted" />
+            <div className="h-3 w-20 animate-pulse rounded bg-muted" />
+          </div>
+        </div>
+        <div className="space-y-2 p-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-11 animate-pulse rounded-xl bg-muted" />
+          ))}
+        </div>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header
+          className={cn('sticky top-0 z-40 border-b', PANEL_BORDER, PANEL_SHELL_BLUR)}
+          style={{ paddingTop: 'env(safe-area-inset-top)' }}
+        >
+          <div className="flex h-14 items-center justify-between gap-2 px-3 sm:px-4">
+            <div className="flex items-center gap-2">
+              <div
+                className="h-9 w-9 animate-pulse rounded-full lg:hidden"
+                style={{ backgroundColor: COTY_HEADER }}
+              />
+              <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+            </div>
+            <div className="h-9 w-9 animate-pulse rounded-full bg-muted" />
+          </div>
+        </header>
+
+        <main className="flex-1 px-3 py-4 sm:px-4 sm:py-5 md:px-6">
+          <div className="mx-auto max-w-6xl space-y-4">
+            <div className="space-y-2">
+              <div className="h-7 w-40 animate-pulse rounded bg-muted" />
+              <div className="h-4 w-72 max-w-full animate-pulse rounded bg-muted" />
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="h-40 animate-pulse rounded-xl bg-muted" />
+              <div className="h-40 animate-pulse rounded-xl bg-muted" />
+              <div className="hidden h-40 animate-pulse rounded-xl bg-muted xl:block" />
+            </div>
+          </div>
+          <MobileShellPadding />
+        </main>
+
+        <nav
+          className={cn('fixed inset-x-0 bottom-0 z-50 border-t lg:hidden', PANEL_BORDER, PANEL_SHELL_BLUR)}
+          style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+        >
+          <div className="mx-auto flex h-[52px] max-w-lg items-center justify-around px-2 pt-1">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-8 w-12 animate-pulse rounded-lg bg-muted" />
+            ))}
+          </div>
+        </nav>
+      </div>
+    </div>
+  )
+}
+
 const NAV_ITEMS: { id: StaffSection; label: string; icon: ElementType }[] = [
   { id: 'orders', label: 'Pedidos', icon: ChefHat },
   { id: 'kitchen', label: 'Cocina', icon: ChefHat },

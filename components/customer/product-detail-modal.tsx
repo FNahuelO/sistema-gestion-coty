@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { Plus, Minus } from 'lucide-react'
 import { SimpleModal } from '@/components/ui/simple-modal'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -160,7 +161,13 @@ export function ProductDetailModal({ product, promotions = [], onClose, onAddToC
     <SimpleModal open onClose={onClose} title={product.name} footer={addToCartFooter}>
       <div className="space-y-5">
         <div className="relative mx-auto aspect-square w-full max-w-[200px] overflow-hidden rounded-2xl bg-[#F8FBFA]">
-          <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+          <Image
+            src={product.image}
+            alt={product.name}
+            fill
+            sizes="200px"
+            className="object-cover"
+          />
         </div>
 
         <div className="text-center">

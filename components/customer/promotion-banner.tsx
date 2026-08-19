@@ -1,11 +1,12 @@
 'use client'
 
+import Image from 'next/image'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 
 export const PROMO_FALLBACK_IMAGE =
-  'https://images.unsplash.com/photo-1436076865539-06670f77990b?w=1600&h=400&fit=crop'
+  'https://images.unsplash.com/photo-1436076865539-06670f77990b?w=1200&h=400&fit=crop'
 
 type PromotionBannerProps = {
   title: string
@@ -34,10 +35,12 @@ export function PromotionBanner({
         className
       )}
     >
-      <img
+      <Image
         src={image || PROMO_FALLBACK_IMAGE}
         alt={title}
-        className="h-full w-full object-cover opacity-60"
+        fill
+        sizes={isHero ? '(max-width: 768px) 100vw, 1152px' : '(max-width: 768px) 100vw, 50vw'}
+        className="object-cover opacity-60"
       />
       <div
         className={cn(

@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
 import {
   Coffee,
   Users,
@@ -40,6 +39,7 @@ import type {
 } from '@/lib/types'
 import { toast } from 'sonner'
 import { COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
+import { buildCloudinaryUrl } from '@/lib/cloudinary-loader'
 import { PANEL_CARD, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
@@ -436,19 +436,16 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
 
           <TabsContent value="tables">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-              {tables.map((table, index) => {
+              {tables.map((table) => {
                 const tableOrders = activeOrdersByTable.get(table.id) ?? []
                 const displayStatus = resolveTableDisplayStatus(table, tableOrders)
                 const visual = tableVisuals[displayStatus]
                 const StatusIcon = visual.icon
 
                 return (
-                  <motion.button
+                  <button
                     key={table.id}
                     type="button"
-                    initial={{ opacity: 0, scale: 0.96 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: index * 0.03 }}
                     onClick={() => handleSelectTable(table)}
                     className={cn(
                       PANEL_CARD,
@@ -492,7 +489,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
                         Total acumulado · {formatPrice(table.currentTotal!)}
                       </div>
                     )}
-                  </motion.button>
+                  </button>
                 )
               })}
             </div>
@@ -563,7 +560,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
                             className="flex w-full items-center gap-3 rounded-xl border border-gray-100 dark:border-border bg-white p-2 text-left transition-colors hover:bg-[#F8FBFA] dark:bg-card dark:hover:bg-muted"
                           >
                             <img
-                              src={product.image}
+                              src={buildCloudinaryUrl(product.image, 96)}
                               alt={product.name}
                               className="h-12 w-12 rounded-lg object-cover"
                             />
@@ -649,7 +646,7 @@ export function TablesSection({ embedded = false }: { embedded?: boolean }) {
                       >
                         <div className="flex min-w-0 items-center gap-2">
                           <img
-                            src={item.product.image}
+                            src={buildCloudinaryUrl(item.product.image, 80)}
                             alt={item.product.name}
                             className="h-10 w-10 shrink-0 rounded-lg object-cover"
                           />

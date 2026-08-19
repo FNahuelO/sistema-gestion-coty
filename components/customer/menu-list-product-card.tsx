@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { Plus, Minus, Trash2 } from 'lucide-react'
 import type { CartItem, Product, Promotion } from '@/lib/types'
 import { useCart } from '@/lib/store'
@@ -64,7 +65,13 @@ export function MenuListProductCard({
         onClick={onOpenDetail}
         className="relative h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl md:h-[96px] md:w-[96px]"
       >
-        <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+        <Image
+          src={product.image}
+          alt={product.name}
+          fill
+          sizes="96px"
+          className="object-cover"
+        />
         {discount > 0 && (
           <Badge className="absolute left-1 top-1 bg-[#EAB308] px-1 text-[9px] text-white hover:bg-[#EAB308]">
             Promo

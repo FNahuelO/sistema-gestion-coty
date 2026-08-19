@@ -1,17 +1,74 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useMemo, useState } from 'react'
-import { OrdersSection } from '@/components/staff/sections/orders-section'
-import { TablesSection } from '@/components/staff/sections/tables-section'
-import { KitchenSection } from '@/components/staff/sections/kitchen-section'
-import { DeliverySection } from '@/components/staff/sections/delivery-section'
-import { CallsSection } from '@/components/staff/sections/calls-section'
-import { CashSection } from '@/components/admin/sections/cash-section'
 import { StaffPageHeader, StaffShell, type StaffSection } from '@/components/staff/staff-shell'
 import { useKitchenAlert } from '@/hooks/use-kitchen-alert'
 import { useCallsAlert } from '@/hooks/use-calls-alert'
 import { canAccessCash } from '@/lib/permissions'
 import { useAuth } from '@/lib/store'
+import { LoadingSkeleton } from '@/components/shared/loading'
+
+function SectionFallback() {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="Cargando sección">
+      <LoadingSkeleton className="h-24 w-full rounded-2xl" />
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <LoadingSkeleton className="h-40 rounded-xl" />
+        <LoadingSkeleton className="h-40 rounded-xl" />
+        <LoadingSkeleton className="hidden h-40 rounded-xl xl:block" />
+      </div>
+    </div>
+  )
+}
+
+const OrdersSection = dynamic(
+  () =>
+    import('@/components/staff/sections/orders-section').then((mod) => ({
+      default: mod.OrdersSection,
+    })),
+  { loading: () => <SectionFallback /> }
+)
+
+const TablesSection = dynamic(
+  () =>
+    import('@/components/staff/sections/tables-section').then((mod) => ({
+      default: mod.TablesSection,
+    })),
+  { loading: () => <SectionFallback /> }
+)
+
+const KitchenSection = dynamic(
+  () =>
+    import('@/components/staff/sections/kitchen-section').then((mod) => ({
+      default: mod.KitchenSection,
+    })),
+  { loading: () => <SectionFallback /> }
+)
+
+const DeliverySection = dynamic(
+  () =>
+    import('@/components/staff/sections/delivery-section').then((mod) => ({
+      default: mod.DeliverySection,
+    })),
+  { loading: () => <SectionFallback /> }
+)
+
+const CallsSection = dynamic(
+  () =>
+    import('@/components/staff/sections/calls-section').then((mod) => ({
+      default: mod.CallsSection,
+    })),
+  { loading: () => <SectionFallback /> }
+)
+
+const CashSection = dynamic(
+  () =>
+    import('@/components/admin/sections/cash-section').then((mod) => ({
+      default: mod.CashSection,
+    })),
+  { loading: () => <SectionFallback /> }
+)
 
 const SECTION_COPY: Record<StaffSection, { title: string; description: string }> = {
   orders: { title: 'Pedidos', description: 'Gestioná delivery, retiro y pedidos de mesa en tiempo real' },

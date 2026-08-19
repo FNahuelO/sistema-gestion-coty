@@ -27,7 +27,7 @@ function HeroCardSkeleton() {
     <div className="overflow-visible rounded-2xl shadow-lg md:rounded-3xl">
       <div className="flex min-h-38 overflow-hidden rounded-2xl md:min-h-44 md:rounded-3xl">
         <div
-          className="flex w-[58%] shrink-0 flex-col justify-center gap-2.5 px-4 py-5 md:w-[55%] md:gap-3 md:px-6 md:py-6"
+          className="flex w-[56%] shrink-0 flex-col justify-center gap-2.5 px-4 py-5 md:w-[55%] md:gap-3 md:px-6 md:py-6"
           style={{ backgroundColor: COTY_HEADER }}
         >
           <LoadingSkeleton className="h-5 w-4/5 !bg-white/20" />

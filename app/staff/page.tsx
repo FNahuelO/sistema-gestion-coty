@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { AuthProvider, TablesProvider, OrdersProvider, BusinessProvider, useAuth } from '@/lib/store'
 import { StaffDashboard } from '@/components/staff/staff-dashboard'
-import { LoadingScreen } from '@/components/shared/loading'
+import { StaffLoadingScreen } from '@/components/staff/staff-shell'
 import { AdminThemeProvider } from '@/lib/admin-theme'
 import { isStaffRole } from '@/lib/types'
 
@@ -21,7 +21,7 @@ function StaffContent() {
   }, [isLoading, user, router])
 
   if (isLoading || !user || (!isStaffRole(user.role) && user.role !== 'admin')) {
-    return <LoadingScreen />
+    return <StaffLoadingScreen />
   }
 
   return <StaffDashboard />

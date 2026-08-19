@@ -3,6 +3,7 @@
 import { Minus, Plus, Trash2 } from 'lucide-react'
 import type { CartItem } from '@/lib/types'
 import { COTY_QTY_BG, COTY_TEAL, formatPrice } from '@/lib/coty-theme'
+import { buildCloudinaryUrl } from '@/lib/cloudinary-loader'
 
 export function getCartItemUnitPrice(item: CartItem) {
   const optionsTotal =
@@ -56,7 +57,7 @@ export function CartProductCard({
       <article className="flex items-start gap-3 border-b border-black/8 py-3 last:border-b-0">
         <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl">
           <img
-            src={item.product.image}
+            src={buildCloudinaryUrl(item.product.image, 112)}
             alt={item.product.name}
             className="h-full w-full object-cover"
           />
@@ -170,7 +171,7 @@ export function CartProductCard({
     <article className="flex gap-3 rounded-2xl border border-black/8 bg-white p-3 shadow-sm">
       <div className="h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl md:h-[96px] md:w-[96px]">
         <img
-          src={item.product.image}
+          src={buildCloudinaryUrl(item.product.image, 192)}
           alt={item.product.name}
           className="h-full w-full object-cover"
         />

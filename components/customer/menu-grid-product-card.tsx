@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { Plus, Minus } from 'lucide-react'
 import type { CartItem, Product, Promotion } from '@/lib/types'
 import { useCart } from '@/lib/store'
@@ -93,7 +94,13 @@ export function MenuGridProductCard({
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm">
       <button type="button" onClick={onOpenDetail} className="relative aspect-square overflow-hidden text-left">
-        <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+        <Image
+          src={product.image}
+          alt={product.name}
+          fill
+          sizes="(max-width: 768px) 50vw, 25vw"
+          className="object-cover"
+        />
         {(discount > 0 || isFeatured) && (
           <div className="absolute left-2 top-2 flex flex-col gap-1">
             {discount > 0 && (

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { formatPrice } from '@/lib/coty-theme'
+import { buildCloudinaryUrl } from '@/lib/cloudinary-loader'
 import { arDayEndISO, arDayKey, arDayStartISO } from '@/lib/datetime'
 import { PANEL_CARD, PANEL_INPUT, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_SURFACE_ALT, PANEL_TITLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
@@ -216,7 +217,7 @@ export function DashboardSection() {
               <div className="flex min-w-0 items-center gap-3">
                 {product.imageUrl ? (
                   <img
-                    src={product.imageUrl}
+                    src={buildCloudinaryUrl(product.imageUrl, 80)}
                     alt={product.productName}
                     className="h-10 w-10 shrink-0 rounded-lg object-cover"
                   />
