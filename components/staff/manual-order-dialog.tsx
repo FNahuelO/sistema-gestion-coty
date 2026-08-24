@@ -232,7 +232,7 @@ export function ManualOrderDialog({ open, onOpenChange, onSubmit }: ManualOrderD
           onOpenChange(next)
         }}
         title="Nuevo pedido manual"
-        description="Para clientes por teléfono o que compran en el local."
+        description="Para clientes que piden por teléfono, WhatsApp o en el local. Los pedidos que llegan solo por chat de WhatsApp (sin usar la web) se cargan acá."
         maxWidthClassName="sm:max-w-xl"
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

@@ -16,6 +16,7 @@ import {
   ArrowUpDown,
   Plus,
   MessageCircle,
+  Printer,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -139,7 +140,7 @@ export function OrdersSection({
   const [selectedTab, setSelectedTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('active')
-  const [sortBy, setSortBy] = useState<OrderSortKey>('number')
+  const [sortBy, setSortBy] = useState<OrderSortKey>('newest')
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [manualOrderOpen, setManualOrderOpen] = useState(false)
 
@@ -210,8 +211,14 @@ export function OrdersSection({
     previousPendingCount.current = pending
   }, [orderStats.pending])
 
-  const printTicketsForOrder = (order: Order) => {
-    void printOrderTicketsLazy({ order, businessName }, ['kitchen', 'customer'])
+  const printTicketsForOrder = (order: Order, variants: ('kitchen' | 'customer')[] = ['kitchen', 'customer']) => {
+    void printOrderTicketsLazy({ order, businessName }, variants).then((started) => {
+      if (started) {
+        toast.info('Se abrió el diálogo de impresión')
+      } else {
+        toast.error('No se pudo abrir la impresión. Revisá que el navegador no bloquee ventanas emergentes.')
+      }
+    })
   }
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus, estimatedMinutes?: number) => {
@@ -595,33 +602,49 @@ export function OrdersSection({
                             >
                               {formatPrice(order.total)}
                             </span>
-                            {action && (
+                            <div className="flex items-center gap-2">
                               <Button
+                                type="button"
                                 size="sm"
-                                className={PANEL_PRIMARY_BTN}
+                                variant="outline"
+                                className="h-8 px-2"
                                 disabled={isBusy}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  // Confirmar o aprobar requiere cargar el tiempo estimado desde el detalle
-                                  if (action.type === 'approve' || action.next === 'confirmed') {
-                                    setSelectedOrder(order)
-                                    return
-                                  }
-                                  void handleStatusChange(order.id, action.next)
+                                aria-label={`Imprimir comanda ${formatOrderNumber(order)}`}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  printTicketsForOrder(order, ['kitchen'])
                                 }}
                               >
-                                {isPending(
-                                  action.type === 'approve' ? `approve:${order.id}` : `status:${order.id}`
-                                ) ? (
-                                  <>
-                                    <Spinner className="mr-1.5" />
-                                    ...
-                                  </>
-                                ) : (
-                                  action.label
-                                )}
+                                <Printer className="h-3.5 w-3.5" />
                               </Button>
-                            )}
+                              {action && (
+                                <Button
+                                  size="sm"
+                                  className={PANEL_PRIMARY_BTN}
+                                  disabled={isBusy}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    // Confirmar o aprobar requiere cargar el tiempo estimado desde el detalle
+                                    if (action.type === 'approve' || action.next === 'confirmed') {
+                                      setSelectedOrder(order)
+                                      return
+                                    }
+                                    void handleStatusChange(order.id, action.next)
+                                  }}
+                                >
+                                  {isPending(
+                                    action.type === 'approve' ? `approve:${order.id}` : `status:${order.id}`
+                                  ) ? (
+                                    <>
+                                      <Spinner className="mr-1.5" />
+                                      ...
+                                    </>
+                                  ) : (
+                                    action.label
+                                  )}
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
                     )
@@ -649,9 +672,9 @@ export function OrdersSection({
         onUpdatePriority={handleUpdatePriority}
         onUpdateItems={handleUpdateItems}
         onUpdatePayment={handleUpdatePayment}
-        onPrintKitchen={(order) => void printOrderTicketsLazy({ order, businessName }, ['kitchen'])}
-        onPrintCustomer={(order) => void printOrderTicketsLazy({ order, businessName }, ['customer'])}
-        onPrintBoth={(order) => printTicketsForOrder(order)}
+        onPrintKitchen={(order) => printTicketsForOrder(order, ['kitchen'])}
+        onPrintCustomer={(order) => printTicketsForOrder(order, ['customer'])}
+        onPrintBoth={(order) => printTicketsForOrder(order, ['kitchen', 'customer'])}
         onCancel={handleCancelOrder}
         onArchive={handleCloseOrder}
         onDeliveryUpdated={() => void mutateDeliveryQueue()}

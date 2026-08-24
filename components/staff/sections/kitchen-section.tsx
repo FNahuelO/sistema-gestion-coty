@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
-import { ArrowUpDown, CheckCircle, ChefHat, Store, Truck, Users } from 'lucide-react'
+import { ArrowUpDown, CheckCircle, ChefHat, Printer, Store, Truck, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -22,6 +22,17 @@ import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { mutate as globalMutate } from 'swr'
 import { POLL_SWR_DEFAULTS, usePollInterval } from '@/lib/swr-poll'
+import { useBusiness } from '@/lib/store'
+
+async function printKitchenTicket(order: Order, businessName: string) {
+  const { printOrderTickets } = await import('@/lib/ticket-print')
+  const started = printOrderTickets({ order, businessName }, ['kitchen'])
+  if (started) {
+    toast.info('Se abrió el diálogo de impresión')
+  } else {
+    toast.error('No se pudo abrir la impresión. Revisá que el navegador no bloquee ventanas emergentes.')
+  }
+}
 
 const fetchJson = async (url: string) => {
   const res = await fetch(url, { credentials: 'include' })
@@ -42,6 +53,8 @@ function notifyOrdersChanged() {
 export function KitchenSection() {
   const [sortBy, setSortBy] = useState<OrderSortKey>('priority')
   const [pendingAction, setPendingAction] = useState<string | null>(null)
+  const { settings } = useBusiness()
+  const businessName = settings?.name ?? 'Coty Café'
   const refreshInterval = usePollInterval(15_000)
   const { data, mutate, isLoading } = useSWR<Order[]>('/api/staff/operations', fetchJson, {
     ...POLL_SWR_DEFAULTS,
@@ -178,7 +191,17 @@ export function KitchenSection() {
                     </li>
                   ))}
                 </ul>
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={pendingAction !== null}
+                    aria-label={`Imprimir comanda ${formatOrderNumber(order)}`}
+                    onClick={() => void printKitchenTicket(order, businessName)}
+                  >
+                    <Printer className="h-4 w-4" />
+                  </Button>
                   {isPreparing ? (
                     <Button
                       size="sm"
