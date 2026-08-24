@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { formatPrice } from '@/lib/coty-theme'
 import { buildCloudinaryUrl } from '@/lib/cloudinary-loader'
-import { arDayEndISO, arDayKey, arDayStartISO, formatDateAR, operationalDayKey, normalizeOperationalDayCutoffTime } from '@/lib/datetime'
+import { arDayEndISO, arDayKey, arDayStartISO, formatDateAR, normalizeOperationalDayCutoffTime } from '@/lib/datetime'
 import { PANEL_CARD, PANEL_INPUT, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_SURFACE_ALT, PANEL_TITLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { useAdminData } from '@/lib/store'
@@ -29,7 +29,8 @@ export function DashboardSection() {
   const [rangeTo, setRangeTo] = useState(() => arDayKey(new Date()))
 
   const cutoffTime = normalizeOperationalDayCutoffTime(admin.settings?.operationalDayCutoffTime)
-  const today = operationalDayKey(new Date(), cutoffTime)
+  // El input type="date" usa día calendario AR; no el día operativo (corte ~01:00).
+  const today = arDayKey(new Date())
 
   const rangeError = useMemo(() => {
     if (!rangeFrom || !rangeTo) return 'Seleccioná ambas fechas para ver el reporte'
