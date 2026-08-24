@@ -1001,7 +1001,10 @@ export async function getStaffOpsAlerts() {
 /** Pedidos activos + terminales del día operativo AR (corte ~01:00, evita arrastrar historial). */
 export async function getOperationalOrders() {
   const cutoffTime = await getOperationalDayCutoffTime()
-  const todayStart = new Date(operationalDayStartISO(operationalDayKey(new Date(), cutoffTime), cutoffTime))
+  const todayKey = operationalDayKey(new Date(), cutoffTime)
+  const todayStart = new Date(operationalDayStartISO(todayKey, cutoffTime))
+  const todayEnd = new Date(operationalDayEndISO(todayKey, cutoffTime))
+  const todayServiceDate = serviceDateFromDayKey(todayKey)
 
   const orders = await prisma.order.findMany({
     where: {
@@ -1012,7 +1015,18 @@ export async function getOperationalOrders() {
             notIn: [PrismaOrderStatus.COMPLETED, PrismaOrderStatus.CANCELLED],
           },
         },
-        { createdAt: { gte: todayStart } },
+        {
+          status: {
+            in: [PrismaOrderStatus.COMPLETED, PrismaOrderStatus.CANCELLED],
+          },
+          OR: [
+            { serviceDate: todayServiceDate },
+            {
+              serviceDate: null,
+              createdAt: { gte: todayStart, lte: todayEnd },
+            },
+          ],
+        },
       ],
     },
     orderBy: { createdAt: 'desc' },

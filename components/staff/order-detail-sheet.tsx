@@ -701,7 +701,7 @@ export function OrderDetailSheet({
               </Button>
             ) : null}
 
-            {!isFinished && (onPrintKitchen || onPrintCustomer || onPrintBoth) ? (
+            {(onPrintKitchen || onPrintCustomer || onPrintBoth) ? (
               <div className="grid grid-cols-3 gap-2">
                 {onPrintKitchen ? (
                   <Button

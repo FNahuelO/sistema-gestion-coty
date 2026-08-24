@@ -355,29 +355,53 @@ export function buildTicketPrintDocument(input: TicketPrintInput, variants: Tick
 export function printOrderTickets(
   input: TicketPrintInput,
   variants: TicketVariant[] = ['kitchen', 'customer']
-) {
-  if (typeof window === 'undefined') return
+): boolean {
+  if (typeof window === 'undefined') return false
 
   const html = buildTicketPrintDocument(input, variants)
+
+  const popup = window.open('', '_blank', 'noopener,noreferrer,width=320,height=640')
+  if (popup) {
+    popup.document.open()
+    popup.document.write(html)
+    popup.document.close()
+    popup.focus()
+
+    const triggerPopupPrint = () => {
+      try {
+        popup.print()
+      } catch {
+        return false
+      }
+      window.setTimeout(() => {
+        popup.close()
+      }, 1000)
+      return true
+    }
+
+    popup.addEventListener('load', triggerPopupPrint, { once: true })
+    window.setTimeout(triggerPopupPrint, 400)
+    return true
+  }
+
   const iframe = document.createElement('iframe')
   iframe.setAttribute('aria-hidden', 'true')
+  iframe.setAttribute('title', 'Impresión de ticket')
   iframe.style.position = 'fixed'
   iframe.style.left = '0'
   iframe.style.top = '0'
   iframe.style.width = '58mm'
-  iframe.style.height = 'auto'
-  iframe.style.minHeight = '200mm'
+  iframe.style.height = '120mm'
   iframe.style.border = '0'
-  iframe.style.opacity = '0'
+  iframe.style.opacity = '0.01'
   iframe.style.pointerEvents = 'none'
-  iframe.style.zIndex = '-1'
   document.body.appendChild(iframe)
 
   const frameWindow = iframe.contentWindow
   const frameDocument = iframe.contentDocument
   if (!frameWindow || !frameDocument) {
     document.body.removeChild(iframe)
-    return
+    return false
   }
 
   let printed = false
@@ -392,8 +416,12 @@ export function printOrderTickets(
     if (printed) return
     printed = true
     window.setTimeout(() => {
-      frameWindow.focus()
-      frameWindow.print()
+      try {
+        frameWindow.focus()
+        frameWindow.print()
+      } catch {
+        printed = false
+      }
     }, 150)
   }
 
@@ -406,4 +434,5 @@ export function printOrderTickets(
 
   window.setTimeout(triggerPrint, 800)
   window.setTimeout(cleanup, 20000)
+  return true
 }
