@@ -517,6 +517,7 @@ model CashMovement {
   id              String           @id @default(cuid())
   sessionId       String
   type            CashMovementType
+  paymentMethod   PaymentMethod    @default(CASH)
   amount          Decimal          @db.Decimal(10, 2)
   description     String
   createdByUserId String

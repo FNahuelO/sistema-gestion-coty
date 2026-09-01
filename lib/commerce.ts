@@ -16,7 +16,8 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { revalidatePublicCatalog } from '@/lib/catalog-cache'
 import { findMatchingZone, type LatLng, type ZoneGeometry } from '@/lib/geo'
-import { prismaPaymentMethodToUi } from '@/lib/payment-splits'
+import { prismaPaymentMethodToUi, uiPaymentMethodToPrisma } from '@/lib/payment-splits'
+import type { PaymentMethod as UiPaymentMethod } from '@/lib/types'
 import type { DeliveryAssignmentStatus as DeliveryAssignmentStatusUi, DeliveryQueueEntry } from '@/lib/types'
 
 function dec(value: number | string | { toString(): string }) {
@@ -112,10 +113,17 @@ export async function openCashSession(openedByUserId: string, openingAmount: num
   })
 }
 
+export type CashMovementPaymentMethod = Exclude<UiPaymentMethod, 'combined'>
+
 export async function addCashMovement(
   sessionId: string,
   userId: string,
-  payload: { type: 'expense' | 'withdrawal' | 'deposit'; amount: number; description: string }
+  payload: {
+    type: 'expense' | 'withdrawal' | 'deposit'
+    amount: number
+    description: string
+    paymentMethod?: CashMovementPaymentMethod
+  }
 ) {
   const session = await prisma.cashSession.findUnique({ where: { id: sessionId } })
   if (!session || session.status !== CashSessionStatus.OPEN) throw new Error('CASH_SESSION_CLOSED')
@@ -131,10 +139,15 @@ export async function addCashMovement(
       sessionId,
       createdByUserId: userId,
       type: typeMap[payload.type],
+      paymentMethod: uiPaymentMethodToPrisma(payload.paymentMethod ?? 'cash'),
       amount: payload.amount,
       description: payload.description,
     },
   })
+}
+
+function isCashMovementPayment(method: PrismaPaymentMethod | string) {
+  return method === PrismaPaymentMethod.CASH || method === 'CASH' || method === 'cash'
 }
 
 export async function closeCashSession(sessionId: string, closedByUserId: string, closingAmount: number, notes?: string) {
@@ -146,10 +159,14 @@ export async function closeCashSession(sessionId: string, closedByUserId: string
 
   const salesBreakdown = await getCashSessionSalesBreakdown(session.openedAt)
   const deposits = session.movements
-    .filter((m) => m.type === CashMovementType.DEPOSIT)
+    .filter((m) => m.type === CashMovementType.DEPOSIT && isCashMovementPayment(m.paymentMethod))
     .reduce((sum, m) => sum + dec(m.amount), 0)
   const outflows = session.movements
-    .filter((m) => m.type === CashMovementType.EXPENSE || m.type === CashMovementType.WITHDRAWAL)
+    .filter(
+      (m) =>
+        (m.type === CashMovementType.EXPENSE || m.type === CashMovementType.WITHDRAWAL) &&
+        isCashMovementPayment(m.paymentMethod)
+    )
     .reduce((sum, m) => sum + dec(m.amount), 0)
 
   // El arqueo físico solo contempla efectivo en cajón; transferencia/tarjeta/MP son informativos.

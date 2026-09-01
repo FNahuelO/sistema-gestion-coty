@@ -9,6 +9,7 @@ const movementSchema = z.object({
   type: z.enum(['expense', 'withdrawal', 'deposit']),
   amount: z.number().positive(),
   description: z.string().trim().min(1).max(200),
+  paymentMethod: z.enum(['cash', 'card', 'transfer', 'mercado_pago']).optional(),
 })
 
 export async function POST(request: NextRequest) {

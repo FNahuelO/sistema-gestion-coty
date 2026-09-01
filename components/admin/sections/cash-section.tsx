@@ -10,6 +10,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatPrice } from '@/lib/coty-theme'
 import { formatDateAR, formatDateTimeAR } from '@/lib/datetime'
+import { PAYMENT_METHOD_LABELS } from '@/lib/order-labels'
+import { prismaPaymentMethodToUi } from '@/lib/payment-splits'
 import { PANEL_CARD, PANEL_INTERACTIVE_HOVER, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TITLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { hasPermission, type SessionRoleContext } from '@/lib/permissions'
@@ -22,6 +24,9 @@ import { Field } from '../ui/field'
 import { Spinner } from '@/components/ui/spinner'
 import { MobileBottomSheet } from '@/components/ui/mobile-bottom-sheet'
 import { ChevronRight } from 'lucide-react'
+import type { PaymentMethod } from '@/lib/types'
+
+const MOVEMENT_PAYMENT_METHODS: PaymentMethod[] = ['cash', 'card', 'transfer', 'mercado_pago']
 
 type CashFormMode = 'open' | 'movement' | 'fund' | 'close'
 
@@ -34,6 +39,7 @@ const fetchJson = async (url: string) => {
 type CashMovement = {
   id: string
   type: string
+  paymentMethod?: string
   amount: string | number
   description: string
   createdAt?: string
@@ -94,17 +100,31 @@ function movementLabel(type: string) {
   return MOVEMENT_TYPE_LABELS[type] ?? type
 }
 
+function isCashPayment(method?: string) {
+  if (!method) return true
+  return prismaPaymentMethodToUi(method) === 'cash'
+}
+
+function paymentMethodLabel(method?: string) {
+  if (!method) return PAYMENT_METHOD_LABELS.cash
+  return PAYMENT_METHOD_LABELS[prismaPaymentMethodToUi(method)]
+}
+
 function computeExpectedCash(session: CashSession) {
   const deposits = (session.movements ?? [])
-    .filter((entry) => entry.type === 'deposit' || entry.type === 'DEPOSIT')
+    .filter(
+      (entry) =>
+        (entry.type === 'deposit' || entry.type === 'DEPOSIT') && isCashPayment(entry.paymentMethod)
+    )
     .reduce((sum, entry) => sum + num(entry.amount), 0)
   const outflows = (session.movements ?? [])
     .filter(
       (entry) =>
-        entry.type === 'expense' ||
-        entry.type === 'EXPENSE' ||
-        entry.type === 'withdrawal' ||
-        entry.type === 'WITHDRAWAL'
+        (entry.type === 'expense' ||
+          entry.type === 'EXPENSE' ||
+          entry.type === 'withdrawal' ||
+          entry.type === 'WITHDRAWAL') &&
+        isCashPayment(entry.paymentMethod)
     )
     .reduce((sum, entry) => sum + num(entry.amount), 0)
   const cashSales = num(session.salesBreakdown?.cash)
@@ -175,7 +195,12 @@ export function CashSection() {
   const [openingAmount, setOpeningAmount] = useState('0')
   const [closingAmount, setClosingAmount] = useState('')
   const [closeNotes, setCloseNotes] = useState('')
-  const [movement, setMovement] = useState({ type: 'expense', amount: '', description: '' })
+  const [movement, setMovement] = useState({
+    type: 'expense',
+    amount: '',
+    description: '',
+    paymentMethod: 'cash' as PaymentMethod,
+  })
   const [busy, setBusy] = useState(false)
 
   const openSession = data?.open
@@ -183,9 +208,16 @@ export function CashSection() {
   const openForm = (mode: CashFormMode) => {
     setFormMode(mode)
     if (mode === 'open') setOpeningAmount('0')
-    if (mode === 'movement') setMovement({ type: 'expense', amount: '', description: '' })
+    if (mode === 'movement') {
+      setMovement({ type: 'expense', amount: '', description: '', paymentMethod: 'cash' })
+    }
     if (mode === 'fund') {
-      setMovement({ type: 'deposit', amount: '', description: 'Refuerzo de fondo' })
+      setMovement({
+        type: 'deposit',
+        amount: '',
+        description: 'Refuerzo de fondo',
+        paymentMethod: 'cash',
+      })
     }
     if (mode === 'close') {
       setClosingAmount('')
@@ -246,13 +278,36 @@ export function CashSection() {
         type: movement.type,
         amount: Number(movement.amount),
         description: movement.description.trim() || 'Refuerzo de fondo',
+        paymentMethod: movement.paymentMethod,
       })
       toast.success(successMessage)
-      setMovement({ type: 'expense', amount: '', description: '' })
+      setMovement({ type: 'expense', amount: '', description: '', paymentMethod: 'cash' })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo registrar el movimiento')
     }
   }
+
+  const renderPaymentMethodField = () => (
+    <Field label="Medio de pago">
+      <Select
+        value={movement.paymentMethod}
+        onValueChange={(value) =>
+          setMovement((c) => ({ ...c, paymentMethod: value as PaymentMethod }))
+        }
+      >
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {MOVEMENT_PAYMENT_METHODS.map((method) => (
+            <SelectItem key={method} value={method}>
+              {PAYMENT_METHOD_LABELS[method]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Field>
+  )
 
   const renderForm = () => {
     switch (formMode) {
@@ -292,6 +347,7 @@ export function CashSection() {
                 onChange={(e) => setMovement((c) => ({ ...c, description: e.target.value }))}
               />
             </Field>
+            {renderPaymentMethodField()}
             <Button
               className={cn('w-full', PANEL_PRIMARY_BTN)}
               disabled={busy}
@@ -331,6 +387,7 @@ export function CashSection() {
                 onChange={(e) => setMovement((c) => ({ ...c, description: e.target.value }))}
               />
             </Field>
+            {renderPaymentMethodField()}
             <Button className={cn('w-full', PANEL_PRIMARY_BTN)} disabled={busy} onClick={() => void handleMovement()}>
               Guardar movimiento
             </Button>
@@ -436,14 +493,20 @@ export function CashSection() {
               <div className="space-y-2">
                 <p>Fondo inicial: {formatPrice(num(openSession.openingAmount))}</p>
                 {(openSession.movements ?? []).some(
-                  (entry) => entry.type === 'deposit' || entry.type === 'DEPOSIT'
+                  (entry) =>
+                    (entry.type === 'deposit' || entry.type === 'DEPOSIT') &&
+                    isCashPayment(entry.paymentMethod)
                 ) ? (
                   <p>
-                    Refuerzos de fondo:{' '}
+                    Refuerzos de fondo (efectivo):{' '}
                     <span className="font-medium text-[#2D5A57]">
                       {formatPrice(
                         (openSession.movements ?? [])
-                          .filter((entry) => entry.type === 'deposit' || entry.type === 'DEPOSIT')
+                          .filter(
+                            (entry) =>
+                              (entry.type === 'deposit' || entry.type === 'DEPOSIT') &&
+                              isCashPayment(entry.paymentMethod)
+                          )
                           .reduce((sum, entry) => sum + num(entry.amount), 0)
                       )}
                     </span>
@@ -482,7 +545,9 @@ export function CashSection() {
               {openSession.movements.map((entry) => (
                 <div key={entry.id} className={cn(PANEL_LIST_ROW, 'flex justify-between gap-3 text-sm')}>
                   <div className="min-w-0">
-                    <p className="text-xs font-medium text-[#2D5A57]/70">{movementLabel(entry.type)}</p>
+                    <p className="text-xs font-medium text-[#2D5A57]/70">
+                      {movementLabel(entry.type)} · {paymentMethodLabel(entry.paymentMethod)}
+                    </p>
                     <p className="truncate">{entry.description}</p>
                   </div>
                   <span className="shrink-0 font-medium">{formatPrice(num(entry.amount))}</span>
@@ -645,7 +710,7 @@ export function CashSection() {
                         <div className="min-w-0">
                           <p className="font-medium">{entry.description}</p>
                           <p className="text-xs text-muted-foreground">
-                            {movementLabel(entry.type)}
+                            {movementLabel(entry.type)} · {paymentMethodLabel(entry.paymentMethod)}
                             {entry.createdAt ? ` · ${formatDateTimeAR(entry.createdAt)}` : ''}
                           </p>
                         </div>
