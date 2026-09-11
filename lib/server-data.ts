@@ -976,9 +976,9 @@ async function loadPublicCatalog() {
   }
 }
 
-/** Catálogo público cacheado ~60s para no golpear Neon en cada visita/poll. */
+/** Catálogo público cacheado ~2 min para no golpear Neon en cada visita. */
 export const getPublicCatalog = unstable_cache(loadPublicCatalog, ['public-catalog-v1'], {
-  revalidate: 60,
+  revalidate: 120,
   tags: [PUBLIC_CATALOG_TAG],
 })
 
