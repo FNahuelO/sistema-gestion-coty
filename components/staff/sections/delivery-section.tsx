@@ -17,7 +17,10 @@ import type { DeliveryQueueEntry } from '@/lib/types'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { buildWhatsAppChatUrl } from '@/lib/whatsapp-message'
-import { POLL_SWR_DEFAULTS, usePollInterval } from '@/lib/swr-poll'
+import { DELIVERY_POLL_BASE_MS, countActiveDeliveryEntries } from '@/lib/adaptive-polling'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
+import { POLL_SWR_DEFAULTS } from '@/lib/swr-poll'
+import { useBusinessIsOpen } from '@/lib/store'
 
 const fetchJson = async (url: string) => {
   const res = await fetch(url, { credentials: 'include' })
@@ -221,7 +224,11 @@ export function DeliverySection({
   scopeToRunnerId?: string
   canAssign?: boolean
 } = {}) {
-  const refreshInterval = usePollInterval(20_000)
+  const isOpen = useBusinessIsOpen()
+  const refreshInterval = useAdaptiveRefreshInterval<DeliveryQueueEntry[]>(DELIVERY_POLL_BASE_MS, {
+    isOpen,
+    getActiveCount: countActiveDeliveryEntries,
+  })
   const { data, mutate, isLoading } = useSWR<DeliveryQueueEntry[]>(
     '/api/staff/operations?view=delivery',
     fetchJson,

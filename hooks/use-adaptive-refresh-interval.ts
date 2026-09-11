@@ -18,7 +18,7 @@ type Options<T> = {
 
 /**
  * Devuelve un `refreshInterval` compatible con SWR (función).
- * Ajusta la agresividad según tráfico, `isOpen` y visibilidad de la pestaña.
+ * Ajusta la agresividad según tráfico, `isOpen`, visibilidad y madrugada AR.
  */
 export function useAdaptiveRefreshInterval<T = unknown>(
   baseMs: number,

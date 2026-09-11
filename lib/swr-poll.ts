@@ -1,11 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { arHour } from '@/lib/datetime'
-
-/** Madrugada AR: reduce presión de polling en plan Hobby. */
-const QUIET_HOUR_START = 1
-const QUIET_HOUR_END = 7
+import { applyQuietHours } from '@/lib/adaptive-polling'
 
 export const POLL_SWR_DEFAULTS = {
   refreshWhenHidden: false,
@@ -14,12 +10,9 @@ export const POLL_SWR_DEFAULTS = {
 
 /** Intervalo efectivo: 0 si la pestaña está oculta; ×4 (mín. 2 min) de madrugada. */
 export function resolvePollInterval(baseMs: number, now = new Date()): number {
+  if (baseMs <= 0) return 0
   if (typeof document !== 'undefined' && document.hidden) return 0
-  const hour = arHour(now)
-  if (hour >= QUIET_HOUR_START && hour < QUIET_HOUR_END) {
-    return Math.max(baseMs * 4, 120_000)
-  }
-  return baseMs
+  return applyQuietHours(baseMs, now)
 }
 
 /** Intervalo reactivo a visibilitychange y al paso de la madrugada. */

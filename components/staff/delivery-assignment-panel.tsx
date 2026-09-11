@@ -8,7 +8,9 @@ import { PANEL_CARD } from '@/lib/panel-theme'
 import { formatDeliveryAssignmentStatus } from '@/lib/delivery-labels'
 import type { DeliveryQueueEntry, Order } from '@/lib/types'
 import { cn } from '@/lib/utils'
-import { POLL_SWR_DEFAULTS, usePollInterval } from '@/lib/swr-poll'
+import { DELIVERY_POLL_BASE_MS } from '@/lib/adaptive-polling'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
+import { POLL_SWR_DEFAULTS } from '@/lib/swr-poll'
 
 const fetchJson = async (url: string) => {
   const res = await fetch(url, { credentials: 'include' })
@@ -27,7 +29,13 @@ export function DeliveryAssignmentPanel({
   const shouldFetch =
     order.type === 'delivery' && !['completed', 'cancelled', 'delivered'].includes(order.status)
 
-  const refreshInterval = usePollInterval(shouldFetch ? 20_000 : 0)
+  const refreshInterval = useAdaptiveRefreshInterval<DeliveryQueueEntry | null>(
+    shouldFetch ? DELIVERY_POLL_BASE_MS : 0,
+    {
+      enabled: shouldFetch,
+      activeCount: 1,
+    }
+  )
   const { data: entry, mutate } = useSWR<DeliveryQueueEntry | null>(
     shouldFetch ? `/api/staff/operations?view=delivery&orderId=${order.id}` : null,
     fetchJson,

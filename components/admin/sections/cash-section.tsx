@@ -15,8 +15,10 @@ import { prismaPaymentMethodToUi } from '@/lib/payment-splits'
 import { PANEL_CARD, PANEL_INTERACTIVE_HOVER, PANEL_LIST_ROW, PANEL_OUTLINE_BTN, PANEL_PRIMARY_BTN, PANEL_TITLE } from '@/lib/panel-theme'
 import { cn } from '@/lib/utils'
 import { hasPermission, type SessionRoleContext } from '@/lib/permissions'
-import { useAuth } from '@/lib/store'
-import { POLL_SWR_DEFAULTS, usePollInterval } from '@/lib/swr-poll'
+import { useAuth, useBusinessIsOpen } from '@/lib/store'
+import { CASH_POLL_BASE_MS } from '@/lib/adaptive-polling'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
+import { POLL_SWR_DEFAULTS } from '@/lib/swr-poll'
 import { useFormPanel } from '../hooks/use-form-panel'
 import { AdminFormPanel } from '../ui/admin-form-panel'
 import { AdminPageHeader } from '../ui/admin-page-header'
@@ -169,7 +171,14 @@ export function CashSection() {
   const [formMode, setFormMode] = useState<CashFormMode>('open')
   const [selectedClosedSessionId, setSelectedClosedSessionId] = useState<string | null>(null)
 
-  const cashPollMs = usePollInterval(20_000)
+  const isOpen = useBusinessIsOpen()
+  const cashPollMs = useAdaptiveRefreshInterval<{ open: CashSession | null; sessions: CashSession[] }>(
+    CASH_POLL_BASE_MS,
+    {
+      isOpen,
+      getActiveCount: (payload) => (payload?.open ? 1 : 0),
+    }
+  )
   const { data, mutate, isLoading } = useSWR<{ open: CashSession | null; sessions: CashSession[] }>(
     '/api/admin/cash',
     fetchJson,

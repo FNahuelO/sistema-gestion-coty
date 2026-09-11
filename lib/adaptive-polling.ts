@@ -1,5 +1,21 @@
+import { arHour } from '@/lib/datetime'
+
 /** Intervalo máximo de polling adaptativo (sigue detectando reapertura / nuevos pedidos). */
 export const ADAPTIVE_POLLING_MAX_MS = 300_000
+
+/** Madrugada AR: reduce presión de polling en plan Hobby. */
+export const QUIET_HOUR_START = 1
+export const QUIET_HOUR_END = 7
+
+/** Pedidos, cocina, mesas y alertas: 20s en hora pico (antes 15s). */
+export const STAFF_POLL_BASE_MS = 20_000
+/** Delivery / tracking: un poco más holgado. */
+export const DELIVERY_POLL_BASE_MS = 30_000
+export const TRACKING_POLL_BASE_MS = 30_000
+/** Caja no necesita el mismo ritmo que cocina. */
+export const CASH_POLL_BASE_MS = 45_000
+/** Analytics del admin: un snapshot cada 2 min alcanza. */
+export const ANALYTICS_POLL_BASE_MS = 120_000
 
 const ACTIVE_ORDER_STATUSES = new Set([
   'pending',
@@ -10,7 +26,7 @@ const ACTIVE_ORDER_STATUSES = new Set([
 ])
 
 export type AdaptivePollingInput = {
-  /** Intervalo base en ms (p. ej. 15000). */
+  /** Intervalo base en ms (p. ej. 20000). */
   baseMs: number
   /** Unidades de trabajo activo detectadas en la última respuesta. */
   activeCount?: number
@@ -19,8 +35,10 @@ export type AdaptivePollingInput = {
    * `null`/`undefined` = desconocido (no fuerza modo idle).
    */
   isOpen?: boolean | null
-  /** Pestaña en segundo plano: multiplica el factor. */
+  /** Pestaña en segundo plano: corta el polling (no suma CPU). */
   isDocumentHidden?: boolean
+  /** Para tests: instante usado en horas valle. */
+  now?: Date
 }
 
 /**
@@ -29,16 +47,19 @@ export type AdaptivePollingInput = {
  * - mucho (≥3 activos): intervalo base
  * - poco (1–2): ~2× más lento
  * - vacío + abierto/desconocido: ~4×
- * - vacío + cerrado: ~12×
- * - pestaña oculta: ×3 adicional (tope 5 min)
+ * - vacío + cerrado: ~12× (tope 5 min)
+ * - pestaña oculta: 0
+ * - madrugada AR (01–07): ×4 (mín. 2 min, tope 5 min)
  */
 export function adaptiveRefreshInterval({
   baseMs,
   activeCount = 0,
   isOpen,
   isDocumentHidden = false,
+  now,
 }: AdaptivePollingInput): number {
   if (baseMs <= 0) return 0
+  if (isDocumentHidden) return 0
 
   let factor = 1
   if (activeCount <= 0) {
@@ -47,11 +68,18 @@ export function adaptiveRefreshInterval({
     factor = 2
   }
 
-  if (isDocumentHidden) {
-    factor *= 3
-  }
+  const ms = Math.min(Math.round(baseMs * factor), ADAPTIVE_POLLING_MAX_MS)
+  return applyQuietHours(ms, now)
+}
 
-  return Math.min(Math.round(baseMs * factor), ADAPTIVE_POLLING_MAX_MS)
+/** ×4 de madrugada (mín. 2 min), sin pasar el tope adaptativo. */
+export function applyQuietHours(ms: number, now = new Date()): number {
+  if (ms <= 0) return 0
+  const hour = arHour(now)
+  if (hour >= QUIET_HOUR_START && hour < QUIET_HOUR_END) {
+    return Math.min(Math.max(ms * 4, 120_000), ADAPTIVE_POLLING_MAX_MS)
+  }
+  return ms
 }
 
 export function countActiveOrders(
@@ -80,4 +108,11 @@ export function countActiveDeliveryEntries(
     if (entry.orderStatus === 'completed' || entry.orderStatus === 'cancelled') return count
     return count + 1
   }, 0)
+}
+
+export function countStaffOpsAlerts(
+  data?: { kitchenPending?: number; tableCallsPending?: number } | null
+): number {
+  if (!data) return 0
+  return (data.kitchenPending ?? 0) + (data.tableCallsPending ?? 0)
 }

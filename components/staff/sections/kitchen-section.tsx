@@ -21,8 +21,10 @@ import { Spinner } from '@/components/ui/spinner'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { mutate as globalMutate } from 'swr'
-import { POLL_SWR_DEFAULTS, usePollInterval } from '@/lib/swr-poll'
-import { useBusiness } from '@/lib/store'
+import { STAFF_POLL_BASE_MS, countActiveOrders } from '@/lib/adaptive-polling'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
+import { POLL_SWR_DEFAULTS } from '@/lib/swr-poll'
+import { useBusiness, useBusinessIsOpen } from '@/lib/store'
 
 async function printKitchenTicket(order: Order, businessName: string) {
   const { printOrderTickets } = await import('@/lib/ticket-print')
@@ -54,8 +56,12 @@ export function KitchenSection() {
   const [sortBy, setSortBy] = useState<OrderSortKey>('priority')
   const [pendingAction, setPendingAction] = useState<string | null>(null)
   const { settings } = useBusiness()
+  const isOpen = useBusinessIsOpen()
   const businessName = settings?.name ?? 'Coty Café'
-  const refreshInterval = usePollInterval(15_000)
+  const refreshInterval = useAdaptiveRefreshInterval<Order[]>(STAFF_POLL_BASE_MS, {
+    isOpen,
+    getActiveCount: countActiveOrders,
+  })
   const { data, mutate, isLoading } = useSWR<Order[]>('/api/staff/operations', fetchJson, {
     ...POLL_SWR_DEFAULTS,
     refreshInterval,

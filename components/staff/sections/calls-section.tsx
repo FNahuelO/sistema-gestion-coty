@@ -6,7 +6,10 @@ import { BellRing } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PANEL_LIST_ROW, PANEL_PRIMARY_BTN } from '@/lib/panel-theme'
 import { Spinner } from '@/components/ui/spinner'
-import { POLL_SWR_DEFAULTS, usePollInterval } from '@/lib/swr-poll'
+import { STAFF_POLL_BASE_MS } from '@/lib/adaptive-polling'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
+import { POLL_SWR_DEFAULTS } from '@/lib/swr-poll'
+import { useBusinessIsOpen } from '@/lib/store'
 
 const fetchJson = async (url: string) => {
   const res = await fetch(url, { credentials: 'include' })
@@ -21,7 +24,11 @@ type TableCall = {
 }
 
 export function CallsSection() {
-  const refreshInterval = usePollInterval(15_000)
+  const isOpen = useBusinessIsOpen()
+  const refreshInterval = useAdaptiveRefreshInterval<TableCall[]>(STAFF_POLL_BASE_MS, {
+    isOpen,
+    getActiveCount: (calls) => calls?.length ?? 0,
+  })
   const { data, mutate, isLoading } = useSWR<TableCall[]>('/api/table-calls', fetchJson, {
     ...POLL_SWR_DEFAULTS,
     refreshInterval,

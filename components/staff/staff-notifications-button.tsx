@@ -11,7 +11,9 @@ import { StatusBadge } from '@/components/shared/status-badge'
 import { useStaffOpsAlerts } from '@/hooks/use-staff-ops-alerts'
 import { PANEL_OUTLINE_BTN } from '@/lib/panel-theme'
 import { formatOrderNumber } from '@/lib/order-labels'
-import { POLL_SWR_DEFAULTS, usePollInterval } from '@/lib/swr-poll'
+import { STAFF_POLL_BASE_MS } from '@/lib/adaptive-polling'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
+import { POLL_SWR_DEFAULTS } from '@/lib/swr-poll'
 import type { Order } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -42,7 +44,10 @@ export function StaffNotificationsButton({
 }: StaffNotificationsButtonProps) {
   const [open, setOpen] = useState(false)
   const { tableCallsPending } = useStaffOpsAlerts()
-  const callsPollMs = usePollInterval(open ? 15_000 : 0)
+  const callsPollMs = useAdaptiveRefreshInterval<TableCall[]>(open ? STAFF_POLL_BASE_MS : 0, {
+    enabled: open,
+    getActiveCount: (calls) => calls?.length ?? 0,
+  })
   const { data: tableCalls } = useSWR<TableCall[]>(open ? '/api/table-calls' : null, fetchJson, {
     ...POLL_SWR_DEFAULTS,
     refreshInterval: callsPollMs,

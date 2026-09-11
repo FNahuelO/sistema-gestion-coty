@@ -14,7 +14,15 @@ import {
 } from '@/lib/offline-order-queue'
 import { getMesaIdFromSearch } from '@/lib/menu-url'
 import { hasPermission, type Permission, type SessionRoleContext } from '@/lib/permissions'
-import { POLL_SWR_DEFAULTS, usePollInterval } from '@/lib/swr-poll'
+import {
+  ANALYTICS_POLL_BASE_MS,
+  STAFF_POLL_BASE_MS,
+  TRACKING_POLL_BASE_MS,
+  countActiveOrders,
+  countBusyTables,
+} from '@/lib/adaptive-polling'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
+import { POLL_SWR_DEFAULTS } from '@/lib/swr-poll'
 
 const CART_STORAGE_KEY = 'coty-cafe-cart'
 
@@ -523,6 +531,13 @@ export function useBusiness() {
   }
 }
 
+/** `null` mientras carga, para no tratar "aún no sabemos" como local cerrado. */
+export function useBusinessIsOpen(): boolean | null {
+  const { settings, isLoading } = useBusiness()
+  if (isLoading) return null
+  return settings.isOpen
+}
+
 export function useCatalog() {
   type CatalogData = {
     settings: BusinessSettings | null
@@ -566,9 +581,17 @@ export function useCatalog() {
 
 export function useOrders() {
   const { user } = useAuth()
+  const isOpen = useBusinessIsOpen()
   const shouldFetch = Boolean(user?.role)
   const [offlineOrders, setOfflineOrders] = useState<Order[]>([])
-  const refreshInterval = usePollInterval(shouldFetch ? 15_000 : 0)
+  const refreshInterval = useAdaptiveRefreshInterval<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
+    shouldFetch ? STAFF_POLL_BASE_MS : 0,
+    {
+      enabled: shouldFetch,
+      isOpen,
+      getActiveCount: countActiveOrders,
+    }
+  )
   const { data, error, isLoading, mutate } = useSWR<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
     shouldFetch ? '/api/orders' : null,
     fetchJson,
@@ -835,7 +858,13 @@ export function useTrackedOrders(searchId: string, paymentReturnOrderId?: string
     trackSnapshot!.every((order) =>
       ['completed', 'cancelled', 'delivered'].includes(order.status)
     )
-  const trackPollMs = usePollInterval(queryString && !trackingSettled ? 20_000 : 0)
+  const trackPollMs = useAdaptiveRefreshInterval<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
+    queryString && !trackingSettled ? TRACKING_POLL_BASE_MS : 0,
+    {
+      enabled: Boolean(queryString) && !trackingSettled,
+      getActiveCount: countActiveOrders,
+    }
+  )
 
   const { data, error, isLoading, mutate } = useSWR<Array<Order & { createdAt: string | Date; updatedAt: string | Date }>>(
     queryString,
@@ -896,8 +925,16 @@ export function useTrackedOrders(searchId: string, paymentReturnOrderId?: string
 
 export function useTables() {
   const { user } = useAuth()
+  const isOpen = useBusinessIsOpen()
   const shouldFetch = Boolean(user?.role)
-  const refreshInterval = usePollInterval(shouldFetch ? 15_000 : 0)
+  const refreshInterval = useAdaptiveRefreshInterval<Table[]>(
+    shouldFetch ? STAFF_POLL_BASE_MS : 0,
+    {
+      enabled: shouldFetch,
+      isOpen,
+      getActiveCount: countBusyTables,
+    }
+  )
   const { data, error, isLoading, mutate } = useSWR<Table[]>(shouldFetch ? '/api/tables' : null, fetchJson, {
     ...POLL_SWR_DEFAULTS,
     refreshInterval,
@@ -1059,7 +1096,15 @@ export function useAdminData(options: { pollAnalytics?: boolean; loadAnalytics?:
     { revalidateOnFocus: false }
   )
   const shouldLoadAnalytics = can('analytics:read') && (pollAnalytics || loadAnalytics)
-  const analyticsPollMs = usePollInterval(shouldLoadAnalytics && pollAnalytics ? 60_000 : 0)
+  const analyticsPollMs = useAdaptiveRefreshInterval(
+    shouldLoadAnalytics && pollAnalytics ? ANALYTICS_POLL_BASE_MS : 0,
+    {
+      enabled: shouldLoadAnalytics && pollAnalytics,
+      isOpen: settingsData?.isOpen ?? null,
+      // Analytics no tiene "unidades activas"; 1 evita el modo idle 4×/12×.
+      activeCount: 1,
+    }
+  )
   const { data: analyticsData, mutate: mutateAnalytics } = useSWR<AnalyticsOverview>(
     shouldLoadAnalytics ? '/api/admin/analytics' : null,
     fetchJson,

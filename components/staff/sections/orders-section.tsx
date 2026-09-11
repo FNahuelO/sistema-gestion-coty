@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useOrders, useBusiness } from '@/lib/store'
+import { useOrders, useBusiness, useBusinessIsOpen } from '@/lib/store'
 import { usePendingAction } from '@/hooks/use-pending-action'
 import { StaffNotificationsButton } from '@/components/staff/staff-notifications-button'
 import { StatusBadge } from '@/components/shared/status-badge'
@@ -32,7 +32,9 @@ import { formatOrderStatus, formatOrderNumber, getDailyOrderControlSummary, getO
 import { normalizeOperationalDayCutoffTime } from '@/lib/datetime'
 import { canApproveTransferPayment } from '@/lib/payment-flow'
 import { ORDER_SORT_OPTIONS, sortOrders, type OrderSortKey } from '@/lib/order-sort'
-import { POLL_SWR_DEFAULTS, usePollInterval } from '@/lib/swr-poll'
+import { DELIVERY_POLL_BASE_MS, countActiveDeliveryEntries } from '@/lib/adaptive-polling'
+import { useAdaptiveRefreshInterval } from '@/hooks/use-adaptive-refresh-interval'
+import { POLL_SWR_DEFAULTS } from '@/lib/swr-poll'
 import type { DeliveryQueueEntry, Order, OrderStatus, OrderType } from '@/lib/types'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -124,8 +126,12 @@ export function OrdersSection({
   const { orders, createManualOrder, updateOrderStatus, updateOrderEstimate, updateOrderPriority, updateOrderItems, updateOrderPayment, closeOrder, approveOrderPayment } =
     useOrders()
   const { settings } = useBusiness()
+  const isOpen = useBusinessIsOpen()
   const businessName = settings?.name ?? 'Coty Café'
-  const deliveryPollMs = usePollInterval(20_000)
+  const deliveryPollMs = useAdaptiveRefreshInterval<DeliveryQueueEntry[]>(DELIVERY_POLL_BASE_MS, {
+    isOpen,
+    getActiveCount: countActiveDeliveryEntries,
+  })
   const { data: deliveryQueue = [], mutate: mutateDeliveryQueue } = useSWR<DeliveryQueueEntry[]>(
     '/api/staff/operations?view=delivery',
     fetchJson,
