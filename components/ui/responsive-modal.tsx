@@ -24,6 +24,8 @@ type ResponsiveModalProps = {
   bodyClassName?: string
   maxWidthClassName?: string
   hideCloseButton?: boolean
+  /** Evita cerrar al interactuar fuera (p. ej. otro modal anidado encima). */
+  preventDismiss?: boolean
 }
 
 export function ResponsiveModal({
@@ -37,20 +39,31 @@ export function ResponsiveModal({
   bodyClassName,
   maxWidthClassName = 'sm:max-w-lg',
   hideCloseButton = false,
+  preventDismiss = false,
 }: ResponsiveModalProps) {
   const isMobile = useIsMobile()
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next && preventDismiss) return
+    onOpenChange(next)
+  }
+
+  const blockOutside = (event: Event) => {
+    if (preventDismiss) event.preventDefault()
+  }
 
   if (isMobile) {
     return (
       <MobileBottomSheet
         open={open}
-        onOpenChange={onOpenChange}
+        onOpenChange={handleOpenChange}
         title={title}
         description={description}
         footer={footer}
         bodyClassName={bodyClassName}
         hideCloseButton={hideCloseButton}
         className={className}
+        preventDismiss={preventDismiss}
       >
         {children}
       </MobileBottomSheet>
@@ -58,9 +71,12 @@ export function ResponsiveModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         showCloseButton={!hideCloseButton}
+        onInteractOutside={blockOutside}
+        onPointerDownOutside={blockOutside}
+        onFocusOutside={blockOutside}
         className={cn(
           'flex max-h-[90vh] flex-col gap-0 overflow-hidden rounded-2xl p-0',
           maxWidthClassName,

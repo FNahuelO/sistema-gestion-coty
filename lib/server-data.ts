@@ -1748,6 +1748,8 @@ const ORDER_ITEM_EDITABLE_STATUSES: PrismaOrderStatus[] = [
   PrismaOrderStatus.CONFIRMED,
   PrismaOrderStatus.PREPARING,
   PrismaOrderStatus.READY,
+  // Entregado pero aún no completado/cobrado (mesa abierta, delivery pendiente de cierre).
+  PrismaOrderStatus.DELIVERED,
 ]
 
 function orderHasStockApplied(order: {

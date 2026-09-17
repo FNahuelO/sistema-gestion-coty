@@ -192,6 +192,7 @@ export function OrderDetailSheet({
       nextAmounts[split.method] = String(split.amount)
     }
     setEditSplitAmounts(nextAmounts)
+    setAddItemsOpen(false)
     // Solo al cambiar de pedido: evita resetear mientras se edita.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order?.id])
@@ -201,9 +202,13 @@ export function OrderDetailSheet({
   const typeMeta = ORDER_TYPE_META[order.type]
   const TypeIcon = typeMeta.icon
   const isFinished = ['completed', 'cancelled'].includes(order.status)
-  const canEditItems =
-    !['completed', 'cancelled', 'delivered'].includes(order.status) && !!onUpdateItems
+  // Mientras el pedido no esté cerrado/cancelado se pueden sumar o ajustar productos
+  // (p. ej. cliente pide algo más por WhatsApp, o mesa ya entregada que sigue abierta).
+  const canEditItems = !isFinished && !!onUpdateItems
   const itemsPending = isPending(`items:${order.id}`)
+  const blockDetailDismiss = (event: Event) => {
+    if (addItemsOpen) event.preventDefault()
+  }
   const awaitingTransferProof = canApproveTransferPayment(order)
   const effectiveStatusAction = awaitingTransferProof ? null : statusAction
   // El tiempo estimado se ingresa al confirmar/aprobar y luego se puede reajustar
@@ -225,8 +230,20 @@ export function OrderDetailSheet({
 
   return (
     <>
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet
+      open={open}
+      onOpenChange={(next) => {
+        // Si se abre el modal de agregar productos (otro Dialog/Sheet), Radix
+        // dispara interact-outside sobre este sheet y lo cerraría — y con él
+        // se desmonta el editor. Bloqueamos el cierre mientras el hijo está abierto.
+        if (!next && addItemsOpen) return
+        onOpenChange(next)
+      }}
+    >
       <SheetContent
+        onInteractOutside={blockDetailDismiss}
+        onPointerDownOutside={blockDetailDismiss}
+        onFocusOutside={blockDetailDismiss}
         className={cn(
           'flex h-full w-full flex-col gap-0 overflow-hidden border-gray-100 p-0 dark:border-border sm:max-w-md',
           '[&>button]:top-4 [&>button]:right-4 [&>button]:text-white [&>button]:opacity-90 [&>button]:hover:bg-white/10 [&>button]:hover:opacity-100'

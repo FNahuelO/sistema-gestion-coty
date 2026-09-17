@@ -227,7 +227,12 @@ export function ManualOrderDialog({ open, onOpenChange, onSubmit }: ManualOrderD
     <>
       <ResponsiveModal
         open={open}
+        preventDismiss={Boolean(productPicker)}
         onOpenChange={(next) => {
+          if (!next && productPicker) {
+            setProductPicker(null)
+            return
+          }
           if (!next) reset()
           onOpenChange(next)
         }}
