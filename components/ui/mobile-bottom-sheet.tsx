@@ -21,6 +21,8 @@ type MobileBottomSheetProps = {
   className?: string
   bodyClassName?: string
   hideCloseButton?: boolean
+  /** Evita cerrar al interactuar fuera (p. ej. otro modal anidado encima). */
+  preventDismiss?: boolean
 }
 
 export function MobileBottomSheet({
@@ -33,17 +35,31 @@ export function MobileBottomSheet({
   className,
   bodyClassName,
   hideCloseButton = false,
+  preventDismiss = false,
 }: MobileBottomSheetProps) {
   const hasFooter = Boolean(footer)
 
+  const blockOutside = (event: Event) => {
+    if (preventDismiss) event.preventDefault()
+  }
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && preventDismiss) return
+        onOpenChange(next)
+      }}
+    >
       <SheetContent
         side="bottom"
         // Evita que el teclado del celular se abra solo al abrir el panel:
         // el foco automático en el primer input se cancela; el teclado sólo
         // aparece cuando el usuario toca un input manualmente.
         onOpenAutoFocus={(event) => event.preventDefault()}
+        onInteractOutside={blockOutside}
+        onPointerDownOutside={blockOutside}
+        onFocusOutside={blockOutside}
         className={cn(
           hasFooter
             ? 'flex max-h-[92vh] flex-col gap-0 overflow-hidden rounded-t-2xl border-t p-0'

@@ -124,11 +124,19 @@ export function AddOrderItemsDialog({
     }
   }
 
+  const productPickerOpen = Boolean(productPicker)
+
   return (
     <>
       <ResponsiveModal
         open={open}
+        preventDismiss={productPickerOpen}
         onOpenChange={(next) => {
+          // El detalle de producto con opciones es otro modal encima: no cerrar este.
+          if (!next && productPickerOpen) {
+            setProductPicker(null)
+            return
+          }
           if (!next) reset()
           onOpenChange(next)
         }}
