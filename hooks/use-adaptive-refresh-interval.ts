@@ -6,6 +6,7 @@ import {
   type AdaptivePollingInput,
 } from '@/lib/adaptive-polling'
 import { useDocumentHidden } from '@/hooks/use-document-hidden'
+import { useInServiceWindow } from '@/hooks/use-service-window'
 
 type Options<T> = {
   enabled?: boolean
@@ -18,13 +19,15 @@ type Options<T> = {
 
 /**
  * Devuelve un `refreshInterval` compatible con SWR (función).
- * Ajusta la agresividad según tráfico, `isOpen`, visibilidad y madrugada AR.
+ * Ajusta la agresividad según tráfico, `isOpen`, visibilidad, horario de atención y madrugada AR.
+ * La identidad cambia al entrar/salir de horario para que SWR reprograme el polling.
  */
 export function useAdaptiveRefreshInterval<T = unknown>(
   baseMs: number,
   options: Options<T> = {}
 ): (data: T | undefined) => number {
   const isDocumentHidden = useDocumentHidden()
+  const inServiceWindow = useInServiceWindow(baseMs > 0 && options.enabled !== false)
   const optionsRef = useRef(options)
 
   useEffect(() => {
@@ -45,8 +48,9 @@ export function useAdaptiveRefreshInterval<T = unknown>(
         activeCount: getActiveCount?.(data) ?? activeCount ?? 0,
         isOpen,
         isDocumentHidden,
+        inServiceWindow,
       } satisfies AdaptivePollingInput)
     },
-    [baseMs, isDocumentHidden]
+    [baseMs, isDocumentHidden, inServiceWindow]
   )
 }

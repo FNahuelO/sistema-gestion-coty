@@ -17,6 +17,13 @@ export const CASH_POLL_BASE_MS = 45_000
 /** Analytics del admin: un snapshot cada 2 min alcanza. */
 export const ANALYTICS_POLL_BASE_MS = 120_000
 
+/**
+ * Margen alrededor del horario de atención. Fuera de él el polling se corta para
+ * que Neon pueda suspender el cómputo (necesita 5 min sin consultas).
+ */
+export const SERVICE_MARGIN_BEFORE_MINUTES = 30
+export const SERVICE_MARGIN_AFTER_MINUTES = 30
+
 const ACTIVE_ORDER_STATUSES = new Set([
   'pending',
   'confirmed',
@@ -37,6 +44,8 @@ export type AdaptivePollingInput = {
   isOpen?: boolean | null
   /** Pestaña en segundo plano: corta el polling (no suma CPU). */
   isDocumentHidden?: boolean
+  /** `false` = fuera del horario de atención (con margen): corta el polling. */
+  inServiceWindow?: boolean | null
   /** Para tests: instante usado en horas valle. */
   now?: Date
 }
@@ -49,6 +58,7 @@ export type AdaptivePollingInput = {
  * - vacío + abierto/desconocido: ~4×
  * - vacío + cerrado: ~12× (tope 5 min)
  * - pestaña oculta: 0
+ * - fuera del horario de atención: 0
  * - madrugada AR (01–07): ×4 (mín. 2 min, tope 5 min)
  */
 export function adaptiveRefreshInterval({
@@ -56,10 +66,12 @@ export function adaptiveRefreshInterval({
   activeCount = 0,
   isOpen,
   isDocumentHidden = false,
+  inServiceWindow,
   now,
 }: AdaptivePollingInput): number {
   if (baseMs <= 0) return 0
   if (isDocumentHidden) return 0
+  if (inServiceWindow === false) return 0
 
   let factor = 1
   if (activeCount <= 0) {

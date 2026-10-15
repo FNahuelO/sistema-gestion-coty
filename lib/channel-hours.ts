@@ -139,6 +139,62 @@ export function getChannelAvailability(
     : { open: false, reason: `${channelLabel(channel)} fuera de horario` }
 }
 
+const MINUTES_PER_DAY = 1440
+const MINUTES_PER_WEEK = MINUTES_PER_DAY * 7
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]
+
+/**
+ * True si `now` cae dentro del horario general o de algún horario de canal activo,
+ * ampliado con márgenes antes de abrir y después de cerrar. Ignora `isOpen`
+ * porque los pedidos de mesa se aceptan aunque el local figure cerrado.
+ */
+export function isWithinServiceWindow(
+  now: Date,
+  settings: Pick<BusinessSettings, 'openTime' | 'closeTime' | 'timezone'>,
+  schedules: Array<Pick<ChannelScheduleInput, 'startTime' | 'endTime' | 'daysOfWeek' | 'active'>>,
+  marginBeforeMinutes: number,
+  marginAfterMinutes: number
+): boolean {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: settings.timezone ?? 'America/Argentina/Buenos_Aires',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    weekday: 'short',
+  })
+  const parts = formatter.formatToParts(now)
+  const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? 0) % 24
+  const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? 0)
+  const weekday = parts.find((part) => part.type === 'weekday')?.value ?? 'Mon'
+  const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(weekday)
+  const nowInWeek = (dayOfWeek < 0 ? now.getDay() : dayOfWeek) * MINUTES_PER_DAY + hour * 60 + minute
+
+  const ranges = [
+    { startTime: settings.openTime, endTime: settings.closeTime, daysOfWeek: ALL_DAYS },
+    ...schedules.filter((schedule) => schedule.active),
+  ]
+    .map(({ startTime, endTime, daysOfWeek }) => ({
+      start: parseTimeToMinutes(startTime ?? ''),
+      end: parseTimeToMinutes(endTime ?? ''),
+      daysOfWeek,
+    }))
+    .filter(({ start, end }) => Number.isFinite(start) && Number.isFinite(end))
+
+  if (ranges.length === 0) return true
+
+  return ranges.some(({ start, end: rawEnd, daysOfWeek }) => {
+    const end = rawEnd < start ? rawEnd + MINUTES_PER_DAY : rawEnd
+
+    return daysOfWeek.some((day) => {
+      const from = day * MINUTES_PER_DAY + start - marginBeforeMinutes
+      const to = day * MINUTES_PER_DAY + end + marginAfterMinutes
+      return [nowInWeek - MINUTES_PER_WEEK, nowInWeek, nowInWeek + MINUTES_PER_WEEK].some(
+        (candidate) => candidate >= from && candidate <= to
+      )
+    })
+  })
+}
+
 function channelLabel(channel: ServiceChannel): string {
   switch (channel) {
     case 'delivery':
