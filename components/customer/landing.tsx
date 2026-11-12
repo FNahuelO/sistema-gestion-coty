@@ -248,7 +248,7 @@ function ProductCard({
 
   return (
     <div
-      className={`flex h-full flex-col overflow-hidden rounded-2xl border border-black/8 shadow-sm md:rounded-3xl ${cardBg === 'white' ? 'bg-white' : 'bg-white/95'
+      className={`flex h-full w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-black/8 shadow-sm md:rounded-3xl ${cardBg === 'white' ? 'bg-white' : 'bg-white/95'
         }`}
     >
       <div className="relative aspect-4/3 shrink-0 overflow-hidden">
